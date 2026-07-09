@@ -65,7 +65,7 @@
 
 1. **Установить/обновить наш скрипт**:
 ```Bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash
+curl -fsSL https://gitlab.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/-/raw/main/install.sh | sudo bash
 ```
 2. **Установить стандартный Telemt** версии 3.4.22 или 3.4.18 и ниже, также **альтернативой** вы можете поставить "**MTPROTO.zig**"
    > (все прокси можно поставить через меню нашего скрипта, ставить их заранее на сервер не обязательно)
