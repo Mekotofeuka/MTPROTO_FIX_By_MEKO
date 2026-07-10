@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-BASE_URL="BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
+BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
 FILES=("main.sh" "proxys/proxymenu.sh" "proxys/telemt1.sh" "proxys/mtprotozig1.sh" "proxys/telemt_in_docker1.sh" "proxy_checker.py")
 
 # ── Цвета ─────────────────────────────────────────────────────
