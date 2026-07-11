@@ -139,6 +139,10 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 
   ✅ cloudflare.com, rutube.ru, my.aeza.ru, wb.ru, ozon.ru, steamcommunity.com, youtube.com, apple.com, openai.com, anthropic.com, meta.com, facebook.com, x.com, wikipedia.org, stackoverflow.com, rust-lang.org, crates.io, docs.rs, instagram.com, fbcdn.net, twitter.com, googletagmanager.com, whatsapp.net, doubleclick.net, googleusercontent.com, appsflyersdk.com, wordpress.org, digicert.com, youtu.be, pinterest.com, goo.gl, x.com, whatsapp.com, icloud.com, googlesyndication.com, cloudflare.net, googledomains.com, wa.me, chatgpt.com, vimeo.com, zoom.us, workers.dev, cloudflare-dns.com, wordpress.com, reddit.com, 
 
+- Если вы используете SelfSteal вариацию, а не какой-либо популярный домен, то убедитесь, что используемый вами nginx был собран на OpenSSL3.5(если вы собирали его на своем сервере, то проверьте какая версия стоит у вас.), иначе у вас будут наблюдаться переодические проблемы с подключением к прокси с ios. Для корректной работы SelfSteal поставьте себе nginx собранный на 3.5 либо обновите версию OpenSSL на вашем сервере до 3.5 и пересоберите nginx
+    - Альтернатива1: использовать caddy
+    - Альтернатива2: использовать MSS, но тогда медиа не будут грузиться
+
 ## ⭐ Поддержать проект
 
 **MEKO fix** — создан в свободное время для сообщества.  
