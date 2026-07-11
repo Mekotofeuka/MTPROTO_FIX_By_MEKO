@@ -206,7 +206,6 @@ mtg_doctor() {
     # Запускаем doctor и сохраняем вывод, игнорируя exit code
     local output
     output=$(mtg doctor "$config_path" 2>&1)
-    local doctor_exit=$?
     
     # Если вывод пустой - ошибка
     if [ -z "$output" ]; then
@@ -217,17 +216,32 @@ mtg_doctor() {
         return 1
     fi
     
-    # Парсим вывод (игнорируем exit code, т.к. он может быть 1 из-за SNI-DNS)
-    echo ""
-    
-    # 1. Deprecated options
-    if echo "$output" | grep -q "Deprecated options" -A 1 | grep -q "All good"; then
-        echo -e "  ${GREEN}✓${NC} Устаревшие опции: ${GREEN}всё в порядке${NC}"
-    else
-        echo -e "  ${YELLOW}⚠${NC} Устаревшие опции: обнаружены проблемы"
+    # ── Извлечение домена из секрета через od ──────────────
+    local domain=""
+    local secret_line
+    secret_line=$(grep -E '^secret' "$config_path" 2>/dev/null | head -1)
+    if [ -n "$secret_line" ]; then
+        local secret_hex
+        secret_hex=$(echo "$secret_line" | sed -E 's/^secret[[:space:]]*=[[:space:]]*"//; s/".*$//')
+        # Удаляем префикс ee (2 символа) и 32 символа секрета
+        local domain_hex
+        domain_hex=$(echo "$secret_hex" | sed -E 's/^ee[0-9a-f]{32}//')
+        if [ -n "$domain_hex" ]; then
+            # Преобразуем hex в текст через od
+            domain=$(echo "$domain_hex" | od -An -tx1 | tr -d ' \n' | sed 's/../\\x&/g' | xargs printf 2>/dev/null)
+            if [ -z "$domain" ]; then
+                domain="$domain_hex (hex)"
+            fi
+        fi
+    fi
+    if [ -z "$domain" ]; then
+        domain="не определён"
     fi
     
-    # 2. Time skewness
+    # Парсим вывод
+    echo ""
+    
+    # 1. Time skewness
     local time_skew
     time_skew=$(echo "$output" | grep -A 2 "Time skewness" | grep -o "Time drift is [0-9.-]*[ms]*" | head -1)
     if [ -n "$time_skew" ]; then
@@ -236,7 +250,7 @@ mtg_doctor() {
         echo -e "  ${YELLOW}⚠${NC} Расхождение времени: не удалось определить"
     fi
     
-    # 3. Validate native network connectivity (DC)
+    # 2. Validate native network connectivity (DC)
     echo -e "  ${BOLD}Подключение к дата-центрам Telegram:${NC}"
     local dc_count=0
     local dc_ok=0
@@ -259,13 +273,7 @@ mtg_doctor() {
         echo -e "    ${YELLOW}⚠ Не удалось проверить DC${NC}"
     fi
     
-    # 4. Validate fronting domain connectivity
-    local domain
-    domain=$(grep -E '^secret' "$config_path" 2>/dev/null | sed -E 's/^secret[[:space:]]*=[[:space:]]*"//; s/".*$//' | sed -E 's/^ee[0-9a-f]+//' | xxd -r -p 2>/dev/null | tr -d '\0')
-    if [ -z "$domain" ]; then
-        domain="не определён"
-    fi
-    
+    # 3. Validate fronting domain connectivity
     local domain_line
     domain_line=$(echo "$output" | grep -A 1 "Validate fronting domain connectivity" | tail -1 | sed 's/^[[:space:]]*//')
     if echo "$domain_line" | grep -q "reachable"; then
@@ -274,24 +282,35 @@ mtg_doctor() {
         echo -e "  ${RED}✗${NC} Домен маскировки: ${domain} — ${RED}недоступен${NC}"
     fi
     
-    # 5. Validate SNI-DNS match (информация о домене без ошибки)
+    # 4. Validate SNI-DNS match (перевод на русский)
     local sni_line
     sni_line=$(echo "$output" | grep -A 1 "Validate SNI-DNS match" | tail -1 | sed 's/^[[:space:]]*//')
-    
-    if echo "$sni_line" | grep -q "Hostname"; then
-        # Убираем эмодзи и лишние пробелы, оставляем информацию
-        local sni_info
-        sni_info=$(echo "$sni_line" | sed -E 's/❌|✅//g' | sed 's/^[[:space:]]*//')
-        echo -e "  ${CYAN}ℹ${NC} Информация о домене: ${sni_info}"
-    else
-        echo -e "  ${CYAN}ℹ${NC} Информация о домене: не получена"
-    fi
     
     # Получаем IP сервера
     local server_ip
     server_ip=$(get_public_ip)
-    if [ -n "$server_ip" ]; then
-        echo -e "  ${CYAN}ℹ${NC} IP сервера: ${server_ip}"
+    
+    if echo "$sni_line" | grep -q "Hostname"; then
+        # Парсим строку: "Hostname ozon.ru is resolved to \"185.73.194.82\", \"185.73.193.68\" addresses, not 2.26.124.65"
+        local domain_name=$(echo "$sni_line" | sed -E 's/.*Hostname ([^ ]*) .*/\1/')
+        local resolved_ips=$(echo "$sni_line" | grep -o '"\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}"' | tr '\n' ' ' | sed 's/"//g')
+        local expected_ip=$(echo "$sni_line" | grep -o 'not [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | sed 's/not //')
+        
+        echo -e "  ${CYAN}ℹ${NC} SNI-информация:"
+        echo -e "     ${CYAN}Домен:${NC} ${domain_name}"
+        echo -e "     ${CYAN}IP-адреса домена:${NC} ${resolved_ips}"
+        if [ -n "$server_ip" ]; then
+            echo -e "     ${CYAN}IP текущего сервера:${NC} ${server_ip}"
+        fi
+        if [ -n "$expected_ip" ] && [ "$expected_ip" != "$server_ip" ]; then
+            echo -e "     ${YELLOW}⚠ Внимание: IP сервера (${server_ip}) не совпадает с IP домена (${expected_ip})${NC}"
+            echo -e "     ${YELLOW}⚠ Если вы используете SelfSteal, обратите на это внимание${NC}"
+        fi
+    else
+        echo -e "  ${CYAN}ℹ${NC} SNI-информация: не получена"
+        if [ -n "$server_ip" ]; then
+            echo -e "     ${CYAN}IP текущего сервера:${NC} ${server_ip}"
+        fi
     fi
     
     echo ""
@@ -656,7 +675,7 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.17${NC}"
+    echo -e "  ${BOLD}MTG меню v0.18${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
