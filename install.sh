@@ -29,6 +29,19 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# ── Функция получения последней версии из GitHub ─────────────
+get_latest_version() {
+    local version
+    version=$(curl -fsSL "https://api.github.com/repos/Mekotofeuka/MTPROTO_FIX_By_MEKO/releases/latest" 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [ -z "$version" ]; then
+        echo "v0.1"
+    else
+        echo "$version"
+    fi
+}
+
+VERSION=$(get_latest_version)
+
 # ── Функция скачивания файла ─────────────────────────────────
 download_file() {
     local file="$1"
@@ -79,7 +92,7 @@ read_input() {
 # ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO v0.1 ${CYAN}${BOLD}⚙️${NC}"
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION} ${CYAN}${BOLD}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Выберите способ установки:${NC}"
