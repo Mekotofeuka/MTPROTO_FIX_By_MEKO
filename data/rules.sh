@@ -296,8 +296,14 @@ install_syn_fix() {
         fi
     else
         echo ""
-        echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080):${NC} "
-        read -r ports_input
+        # Используем /dev/tty для ввода
+        if [ -r /dev/tty ]; then
+            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080):${NC} "
+            read -r ports_input </dev/tty
+        else
+            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080):${NC} "
+            read -r ports_input
+        fi
         if [ -z "$ports_input" ]; then
             ports_input="443"
         fi
@@ -318,8 +324,13 @@ install_syn_fix() {
         echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
-        echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}):${NC} "
-        read -r fix_choice
+        if [ -r /dev/tty ]; then
+            echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}):${NC} "
+            read -r fix_choice </dev/tty
+        else
+            echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}):${NC} "
+            read -r fix_choice
+        fi
 
         if [ -z "$fix_choice" ] || [ "$fix_choice" = "1" ]; then
             FIX_TYPE="new"
@@ -354,8 +365,13 @@ install_syn_fix() {
     if [ ${#valid_ports[@]} -eq 0 ]; then
         log_error "Нет корректных портов для установки"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        read -rsn1
+        if [ -r /dev/tty ]; then
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1 </dev/tty
+        else
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1
+        fi
         return 1
     fi
 
@@ -378,8 +394,13 @@ install_syn_fix() {
             else
                 echo ""
                 log_error "Не удалось установить nftables автоматически"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                read -rsn1
+                if [ -r /dev/tty ]; then
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1 </dev/tty
+                else
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1
+                fi
                 return 1
             fi
         fi
@@ -395,9 +416,13 @@ install_syn_fix() {
             echo ""
             log_warning "${BOLD}ВНИМАНИЕ:${NC} Данная настройка изменит файрвол системы."
             echo ""
-            echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
-            local confirm
-            read -r confirm
+            if [ -r /dev/tty ]; then
+                echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+                read -r confirm </dev/tty
+            else
+                echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+                read -r confirm
+            fi
             if [[ ! "$confirm" =~ ^[yY]$ ]]; then
                 log_info "Установка отменена"
                 sleep 0.5
@@ -460,9 +485,13 @@ CLASSIC_RULES_EOF
         else
             echo ""
             log_error "Ошибка применения NFT правил"
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            read -rsn1
+            if [ -r /dev/tty ]; then
+                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                read -rsn1 </dev/tty
+            else
+                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                read -rsn1
+            fi
             return 1
         fi
 
@@ -489,9 +518,13 @@ SERVICE_NFT_EOF
 
         echo ""
         log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str"
-        echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        read -rsn1
+        if [ -r /dev/tty ]; then
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1 </dev/tty
+        else
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1
+        fi
         return 0
     fi
 
@@ -507,9 +540,13 @@ SERVICE_NFT_EOF
         echo ""
         log_warning "${BOLD}ВНИМАНИЕ:${NC} Данная настройка изменит файрвол системы."
         echo ""
-        echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
-        local confirm
-        read -r confirm
+        if [ -r /dev/tty ]; then
+            echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+            read -r confirm </dev/tty
+        else
+            echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+            read -r confirm
+        fi
         if [[ ! "$confirm" =~ ^[yY]$ ]]; then
             log_info "Установка отменена"
             sleep 0.5
@@ -537,8 +574,13 @@ SERVICE_NFT_EOF
         echo -e "  ${GREEN}Enter/Y${NC} — установить и продолжить"
         echo -e "  ${RED}N/n${NC} — отменить установку и вернуться в меню"
         echo ""
-        echo -en "  ${BOLD}Ввод:${NC} "
-        read -r install_u32
+        if [ -r /dev/tty ]; then
+            echo -en "  ${BOLD}Ввод:${NC} "
+            read -r install_u32 </dev/tty
+        else
+            echo -en "  ${BOLD}Ввод:${NC} "
+            read -r install_u32
+        fi
 
         if [[ -z "$install_u32" || "$install_u32" =~ ^[yY]$ ]]; then
             echo ""
@@ -573,8 +615,13 @@ SERVICE_NFT_EOF
                 echo -e "  ${GREEN}[✓]${NC} Репозиторий elrepo добавлен"
             else
                 echo -e "  ${RED}[✗]${NC} Не удалось добавить репозиторий elrepo"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                read -rsn1
+                if [ -r /dev/tty ]; then
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1 </dev/tty
+                else
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1
+                fi
                 return 1
             fi
             
@@ -592,40 +639,60 @@ SERVICE_NFT_EOF
                 
                 echo ""
                 log_success "SYN FIX успешно установлен на порты: $ports_str"
-                echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                read -rsn1
+                if [ -r /dev/tty ]; then
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1 </dev/tty
+                else
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1
+                fi
             else
                 echo -e "  ${RED}[✗]${NC} Не удалось установить модуль kmod-xt_u32"
                 echo -e "  ${YELLOW}[!]${NC} Попробуйте выбрать старый вариант фикса (TTL+Length)"
-                echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                read -rsn1
+                if [ -r /dev/tty ]; then
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1 </dev/tty
+                else
+                    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                    read -rsn1
+                fi
                 return 1
             fi
         else
             log_info "Установка отменена"
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            read -rsn1
+            if [ -r /dev/tty ]; then
+                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                read -rsn1 </dev/tty
+            else
+                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                read -rsn1
+            fi
             return 1
         fi
     elif [ $apply_exit_code -ne 0 ]; then
         echo ""
         log_error "Ошибка применения правил iptables:"
         echo "$apply_output"
-        echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        read -rsn1
+        if [ -r /dev/tty ]; then
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1 </dev/tty
+        else
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1
+        fi
         return 1
     else
         systemctl enable mtpr-synfix.service
         systemctl restart mtpr-synfix.service
         echo ""
         log_success "SYN FIX успешно установлен на порты: $ports_str"
-        echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        read -rsn1
+        if [ -r /dev/tty ]; then
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1 </dev/tty
+        else
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+            read -rsn1
+        fi
     fi
 }
 
