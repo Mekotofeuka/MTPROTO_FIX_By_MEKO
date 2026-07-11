@@ -102,81 +102,21 @@ get_public_ip() {
     echo "$_ip"
 }
 
-# ── Генерация ссылок через mtg access ──────────────────────
-generate_proxy_links() {
-    local config_path=$(get_config_path)
-    if [ ! -f "$config_path" ]; then
-        return 1
-    fi
-
-    # Проверяем, есть ли jq для парсинга JSON
-    if ! command -v jq &>/dev/null; then
-        echo -e "  ${YELLOW}[!] jq не установлен, устанавливаю...${NC}"
-        if command -v apt-get &>/dev/null; then
-            apt-get update -qq && apt-get install -y -qq jq
-        elif command -v yum &>/dev/null; then
-            yum install -y -q jq
-        elif command -v dnf &>/dev/null; then
-            dnf install -y -q jq
-        elif command -v apk &>/dev/null; then
-            apk add --no-cache jq
-        else
-            echo -e "  ${RED}[✗] Не удалось установить jq. Установите вручную.${NC}"
-            return 1
-        fi
-    fi
-
-    local output
-    output=$(mtg access "$config_path" 2>/dev/null)
-    if [ $? -ne 0 ] || [ -z "$output" ]; then
-        echo -e "  ${RED}[✗] Не удалось получить ссылки. Проверьте, что MTG запущен.${NC}"
-        return 1
-    fi
-
-    # Парсим JSON
-    local tg_url
-    tg_url=$(echo "$output" | jq -r '.ipv4.tg_url // empty' 2>/dev/null)
-    if [ -n "$tg_url" ]; then
-        echo -e "  ${BOLD}Ссылка для подключения (IPv4):${NC}"
-        echo -e "  ${CYAN}${tg_url}${NC}"
-        echo ""
-    fi
-
-    local tme_url
-    tme_url=$(echo "$output" | jq -r '.ipv4.tme_url // empty' 2>/dev/null)
-    if [ -n "$tme_url" ]; then
-        echo -e "  ${BOLD}Альтернативная ссылка (t.me):${NC}"
-        echo -e "  ${CYAN}${tme_url}${NC}"
-        echo ""
-    fi
-
-    local secret_hex
-    secret_hex=$(echo "$output" | jq -r '.secret.hex // empty' 2>/dev/null)
-    if [ -n "$secret_hex" ]; then
-        echo -e "  ${BOLD}Секрет (hex):${NC} ${DIM}${secret_hex}${NC}"
-    fi
-
-    return 0
-}
-
 # ── Функция установки MTG ────────────────────────────────────
 install_mtg() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Установка MTG"
 
-    # Проверяем, установлен ли уже
+    # Проверяем, установлен ли уже (просто показываем, что установка начата)
+    local already_installed=false
     if is_mtg_installed; then
-        echo -e "  ${YELLOW}[!] MTG уже установлен. Версия: $(get_mtg_version)${NC}"
-        echo -en "  ${BOLD}Переустановить? [y/N]:${NC} "
-        local reinstall
-        read -r reinstall
-        if [[ ! "$reinstall" =~ ^[yY]$ ]]; then
-            echo -e "  ${GRAY}Установка отменена${NC}"
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            read -rsn1
-            return 0
-        fi
+        already_installed=true
+        local current_version=$(get_mtg_version)
+        echo -e "  ${YELLOW}[!] Обнаружена старая версия MTG: ${current_version}${NC}"
+        echo -e "  ${YELLOW}[!] Будет выполнена переустановка (старая версия будет удалена)${NC}"
+        echo ""
+        # Удаляем старую версию без подтверждения
+        purge_mtg_silent
     fi
 
     # Запрос порта
@@ -203,25 +143,67 @@ install_mtg() {
     fi
     local domain="$domain_input"
 
-    # Генерация секрета
+    # Генерация секрета с циклом (как в telemt_in_docker1.sh)
     echo ""
-    echo -e "  ${BLUE}[i]${NC} Генерация секрета для домена ${domain}..."
-    local secret
-    secret=$(mtg generate-secret --hex "$domain" 2>/dev/null)
-    if [ -z "$secret" ]; then
-        echo -e "  ${RED}[✗] Не удалось сгенерировать секрет. Убедитесь, что mtg установлен.${NC}"
+    echo -e "  ${BOLD}Секрет для доступа к прокси${NC}"
+
+    SECRET=""
+    while true; do
+        # Генерируем секрет при первом проходе или при gen
+        if [ -z "$SECRET" ]; then
+            SECRET=$(mtg generate-secret --hex "$domain" 2>/dev/null)
+            if [ -z "$SECRET" ]; then
+                echo -e "  ${RED}[✗] Не удалось сгенерировать секрет. Убедитесь, что mtg установлен.${NC}"
+                echo ""
+                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                read -rsn1
+                return 1
+            fi
+        fi
+        
+        echo -e "  ${DIM}Сгенерирован секрет: ${CYAN}${SECRET}${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        read -rsn1
-        return 1
-    fi
-    echo -e "  ${GREEN}✓${NC} Секрет: ${DIM}${secret}${NC}"
+        echo -e "  ${BOLD}Варианты:${NC}"
+        echo -e "  ${GREEN}Enter/Y${NC} — использовать сгенерированный секрет"
+        echo -e "  ${CYAN}Ввести вручную${NC} — указать свой секрет (в hex формате)"
+        echo -e "  ${RED}gen${NC} — перегенерировать новый секрет"
+        echo ""
+        echo -en "  ${BOLD}Ваш выбор:${NC} "
+        read -r secret_input
+        
+        if [[ "$secret_input" =~ ^[Gg][Ee][Nn]$ ]]; then
+            SECRET=$(mtg generate-secret --hex "$domain" 2>/dev/null)
+            if [ -z "$SECRET" ]; then
+                echo -e "  ${RED}[✗] Не удалось сгенерировать секрет.${NC}"
+                sleep 1
+                continue
+            fi
+            echo ""
+            echo -e "  ${GREEN}✓${NC} Новый секрет: ${CYAN}${SECRET}${NC}"
+            echo ""
+            # Показываем меню снова с новым секретом
+            continue
+        elif [[ -n "$secret_input" ]] && [[ ! "$secret_input" =~ ^[yY]$ ]]; then
+            # Ввели что-то кроме gen, enter, y, Y — считаем это ручным вводом секрета
+            SECRET="$secret_input"
+            echo ""
+            echo -e "  ${GREEN}✓${NC} Использован секрет: ${CYAN}${SECRET}${NC}"
+            echo ""
+            break
+        else
+            # Enter или y/Y
+            echo ""
+            echo -e "  ${GREEN}✓${NC} Использован сгенерированный секрет: ${CYAN}${SECRET}${NC}"
+            echo ""
+            break
+        fi
+    done
 
     # Создание конфига
     echo ""
     echo -e "  ${BLUE}[i]${NC} Создание конфига /etc/mtg.toml..."
     cat > /etc/mtg.toml << EOF
-secret = "${secret}"
+secret = "${SECRET}"
 bind-to = "0.0.0.0:${port}"
 EOF
 
@@ -281,6 +263,20 @@ EOF
     echo ""
     echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
     read -rsn1
+}
+
+# ── Функция тихого удаления MTG (без подтверждения) ─────────
+purge_mtg_silent() {
+    systemctl stop mtg.service 2>/dev/null || true
+    systemctl disable mtg.service 2>/dev/null || true
+    rm -f /etc/systemd/system/mtg.service
+    systemctl daemon-reload 2>/dev/null || true
+    rm -f /usr/local/bin/mtg
+    rm -f /etc/mtg.toml
+    rm -f "$CONFIG_PATH_FILE"
+    rm -f mtg-latest.tar.gz 2>/dev/null || true
+    rm -f mtg-*.tar.gz 2>/dev/null || true
+    rm -rf mtg-*/ 2>/dev/null || true
 }
 
 # ── Функция открытия конфига ─────────────────────────────────
@@ -366,6 +362,7 @@ purge_mtg() {
     echo -e "  • Бинарник /usr/local/bin/mtg"
     echo -e "  • Конфигурационный файл /etc/mtg.toml"
     echo -e "  • Systemd служба (если есть)"
+    echo -e "  • Все скачанные архивы MTG"
     echo ""
     echo -e "  ${YELLOW}[!] Это действие нельзя отменить!"
     echo -en "  ${BOLD}Продолжить удаление? [y/N]:${NC} "
@@ -381,13 +378,7 @@ purge_mtg() {
 
     echo ""
     echo -e "  ${BLUE}[i]${NC} Удаление MTG..."
-    systemctl stop mtg.service 2>/dev/null || true
-    systemctl disable mtg.service 2>/dev/null || true
-    rm -f /etc/systemd/system/mtg.service
-    rm -f /usr/local/bin/mtg
-    rm -f /etc/mtg.toml
-    rm -f "$CONFIG_PATH_FILE"
-    systemctl daemon-reload 2>/dev/null || true
+    purge_mtg_silent
 
     echo -e "  ${GREEN}[✓] MTG успешно удалён"
     echo ""
@@ -425,18 +416,55 @@ update_config_path() {
     read -rsn1
 }
 
+# ── Функция показа ссылки ────────────────────────────────────
+show_link() {
+    echo ""
+    echo -e "  ${BLUE}[i]${NC} Генерация ссылки для подключения..."
+    
+    local secret
+    secret=$(sudo cat /etc/mtg.toml 2>/dev/null | grep '^secret' | awk -F'"' '{print $2}' | tr -d '\n')
+    
+    if [ -z "$secret" ]; then
+        echo -e "  ${RED}[✗] Не удалось получить секрет из конфига.${NC}"
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+        read -rsn1
+        return 1
+    fi
+    
+    local ip
+    ip=$(curl -4 -fsS --max-time 3 ifconfig.me 2>/dev/null || curl -4 -fsS --max-time 3 icanhazip.com 2>/dev/null || echo "SERVER_IP")
+    
+    local port
+    port=$(get_mtg_port "/etc/mtg.toml")
+    if [ -z "$port" ]; then
+        port="443"
+    fi
+    
+    echo ""
+    echo -e "  ${BOLD}Ссылка для подключения:${NC}"
+    echo -e "  ${CYAN}https://t.me/proxy?server=${ip}&port=${port}&secret=${secret}${NC}"
+    echo ""
+    echo -e "  ${BOLD}Данные для подключения:${NC}"
+    echo -e "  ${BOLD}Сервер:${NC} ${ip}"
+    echo -e "  ${BOLD}Порт:${NC} ${port}"
+    echo -e "  ${BOLD}Секрет:${NC} ${secret}"
+    echo ""
+    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+    read -rsn1
+}
+
 # ── Главное меню ─────────────────────────────────────────────
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.1${NC}"
+    echo -e "  ${BOLD}MTG меню v0.12${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
     if is_mtg_installed; then
         echo -e "  ${NC}${BOLD}MTG:${NC}${GREEN} установлен${NC}"
         version=$(get_mtg_version)
-        if [ -n "$version" ]; then
+        if [ -n "$version" ] && [ "$version" != "go1.26.1:" ]; then
             echo -e "  ${NC}${BOLD}Версия:${NC} ${GREEN}${version}${NC}"
         fi
         config_path=$(get_config_path)
@@ -452,7 +480,7 @@ while true; do
         echo ""
     fi
 
-    echo -e "  ${CYAN}[1]${NC}  ${BOLD}Установить/переустановить MTG${NC}"
+    echo -e "  ${CYAN}[1]${NC}  ${BOLD}Установить MTG${NC}"
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Открыть конфиг MTG${NC}"
     echo -e "  ${CYAN}[3]${NC}  ${BOLD}Перезапустить MTG${NC}"
     echo -e "  ${CYAN}[4]${NC}  ${BOLD}Обновить путь к конфигу MTG${NC}"
@@ -488,11 +516,7 @@ while true; do
             view_logs
             ;;
         6)
-            echo ""
-            generate_proxy_links
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            read -rsn1
+            show_link
             ;;
         7)
             purge_mtg
