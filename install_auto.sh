@@ -3,7 +3,7 @@
 
 set -e
 
-BASE_URL="https://raw.githubusercontent.comMekotofeuka/MTPROTO_FIX_By_MEKO/main"
+BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
 INSTALL_DIR="/opt/mtpr-simple"
 
 # ── Цвета ─────────────────────────────────────────────────────
