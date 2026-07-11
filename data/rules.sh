@@ -1,4 +1,5 @@
 #!/bin/bash
+# data/rules.sh – все функции для работы с SYN FIX (iptables/nftables)
 
 # ── Цвета ─────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -310,10 +311,10 @@ install_syn_fix() {
         echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
-        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${GREEN}${BOLD} - рекомендуется${NC}${BOLD} (работает с Docker)${NC}"
+        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${NC}${BOLD} - рекомендуется для nftables${NC}"
         echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
-        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}" ${NC}${BOLD} (работает с Docker)
+        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}"
         echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
