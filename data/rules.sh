@@ -298,10 +298,10 @@ install_syn_fix() {
         echo ""
         # Используем /dev/tty для ввода
         if [ -r /dev/tty ]; then
-            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080):${NC} "
+            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080(${GREEN}${BOLD}Enter - 443)${NC}${BOLD}):${NC} "
             read -r ports_input </dev/tty
         else
-            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080):${NC} "
+            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080(${GREEN}${BOLD}Enter - 443)${NC}${BOLD}):${NC} "
             read -r ports_input
         fi
         if [ -z "$ports_input" ]; then
