@@ -79,7 +79,7 @@ read_input() {
 # ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${BOLD}${CYAN}⚙️ ${BOLD}${NC}Установка фикса ${BOLD}${CYAN}MEKO v0.1 ${BOLD}${CYAN}⚙️${NC}"
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO v0.1 ${CYAN}${BOLD}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Выберите способ установки:${NC}"
@@ -93,9 +93,9 @@ echo ""
 echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Ручная установка${NC}  ${NC}${BOLD}(режим разработчика)${NC}"
 echo -e "      ${DIM}Выдаст список команд для ручного выполнения фикса/установки${NC}"
 echo ""
-echo -e "  ${RED}[0]${NC}  ${BOLD}${RED}Выход${NC}"
+echo -e "  ${RED}${BOLD}[0]${NC}  ${BOLD}${RED}Выход${NC}"
 echo ""
-echo -en "  ${NC}${BOLD}Выбор (Enter - стандартная установка):${NC} "
+echo -en "  ${NC}${BOLD}Выбор (${GREEN}${BOLD}Enter${NC}${BOLD} - стандартная установка):${NC} "
 
 # ── Читаем выбор с терминала ──────────────────────────────────
 choice=$(read_input)
