@@ -203,11 +203,13 @@ mtg_doctor() {
         return 1
     fi
     
+    # Запускаем doctor и сохраняем вывод, игнорируя exit code
     local output
-    output=$(mtg doctor "$config_path" 2>/dev/null)
+    output=$(mtg doctor "$config_path" 2>&1)
     local doctor_exit=$?
     
-    if [ $doctor_exit -ne 0 ] || [ -z "$output" ]; then
+    # Если вывод пустой - ошибка
+    if [ -z "$output" ]; then
         echo -e "  ${RED}[✗] Не удалось выполнить проверку. Убедитесь, что MTG запущен.${NC}"
         echo ""
         echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
@@ -215,7 +217,7 @@ mtg_doctor() {
         return 1
     fi
     
-    # Парсим вывод
+    # Парсим вывод (игнорируем exit code, т.к. он может быть 1 из-за SNI-DNS)
     echo ""
     
     # 1. Deprecated options
@@ -277,11 +279,12 @@ mtg_doctor() {
     sni_line=$(echo "$output" | grep -A 1 "Validate SNI-DNS match" | tail -1 | sed 's/^[[:space:]]*//')
     
     if echo "$sni_line" | grep -q "Hostname"; then
+        # Убираем эмодзи и лишние пробелы, оставляем информацию
         local sni_info
         sni_info=$(echo "$sni_line" | sed -E 's/❌|✅//g' | sed 's/^[[:space:]]*//')
-        echo -e "  ${CYAN}ℹ${NC} SNI-домен: ${sni_info}"
+        echo -e "  ${CYAN}ℹ${NC} Информация о домене: ${sni_info}"
     else
-        echo -e "  ${CYAN}ℹ${NC} SNI-домен: информация не получена"
+        echo -e "  ${CYAN}ℹ${NC} Информация о домене: не получена"
     fi
     
     # Получаем IP сервера
@@ -653,7 +656,7 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.16${NC}"
+    echo -e "  ${BOLD}MTG меню v0.17${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
