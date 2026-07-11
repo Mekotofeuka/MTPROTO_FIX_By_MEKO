@@ -91,7 +91,7 @@ ensure_proxy_file() {
 }
 
 clear
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.11${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.12${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 # ── Меню выбора правил SYN FIX ──────────────────────────────
@@ -117,7 +117,7 @@ echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 
 echo ""
 echo -e "  ${YELLOW}[0]${NC}  ${BOLD}Пропустить установку SYN FIX${NC}"
 echo ""
-echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}, пропустить - ${YELLOW}${BOLD}0${NC}${BOLD}):${NC} "
+echo -en "  ${NC}${BOLD}Ввод (Поумолчанию${GREEN}${BOLD} - 1 (Enter)${NC}${BOLD}:${NC} "
 
 fix_choice=$(read_input)
 
