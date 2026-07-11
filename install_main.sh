@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
+BASE_URL="https://raw.githubusercontent.comMekotofeuka/MTPROTO_FIX_By_MEKO/main"
 MANIFEST_URL="$BASE_URL/data/manifest.txt"
 MANIFEST_FILE="/tmp/manifest.txt"
 INSTALL_DIR="/opt/mtpr-simple"
@@ -16,6 +16,9 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# ── Экспортируем цвета для дочерних процессов ──────────────
+export GREEN BLUE CYAN YELLOW RED BOLD DIM NC
+
 # ── Проверка root ────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
     echo -e "${RED}[✗]${NC} Запустите от root: ${BOLD}curl -fsSL ... | sudo bash${NC}" >&2
@@ -25,12 +28,12 @@ fi
 clear
 # ── Шапка ─────────────────────────────────────────────────────
 echo ""
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.11${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.12${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
 # ── Получение манифеста ──────────────────────────────────────
-echo -e "  ${BLUE}[i]${NC} Загрузка данных..."
+echo -e "  ${BLUE}[i]${NC} Загрузка dados..."
 if ! curl -fsSL "$MANIFEST_URL" -o "$MANIFEST_FILE"; then
     echo -e "  ${RED}[✗]${NC} Не удалось загрузить информацию о необходимых файлах"
     exit 1
@@ -80,10 +83,10 @@ download_file() {
     echo -e "  ${CYAN}⏳${NC} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})..."
     
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
-        echo -e "  ${BOLD}${GREEN}✓${NC} ${BOLD}${name}${NC} (${size_str})"
+        echo -e "  ${GREEN}${BOLD}✓${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
         return 0
     else
-        echo -e "  ${RED}✗${NC} ${BOLD}${name}${NC} — ошибка загрузки"
+        echo -e "  ${RED}✗${NC} ${RED}${name}${NC} — ошибка загрузки"
         return 1
     fi
 }
