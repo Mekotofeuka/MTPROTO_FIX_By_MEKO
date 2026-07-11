@@ -216,7 +216,7 @@ mtg_doctor() {
         return 1
     fi
     
-    # ── Извлечение домена из секрета через od ──────────────
+    # ── Извлечение домена из секрета через bash ──────────────
     local domain=""
     local secret_line
     secret_line=$(grep -E '^secret' "$config_path" 2>/dev/null | head -1)
@@ -227,8 +227,8 @@ mtg_doctor() {
         local domain_hex
         domain_hex=$(echo "$secret_hex" | sed -E 's/^ee[0-9a-f]{32}//')
         if [ -n "$domain_hex" ]; then
-            # Преобразуем hex в текст через od
-            domain=$(echo "$domain_hex" | od -An -tx1 | tr -d ' \n' | sed 's/../\\x&/g' | xargs printf 2>/dev/null)
+            # Конвертируем hex в текст через printf (без od)
+            domain=$(printf '%b' "$(echo "$domain_hex" | sed 's/../\\x&/g')" 2>/dev/null)
             if [ -z "$domain" ]; then
                 domain="$domain_hex (hex)"
             fi
@@ -282,7 +282,7 @@ mtg_doctor() {
         echo -e "  ${RED}✗${NC} Домен маскировки: ${domain} — ${RED}недоступен${NC}"
     fi
     
-    # 4. Validate SNI-DNS match (перевод на русский)
+    # 4. Validate SNI-DNS match (перевод на русский с предупреждением)
     local sni_line
     sni_line=$(echo "$output" | grep -A 1 "Validate SNI-DNS match" | tail -1 | sed 's/^[[:space:]]*//')
     
@@ -291,9 +291,9 @@ mtg_doctor() {
     server_ip=$(get_public_ip)
     
     if echo "$sni_line" | grep -q "Hostname"; then
-        # Парсим строку: "Hostname ozon.ru is resolved to \"185.73.194.82\", \"185.73.193.68\" addresses, not 2.26.124.65"
+        # Парсим строку
         local domain_name=$(echo "$sni_line" | sed -E 's/.*Hostname ([^ ]*) .*/\1/')
-        local resolved_ips=$(echo "$sni_line" | grep -o '"\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}"' | tr '\n' ' ' | sed 's/"//g')
+        local resolved_ips=$(echo "$sni_line" | grep -o '"\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
         local expected_ip=$(echo "$sni_line" | grep -o 'not [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | sed 's/not //')
         
         echo -e "  ${CYAN}ℹ${NC} SNI-информация:"
@@ -302,9 +302,10 @@ mtg_doctor() {
         if [ -n "$server_ip" ]; then
             echo -e "     ${CYAN}IP текущего сервера:${NC} ${server_ip}"
         fi
-        if [ -n "$expected_ip" ] && [ "$expected_ip" != "$server_ip" ]; then
-            echo -e "     ${YELLOW}⚠ Внимание: IP сервера (${server_ip}) не совпадает с IP домена (${expected_ip})${NC}"
-            echo -e "     ${YELLOW}⚠ Если вы используете SelfSteal, обратите на это внимание${NC}"
+        if [ -n "$expected_ip" ] && [ -n "$server_ip" ] && [ "$expected_ip" != "$server_ip" ]; then
+            echo -e "     ${YELLOW}⚠ ВНИМАНИЕ: IP сервера (${server_ip}) НЕ СОВПАДАЕТ с IP домена (${expected_ip})${NC}"
+            echo -e "     ${YELLOW}⚠ Если вы используете SelfSteal, проверьте DNS-запись A для домена!${NC}"
+            echo -e "     ${YELLOW}⚠ Домен должен резолвиться в IP вашего сервера, иначе iOS-клиенты могут не работать.${NC}"
         fi
     else
         echo -e "  ${CYAN}ℹ${NC} SNI-информация: не получена"
@@ -675,7 +676,7 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.18${NC}"
+    echo -e "  ${BOLD}MTG меню v0.19${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
