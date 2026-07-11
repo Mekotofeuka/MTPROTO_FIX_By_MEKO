@@ -29,6 +29,17 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# ── Функция чтения ввода с терминала ──────────────────────────
+read_input() {
+    local input
+    if [ -r /dev/tty ]; then
+        read -r input </dev/tty
+        echo "$input"
+    else
+        echo ""
+    fi
+}
+
 # ── Функция скачивания файла ─────────────────────────────────
 download_file() {
     local file="$1"
@@ -81,6 +92,7 @@ ensure_proxy_file() {
 
 echo -e "  ${BOLD}${CYAN}⚙️ УСТАНОВКА MEKOPR (РЕЖИМ: Auto) v0.1${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+
 # ── Меню выбора правил SYN FIX ──────────────────────────────
 echo ""
 echo -e "  ${BOLD}${CYAN}🔧 УСТАНОВКА SYN FIX${NC}"
@@ -105,7 +117,8 @@ echo ""
 echo -e "  ${YELLOW}[0]${NC}  ${BOLD}Пропустить установку SYN FIX${NC}"
 echo ""
 echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}, пропустить - ${YELLOW}${BOLD}0${NC}${BOLD}):${NC} "
-read -r fix_choice
+
+fix_choice=$(read_input)
 
 case "$fix_choice" in
     0|"") ;;
@@ -132,7 +145,8 @@ echo -e "  ${YELLOW}[5]${NC}  ${BOLD}Пропустить установку п�
 echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
 echo ""
 echo -en "  ${BOLD}Выбор:${NC} "
-read -r proxy_choice
+
+proxy_choice=$(read_input)
 
 case "$proxy_choice" in
     1)
@@ -199,7 +213,8 @@ echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM
 echo -e "  ${RED}[0]${NC}  ${BOLD}Закрыть меню установки${NC}"
 echo ""
 echo -en "  ${BOLD}Выбор (Enter - установить лаунчер):${NC} "
-read -r final_choice
+
+final_choice=$(read_input)
 
 case "$final_choice" in
     0)
