@@ -90,9 +90,10 @@ ensure_proxy_file() {
     return 0
 }
 
-echo -e "  ${BOLD}${CYAN}⚙️ УСТАНОВКА MEKOPR (РЕЖИМ: Auto) v0.1${NC}"
+clear
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.11${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
-
+echo ""
 # ── Меню выбора правил SYN FIX ──────────────────────────────
 echo ""
 echo -e "  ${BOLD}${CYAN}🔧 УСТАНОВКА SYN FIX${NC}"
