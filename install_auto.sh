@@ -3,7 +3,7 @@
 
 set -e
 
-BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
+BASE_URL="https://raw.githubusercontent.comMekotofeuka/MTPROTO_FIX_By_MEKO/main"
 INSTALL_DIR="/opt/mtpr-simple"
 
 # ── Цвета ─────────────────────────────────────────────────────
@@ -72,6 +72,19 @@ fi
 # Подключаем rules.sh
 source "$RULES_SCRIPT"
 
+# ── Функция-обёртка для install_syn_fix с корректным stdin ──
+run_syn_fix() {
+    # Сохраняем текущий stdin
+    exec 3<&0
+    # Перенаправляем stdin на /dev/tty
+    exec </dev/tty 2>/dev/null || true
+    # Вызываем install_syn_fix из rules.sh
+    install_syn_fix
+    # Восстанавливаем stdin
+    exec <&3 2>/dev/null || true
+    exec 3<&- 2>/dev/null || true
+}
+
 # ── Функция проверки и загрузки файла прокси ──────────────────
 ensure_proxy_file() {
     local proxy_file="$1"
@@ -91,17 +104,17 @@ ensure_proxy_file() {
 }
 
 clear
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.15${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.18${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
-# ── 1. Установка SYN FIX (просто запускаем install_syn_fix из rules.sh) ──
+# ── 1. Установка SYN FIX ──────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}${CYAN}🔧 УСТАНОВКА SYN FIX${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
-install_syn_fix
+run_syn_fix
 
 # ── Меню выбора прокси ──────────────────────────────────────
 while true; do
@@ -126,9 +139,7 @@ while true; do
             echo ""
             log_info "Установка TELEMT..."
             if ensure_proxy_file "proxys/telemt1.sh"; then
-                source "$INSTALL_DIR/proxys/telemt1.sh"
-                install_telemt
-                break
+                exec "$INSTALL_DIR/proxys/telemt1.sh" </dev/tty
             else
                 exit 1
             fi
@@ -137,8 +148,7 @@ while true; do
             echo ""
             log_info "Установка TELEMT в Docker..."
             if ensure_proxy_file "proxys/telemt_in_docker1.sh"; then
-                source "$INSTALL_DIR/proxys/telemt_in_docker1.sh"
-                break
+                exec "$INSTALL_DIR/proxys/telemt_in_docker1.sh" </dev/tty
             else
                 exit 1
             fi
@@ -147,9 +157,7 @@ while true; do
             echo ""
             log_info "Установка MTG..."
             if ensure_proxy_file "proxys/mtgv2_1.sh"; then
-                source "$INSTALL_DIR/proxys/mtgv2_1.sh"
-                install_mtg
-                break
+                exec "$INSTALL_DIR/proxys/mtgv2_1.sh" </dev/tty
             else
                 exit 1
             fi
@@ -158,9 +166,7 @@ while true; do
             echo ""
             log_info "Установка MTProtoZig..."
             if ensure_proxy_file "proxys/mtprotozig1.sh"; then
-                source "$INSTALL_DIR/proxys/mtprotozig1.sh"
-                install_zig_cli && install_proxy
-                break
+                exec "$INSTALL_DIR/proxys/mtprotozig1.sh" </dev/tty
             else
                 exit 1
             fi
