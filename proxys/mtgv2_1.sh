@@ -53,7 +53,8 @@ is_mtg_installed() {
 
 get_mtg_version() {
     if command -v mtg >/dev/null 2>&1; then
-        mtg --version 2>/dev/null | head -1 | awk '{print $2}'
+        # Берём первую часть до пробела — это версия
+        mtg --version 2>/dev/null | head -1 | awk '{print $1}'
     else
         echo ""
     fi
@@ -163,7 +164,7 @@ install_mtg_binary() {
 
     # Проверяем установку
     if command -v mtg >/dev/null 2>&1; then
-        local version=$(mtg --version 2>/dev/null | head -1 | awk '{print $2}')
+        local version=$(get_mtg_version)
         echo -e "  ${GREEN}✓${NC} MTG успешно установлен (версия: ${version})"
         return 0
     else
@@ -186,15 +187,114 @@ purge_mtg_silent() {
     rm -rf mtg-*/ 2>/dev/null || true
 }
 
+# ── Функция проверки MTG (doctor) ────────────────────────────
+mtg_doctor() {
+    local config_path="/etc/mtg.toml"
+    
+    if [ ! -f "$config_path" ]; then
+        echo -e "  ${RED}[✗] Конфиг не найден: $config_path${NC}"
+        return 1
+    fi
+    
+    echo ""
+    echo -e "  ${BOLD}${CYAN}Проверка MTG прокси${NC}"
+    echo -e "  ${DIM}─────────────────────────────────────────${NC}"
+    
+    local output
+    output=$(mtg doctor "$config_path" 2>/dev/null)
+    if [ $? -ne 0 ] || [ -z "$output" ]; then
+        echo -e "  ${RED}[✗] Не удалось выполнить проверку. Убедитесь, что MTG запущен.${NC}"
+        return 1
+    fi
+    
+    # Парсим вывод
+    echo ""
+    
+    # 1. Deprecated options
+    if echo "$output" | grep -q "Deprecated options" -A 1 | grep -q "All good"; then
+        echo -e "  ${GREEN}✓${NC} Устаревшие опции: ${GREEN}всё в порядке${NC}"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Устаревшие опции: обнаружены проблемы"
+    fi
+    
+    # 2. Time skewness
+    local time_skew
+    time_skew=$(echo "$output" | grep -A 2 "Time skewness" | grep -o "Time drift is [0-9.-]*[ms]*" | head -1)
+    if [ -n "$time_skew" ]; then
+        echo -e "  ${GREEN}✓${NC} Расхождение времени: ${time_skew} (допуск 3с)"
+    else
+        echo -e "  ${YELLOW}⚠${NC} Расхождение времени: не удалось определить"
+    fi
+    
+    # 3. Validate native network connectivity (DC)
+    echo -e "  ${BOLD}Подключение к дата-центрам Telegram:${NC}"
+    local dc_count=0
+    local dc_ok=0
+    while IFS= read -r line; do
+        if echo "$line" | grep -q "DC [0-9]"; then
+            dc_count=$((dc_count + 1))
+            if echo "$line" | grep -q "✅"; then
+                dc_ok=$((dc_ok + 1))
+                echo -e "    ${GREEN}✓${NC} $(echo "$line" | sed 's/^[[:space:]]*//')"
+            else
+                echo -e "    ${RED}✗${NC} $(echo "$line" | sed 's/^[[:space:]]*//')"
+            fi
+        fi
+    done <<< "$output"
+    if [ $dc_count -gt 0 ] && [ $dc_count -eq $dc_ok ]; then
+        echo -e "    ${GREEN}Все DC доступны${NC}"
+    elif [ $dc_count -gt 0 ]; then
+        echo -e "    ${YELLOW}Некоторые DC недоступны${NC}"
+    else
+        echo -e "    ${YELLOW}⚠ Не удалось проверить DC${NC}"
+    fi
+    
+    # 4. Validate fronting domain connectivity
+    local domain
+    domain=$(grep -E '^secret' "$config_path" 2>/dev/null | sed -E 's/^secret[[:space:]]*=[[:space:]]*"//; s/".*$//' | sed -E 's/^ee[0-9a-f]+//' | xxd -r -p 2>/dev/null | tr -d '\0')
+    if [ -z "$domain" ]; then
+        domain="не определён"
+    fi
+    
+    local domain_line
+    domain_line=$(echo "$output" | grep -A 1 "Validate fronting domain connectivity" | tail -1 | sed 's/^[[:space:]]*//')
+    if echo "$domain_line" | grep -q "reachable"; then
+        echo -e "  ${GREEN}✓${NC} Домен маскировки: ${domain} — ${GREEN}доступен${NC}"
+    else
+        echo -e "  ${RED}✗${NC} Домен маскировки: ${domain} — ${RED}недоступен${NC}"
+    fi
+    
+    # 5. Validate SNI-DNS match (информация о домене без ошибки)
+    local sni_line
+    sni_line=$(echo "$output" | grep -A 1 "Validate SNI-DNS match" | tail -1 | sed 's/^[[:space:]]*//')
+    
+    if echo "$sni_line" | grep -q "Hostname"; then
+        local sni_info
+        sni_info=$(echo "$sni_line" | sed -E 's/❌|✅//g' | sed 's/^[[:space:]]*//')
+        echo -e "  ${CYAN}ℹ${NC} SNI-домен: ${sni_info}"
+    else
+        echo -e "  ${CYAN}ℹ${NC} SNI-домен: информация не получена"
+    fi
+    
+    # Получаем IP сервера
+    local server_ip
+    server_ip=$(get_public_ip)
+    if [ -n "$server_ip" ]; then
+        echo -e "  ${CYAN}ℹ${NC} IP сервера: ${server_ip}"
+    fi
+    
+    echo ""
+    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+    read -rsn1
+}
+
 # ── Функция установки MTG ────────────────────────────────────
 install_mtg() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Установка MTG"
 
     # Проверяем, установлен ли уже бинарник
-    local already_installed=false
     if is_mtg_installed; then
-        already_installed=true
         local current_version=$(get_mtg_version)
         echo -e "  ${YELLOW}[!] Обнаружена старая версия MTG: ${current_version}${NC}"
         echo -e "  ${YELLOW}[!] Будет выполнена переустановка${NC}"
@@ -215,19 +315,24 @@ install_mtg() {
 
     # Теперь mtg установлен, можно генерировать секрет
 
-    # Запрос порта
+    # Запрос порта с циклом
     local default_port="443"
-    echo ""
-    echo -en "  ${BOLD}Введите порт для MTG [${default_port}]:${NC} "
-    read -r port_input
-    if [ -z "$port_input" ]; then
-        port_input="$default_port"
-    fi
-    if ! [[ "$port_input" =~ ^[0-9]+$ ]] || [ "$port_input" -lt 1 ] || [ "$port_input" -gt 65535 ]; then
-        echo -e "  ${RED}[✗] Некорректный порт. Использую 443.${NC}"
-        port_input="443"
-    fi
-    local port="$port_input"
+    local port=""
+    while true; do
+        echo ""
+        echo -en "  ${BOLD}Введите порт для MTG [${default_port}]:${NC} "
+        read -r port_input
+        if [ -z "$port_input" ]; then
+            port="$default_port"
+            break
+        fi
+        if [[ "$port_input" =~ ^[0-9]+$ ]] && [ "$port_input" -ge 1 ] && [ "$port_input" -le 65535 ]; then
+            port="$port_input"
+            break
+        else
+            echo -e "  ${RED}[✗] Некорректный порт. Введите число от 1 до 65535 или нажмите Enter для порта по умолчанию.${NC}"
+        fi
+    done
 
     # Запрос домена для TLS (используется в секрете)
     echo ""
@@ -304,7 +409,7 @@ secret = "${SECRET}"
 bind-to = "0.0.0.0:${port}"
 EOF
 
-    # Добавление опций keep-alive (по желанию)
+    # Добавление опций keep-alive (по желанию) с новыми значениями
     echo ""
     echo -e "  ${BOLD}Добавить настройки TCP keep-alive для мобильных клиентов?${NC}"
     echo -e "  ${DIM}Это улучшает стабильность на iOS/Android.${NC}"
@@ -315,11 +420,11 @@ EOF
 
 [network.keep-alive]
 disabled = false
-idle = "15s"
-interval = "15s"
-count = 9
+idle = "10s"
+interval = "10s"
+count = 3
 EOF
-        echo -e "  ${GREEN}✓${NC} Настройки keep-alive добавлены."
+        echo -e "  ${GREEN}✓${NC} Настройки keep-alive добавлены (idle=10s, interval=10s, count=3)."
     fi
 
     # Сохраняем путь к конфигу
@@ -502,7 +607,7 @@ update_config_path() {
 # ── Функция показа ссылки ────────────────────────────────────
 show_link() {
     echo ""
-    echo -e "  ${BLUE}[i]${NC} Генерация ссылки для подключения..."
+    echo -e  "  ${BLUE}[i]${NC} Генерация ссылки для подключения..."
     
     local secret
     secret=$(sudo cat /etc/mtg.toml 2>/dev/null | grep '^secret' | awk -F'"' '{print $2}' | tr -d '\n')
@@ -540,14 +645,14 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.13${NC}"
+    echo -e "  ${BOLD}MTG меню v0.15${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
     if is_mtg_installed; then
         echo -e "  ${NC}${BOLD}MTG:${NC}${GREEN} установлен${NC}"
         version=$(get_mtg_version)
-        if [ -n "$version" ] && [[ "$version" != "go1.26.1:"* ]]; then
+        if [ -n "$version" ]; then
             echo -e "  ${NC}${BOLD}Версия:${NC} ${GREEN}${version}${NC}"
         fi
         config_path=$(get_config_path)
@@ -569,7 +674,8 @@ while true; do
     echo -e "  ${CYAN}[4]${NC}  ${BOLD}Обновить путь к конфигу MTG${NC}"
     echo -e "  ${CYAN}[5]${NC}  ${BOLD}Посмотреть логи MTG${NC}"
     echo -e "  ${CYAN}[6]${NC}  ${BOLD}Показать ссылку для подключения${NC}"
-    echo -e "  ${RED}[7]${NC}  ${BOLD}Удалить MTG${NC}"
+    echo -e "  ${CYAN}[7]${NC}  ${BOLD}Проверить MTG (doctor)${NC}"
+    echo -e "  ${RED}[8]${NC}  ${BOLD}Удалить MTG${NC}"
     echo -e "  ${CYAN}[0]${NC}  ${BOLD}Назад в прокси меню${NC}"
     echo ""
 
@@ -602,6 +708,9 @@ while true; do
             show_link
             ;;
         7)
+            mtg_doctor
+            ;;
+        8)
             purge_mtg
             ;;
         0)
