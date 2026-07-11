@@ -29,18 +29,59 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# ── Подключение правил из data/rules.sh ─────────────────────
-RULES_SCRIPT="/opt/mtpr-simple/data/rules.sh"
-if [ -f "$RULES_SCRIPT" ]; then
-    source "$RULES_SCRIPT"
-else
-    log_warning "data/rules.sh не найден. Сначала установите MEKO Launcher."
-    echo ""
-    echo -e "  ${YELLOW}Установите MEKO Launcher через стандартную установку.${NC}"
-    exit 1
+# ── Функция скачивания файла ─────────────────────────────────
+download_file() {
+    local file="$1"
+    local dest="$2"
+    local url="$BASE_URL/$file"
+    
+    mkdir -p "$(dirname "$dest")"
+    
+    if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
+        chmod +x "$dest" 2>/dev/null || true
+        return 0
+    else
+        return 1
+    fi
+}
+
+# ── 1. ПРОВЕРКА И УСТАНОВКА RULES.SH ──────────────────────────
+RULES_SCRIPT="$INSTALL_DIR/data/rules.sh"
+
+if [ ! -f "$RULES_SCRIPT" ]; then
+    log_info "Скачивание data/rules.sh..."
+    if download_file "data/rules.sh" "$RULES_SCRIPT"; then
+        log_success "data/rules.sh загружен"
+    else
+        log_error "Не удалось загрузить data/rules.sh"
+        exit 1
+    fi
 fi
 
-# ── Меню выбора правил SYN FIX (прямо как в main.sh) ──────
+# Подключаем rules.sh
+source "$RULES_SCRIPT"
+
+# ── Функция проверки и загрузки файла прокси ──────────────────
+ensure_proxy_file() {
+    local proxy_file="$1"
+    local dest="$INSTALL_DIR/$proxy_file"
+    
+    if [ ! -f "$dest" ]; then
+        log_info "Скачивание $proxy_file..."
+        if download_file "$proxy_file" "$dest"; then
+            log_success "$proxy_file загружен"
+        else
+            log_error "Не удалось загрузить $proxy_file"
+            return 1
+        fi
+    fi
+    chmod +x "$dest" 2>/dev/null || true
+    return 0
+}
+
+echo -e "  ${BOLD}${CYAN}⚙️ УСТАНОВКА MEKOPR (РЕЖИМ: Auto) v0.1${NC}"
+echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+# ── Меню выбора правил SYN FIX ──────────────────────────────
 echo ""
 echo -e "  ${BOLD}${CYAN}🔧 УСТАНОВКА SYN FIX${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
@@ -71,7 +112,6 @@ case "$fix_choice" in
     1|2|3|4)
         echo ""
         log_info "Запуск установки SYN FIX..."
-        # Вызываем функцию из rules.sh
         install_syn_fix
         ;;
     *)
@@ -98,48 +138,39 @@ case "$proxy_choice" in
     1)
         echo ""
         log_info "Установка TELEMT..."
-        # Проверяем, установлен ли скрипт telemt1.sh
-        if [ -f "$INSTALL_DIR/proxys/telemt1.sh" ]; then
-            chmod +x "$INSTALL_DIR/proxys/telemt1.sh"
+        if ensure_proxy_file "proxys/telemt1.sh"; then
             source "$INSTALL_DIR/proxys/telemt1.sh"
-            install_telemt   # вызываем функцию из telemt1.sh
+            install_telemt
         else
-            log_error "telemt1.sh не найден. Сначала установите MEKO Launcher."
             exit 1
         fi
         ;;
     2)
         echo ""
         log_info "Установка TELEMT в Docker..."
-        if [ -f "$INSTALL_DIR/proxys/telemt_in_docker1.sh" ]; then
-            chmod +x "$INSTALL_DIR/proxys/telemt_in_docker1.sh"
+        if ensure_proxy_file "proxys/telemt_in_docker1.sh"; then
             source "$INSTALL_DIR/proxys/telemt_in_docker1.sh"
         else
-            log_error "telemt_in_docker1.sh не найден. Сначала установите MEKO Launcher."
             exit 1
         fi
         ;;
     3)
         echo ""
         log_info "Установка MTG..."
-        if [ -f "$INSTALL_DIR/proxys/mtgv2_1.sh" ]; then
-            chmod +x "$INSTALL_DIR/proxys/mtgv2_1.sh"
+        if ensure_proxy_file "proxys/mtgv2_1.sh"; then
             source "$INSTALL_DIR/proxys/mtgv2_1.sh"
-            install_mtg   # вызываем функцию из mtgv2_1.sh
+            install_mtg
         else
-            log_error "mtgv2_1.sh не найден. Сначала установите MEKO Launcher."
             exit 1
         fi
         ;;
     4)
         echo ""
         log_info "Установка MTProtoZig..."
-        if [ -f "$INSTALL_DIR/proxys/mtprotozig1.sh" ]; then
-            chmod +x "$INSTALL_DIR/proxys/mtprotozig1.sh"
+        if ensure_proxy_file "proxys/mtprotozig1.sh"; then
             source "$INSTALL_DIR/proxys/mtprotozig1.sh"
-            install_zig_cli && install_proxy   # вызываем функции из mtprotozig1.sh
+            install_zig_cli && install_proxy
         else
-            log_error "mtprotozig1.sh не найден. Сначала установите MEKO Launcher."
             exit 1
         fi
         ;;
@@ -167,7 +198,7 @@ echo ""
 echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM}(для работы/отслеживания прокси)${NC}"
 echo -e "  ${RED}[0]${NC}  ${BOLD}Закрыть меню установки${NC}"
 echo ""
-echo -en "  ${NC}${BOLD}Выбор ${DIM}${BOLD}(Enter - установить лаунчер):${NC} "
+echo -en "  ${BOLD}Выбор (Enter - установить лаунчер):${NC} "
 read -r final_choice
 
 case "$final_choice" in
