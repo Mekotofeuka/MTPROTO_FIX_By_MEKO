@@ -1154,7 +1154,7 @@ get_online_count() {
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.68${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.69${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
@@ -1636,6 +1636,7 @@ update_script() {
             "proxys/telemt1.sh"
             "proxys/mtprotozig1.sh"
             "proxys/telemt_in_docker1.sh"
+            "proxys/mtgv2_1.sh"
             "proxy_checker.py"
         )
         
