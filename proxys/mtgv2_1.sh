@@ -314,6 +314,11 @@ mtg_doctor() {
             echo -e "     ${CYAN}IP текущего сервера:${NC} ${server_ip}"
         fi
     fi
+    
+    echo ""
+    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+    read -rsn1
+}
 
 # ── Функция установки MTG ────────────────────────────────────
 install_mtg() {
@@ -672,7 +677,7 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.2${NC}"
+    echo -e "  ${BOLD}MTG меню v0.21${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
