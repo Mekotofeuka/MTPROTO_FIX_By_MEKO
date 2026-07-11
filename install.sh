@@ -63,8 +63,21 @@ ensure_file() {
     return 0
 }
 
+# ── Функция чтения ввода с терминала ──────────────────────────
+read_input() {
+    local input
+    # Пытаемся прочитать с /dev/tty (реальный терминал)
+    if [ -r /dev/tty ]; then
+        read -r input </dev/tty
+        echo "$input"
+    else
+        # Если /dev/tty недоступен — ничего не делаем
+        echo ""
+    fi
+}
+
 # ── Очистка экрана и шапка ────────────────────────────────────
-clear
+clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
 echo -e "  ${BOLD}${CYAN}⚙️ ${BOLD}${NC}Установка фикса ${BOLD}${CYAN}MEKO v0.1 ${BOLD}${CYAN}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
@@ -82,8 +95,10 @@ echo -e "      ${DIM}Выдаст список команд для ручног�
 echo ""
 echo -e "  ${RED}[0]${NC}  ${BOLD}${RED}Выход${NC}"
 echo ""
-echo -en "  ${NC}${BOLD}Выбор (${GREN}${BOLD}Enter${NC}${BOLD} - стандартная установка):${NC} "
-read -r choice
+echo -en "  ${NC}${BOLD}Выбор (Enter - стандартная установка):${NC} "
+
+# ── Читаем выбор с терминала ──────────────────────────────────
+choice=$(read_input)
 
 case "$choice" in
     0)
@@ -95,7 +110,6 @@ case "$choice" in
         echo ""
         log_info "Запуск автоустановки..."
         
-        # Скачиваем и запускаем install_auto.sh
         if ensure_file "install_auto.sh"; then
             exec "$INSTALL_DIR/install_auto.sh"
         else
@@ -107,7 +121,6 @@ case "$choice" in
         echo ""
         log_info "Запуск ручной установки..."
         
-        # Скачиваем и запускаем install_manual.sh
         if ensure_file "install_manual.sh"; then
             exec "$INSTALL_DIR/install_manual.sh"
         else
@@ -120,7 +133,6 @@ case "$choice" in
         echo ""
         log_info "Запуск стандартной установки MEKO Launcher..."
         
-        # Скачиваем и запускаем install_main.sh (бывший install.sh)
         if ensure_file "install_main.sh"; then
             exec "$INSTALL_DIR/install_main.sh"
         else
