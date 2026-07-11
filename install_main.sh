@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
+BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main" 
 MANIFEST_URL="$BASE_URL/data/manifest.txt"
 MANIFEST_FILE="/tmp/manifest.txt"
 INSTALL_DIR="/opt/mtpr-simple"
