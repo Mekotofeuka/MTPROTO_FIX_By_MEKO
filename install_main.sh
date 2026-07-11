@@ -22,6 +22,7 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+clear
 # ── Шапка ─────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}${CYAN}⚙️ УСТАНОВКА MEKOPR (РЕЖИМ: Main) v0.1${NC}"
@@ -76,10 +77,10 @@ download_file() {
         fi
     fi
     
-    echo -e "  ${CYAN}⏳${NC} Загрузка ${BOLD}${name}${NC} (${desc})..."
+    echo -e "  ${CYAN}⏳${NC} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})..."
     
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
-        echo -e "  ${GREEN}✓${NC} ${BOLD}${name}${NC} (${size_str})"
+        echo -e "  ${BOLD}${GREEN}✓${NC} ${BOLD}${name}${NC} (${size_str})"
         return 0
     else
         echo -e "  ${RED}✗${NC} ${BOLD}${name}${NC} — ошибка загрузки"
