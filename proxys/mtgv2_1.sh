@@ -304,9 +304,9 @@ mtg_doctor() {
         
         # Проверяем, есть ли IP сервера в списке IP домена
         if [ -n "$server_ip" ] && ! echo "$resolved_ips" | grep -q "$server_ip"; then
-            echo -e "     ${YELLOW}⚠ ВНИМАНИЕ: IP сервера (${server_ip}) НЕ СОВПАДАЕТ с IP домена (${resolved_ips})${NC}"
-            echo -e "     ${YELLOW}⚠ Если вы используете SelfSteal, проверьте DNS-запись A для домена!${NC}"
-            echo -e "     ${YELLOW}⚠ Домен должен резолвиться в IP вашего сервера, иначе iOS-клиенты могут не работать.${NC}"
+            echo -e "     ${YELLOW}${BOLD}⚠ ВНИМАНИЕ:${NC}${BOLD} IP текущего сервера ${CYAN}${BOLD}${server_ip} ${NC}${BOLD}НЕ СОВПАДАЕТ с IP домена ${CYAN}${BOLD}${resolved_ips}${NC}"
+            echo -e "     ${NC}${BOLD}  Если вы используете SelfSteal, проверьте DNS-запись A для домена${NC}"
+            echo -e "     ${NC}${BOLD}  Если же вы не используете SelfSteal - не обращайте внимания на этот текст${NC}"
         fi
     else
         echo -e "  ${CYAN}ℹ${NC} SNI-информация: не получена"
