@@ -460,14 +460,14 @@ install_syn_fix() {
         echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
-        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${NC}${BOLD} Docker - ${GREEN}рекомендуется для Docker${NC}"
+        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${NC}${BOLD} - рекомендуется для nftables${NC}"
         echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
-        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD} Docker "
+        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}"
         echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
-        echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, Docker Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, Docker старый - ${RED}${BOLD}4${NC}${BOLD}):${NC} "
+        echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}):${NC} "
         read -r fix_choice
 
         if [ -z "$fix_choice" ] || [ "$fix_choice" = "1" ]; then
@@ -478,10 +478,10 @@ install_syn_fix() {
             log_info "Выбран старый вариант фикса"
         elif [ "$fix_choice" = "3" ]; then
             FIX_TYPE="docker_smart"
-            log_info "Выбран Docker Smart By-MEKO (nftables)"
+            log_info "Выбран nftables Smart By-MEKO"
         elif [ "$fix_choice" = "4" ]; then
             FIX_TYPE="docker_classic"
-            log_info "Выбран Docker Classic (nftables)"
+            log_info "Выбран nftables Classic"
         else
             log_warning "Неверный выбор, используем новый вариант"
             FIX_TYPE="new"
@@ -512,18 +512,8 @@ install_syn_fix() {
     log_info "Установка SYN FIX на порты: $ports_str"
     save_port "$ports_str"
 
-    # ── Docker режимы (nftables) ────────────────────────────
+    # ── nftables режимы ──────────────────────────────────────
     if [ "$FIX_TYPE" = "docker_smart" ] || [ "$FIX_TYPE" = "docker_classic" ]; then
-
-        # Проверяем Docker
-        if ! command -v docker &>/dev/null; then
-            echo ""
-            log_error "Docker не установлен. Установите Docker перед использованием этого режима."
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            read -rsn1
-            return 1
-        fi
 
         # Проверяем nftables
         if ! command -v nft &>/dev/null; then
@@ -1164,7 +1154,7 @@ get_online_count() {
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.67${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.68${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
