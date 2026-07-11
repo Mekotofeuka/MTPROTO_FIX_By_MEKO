@@ -12,10 +12,21 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# ── Функция чтения ввода с терминала ──────────────────────────
+read_input() {
+    local input
+    if [ -r /dev/tty ]; then
+        read -r input </dev/tty
+        echo "$input"
+    else
+        echo ""
+    fi
+}
+
 # ── Очистка экрана и шапка ──────────────────────────────────
-clear
+clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${BOLD}${CYAN}📋 РУЧНАЯ УСТАНОВКА MEKOPR${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Manual${NC}${BOLD}) v0.11${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${YELLOW}${BOLD}⚠ ВНИМАНИЕ:${NC} Данное меню находится в разработке."
@@ -34,32 +45,33 @@ while true; do
     echo -e "  ${CYAN}[0]${NC}  Выход"
     echo ""
     echo -en "  ${BOLD}Выбор:${NC} "
-    read -r choice
+    
+    choice=$(read_input)
 
     case "$choice" in
         1)
             echo ""
             echo -e "  ${YELLOW}[!]${NC} Установка Telemt в разработке..."
             echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            read -rsn1
+            read -rsn1 2>/dev/null || read -rsn1 </dev/tty
             ;;
         2)
             echo ""
             echo -e "  ${YELLOW}[!]${NC} Установка MTProtoZig в разработке..."
             echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            read -rsn1
+            read -rsn1 2>/dev/null || read -rsn1 </dev/tty
             ;;
         3)
             echo ""
             echo -e "  ${YELLOW}[!]${NC} Установка MTG в разработке..."
             echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            read -rsn1
+            read -rsn1 2>/dev/null || read -rsn1 </dev/tty
             ;;
         4)
             echo ""
             echo -e "  ${YELLOW}[!]${NC} Настройка SYN FIX в разработке..."
             echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            read -rsn1
+            read -rsn1 2>/dev/null || read -rsn1 </dev/tty
             ;;
         0 | q | Q)
             echo ""
