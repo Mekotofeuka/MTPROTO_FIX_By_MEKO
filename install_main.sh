@@ -80,10 +80,10 @@ download_file() {
         fi
     fi
     
-    echo -e "  ${CYAN}⏳${NC} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})..."
+    echo -e "  ${CYAN}⏳${NC} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})"
     
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
-        echo -e "  ${GREEN}${BOLD}✓${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
+        echo -e "  ${GREEN}${BOLD}✓ Скачан успешно:${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
         return 0
     else
         echo -e "  ${RED}✗${NC} ${RED}${name}${NC} — ошибка загрузки"
