@@ -294,7 +294,6 @@ mtg_doctor() {
         # Парсим строку
         local domain_name=$(echo "$sni_line" | sed -E 's/.*Hostname ([^ ]*) .*/\1/')
         local resolved_ips=$(echo "$sni_line" | grep -o '"\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
-        local expected_ip=$(echo "$sni_line" | grep -o 'not [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | sed 's/not //')
         
         echo -e "  ${CYAN}ℹ${NC} SNI-информация:"
         echo -e "     ${CYAN}Домен:${NC} ${domain_name}"
@@ -302,8 +301,10 @@ mtg_doctor() {
         if [ -n "$server_ip" ]; then
             echo -e "     ${CYAN}IP текущего сервера:${NC} ${server_ip}"
         fi
-        if [ -n "$expected_ip" ] && [ -n "$server_ip" ] && [ "$expected_ip" != "$server_ip" ]; then
-            echo -e "     ${YELLOW}⚠ ВНИМАНИЕ: IP сервера (${server_ip}) НЕ СОВПАДАЕТ с IP домена (${expected_ip})${NC}"
+        
+        # Проверяем, есть ли IP сервера в списке IP домена
+        if [ -n "$server_ip" ] && ! echo "$resolved_ips" | grep -q "$server_ip"; then
+            echo -e "     ${YELLOW}⚠ ВНИМАНИЕ: IP сервера (${server_ip}) НЕ СОВПАДАЕТ с IP домена (${resolved_ips})${NC}"
             echo -e "     ${YELLOW}⚠ Если вы используете SelfSteal, проверьте DNS-запись A для домена!${NC}"
             echo -e "     ${YELLOW}⚠ Домен должен резолвиться в IP вашего сервера, иначе iOS-клиенты могут не работать.${NC}"
         fi
@@ -313,11 +314,6 @@ mtg_doctor() {
             echo -e "     ${CYAN}IP текущего сервера:${NC} ${server_ip}"
         fi
     fi
-    
-    echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    read -rsn1
-}
 
 # ── Функция установки MTG ────────────────────────────────────
 install_mtg() {
@@ -676,7 +672,7 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.19${NC}"
+    echo -e "  ${BOLD}MTG меню v0.2${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
