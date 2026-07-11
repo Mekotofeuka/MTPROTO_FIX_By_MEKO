@@ -191,19 +191,27 @@ purge_mtg_silent() {
 mtg_doctor() {
     local config_path="/etc/mtg.toml"
     
-    if [ ! -f "$config_path" ]; then
-        echo -e "  ${RED}[✗] Конфиг не найден: $config_path${NC}"
-        return 1
-    fi
-    
     echo ""
     echo -e "  ${BOLD}${CYAN}Проверка MTG прокси${NC}"
     echo -e "  ${DIM}─────────────────────────────────────────${NC}"
     
+    if [ ! -f "$config_path" ]; then
+        echo -e "  ${RED}[✗] Конфиг не найден: $config_path${NC}"
+        echo ""
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+        read -rsn1
+        return 1
+    fi
+    
     local output
     output=$(mtg doctor "$config_path" 2>/dev/null)
-    if [ $? -ne 0 ] || [ -z "$output" ]; then
+    local doctor_exit=$?
+    
+    if [ $doctor_exit -ne 0 ] || [ -z "$output" ]; then
         echo -e "  ${RED}[✗] Не удалось выполнить проверку. Убедитесь, что MTG запущен.${NC}"
+        echo ""
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+        read -rsn1
         return 1
     fi
     
@@ -284,7 +292,7 @@ mtg_doctor() {
     fi
     
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
     read -rsn1
 }
 
@@ -645,7 +653,7 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.15${NC}"
+    echo -e "  ${BOLD}MTG меню v0.16${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
