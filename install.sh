@@ -1,18 +1,27 @@
 #!/bin/bash
+# install.sh – Главный установщик MEKOPR
+
 set -e
 
 BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
-FILES=("main.sh" "proxys/proxymenu.sh" "proxys/telemt1.sh" "proxys/mtprotozig1.sh" "proxys/mtgv2_1.sh" "proxys/telemt_in_docker1.sh" "proxy_checker.py")
+INSTALL_DIR="/opt/mtpr-simple"
 
 # ── Цвета ─────────────────────────────────────────────────────
+RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-YELLOW='\033[0;33m'
-RED='\033[0;31m'
+GRAY='\033[0;90m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
+
+# ── Логирование ─────────────────────────────────────────────
+log_info() { echo -e "  ${BLUE}[i]${NC} $1"; }
+log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
+log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
+log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 
 # ── Проверка root ────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
@@ -20,78 +29,103 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# ── Шапка ─────────────────────────────────────────────────────
-echo ""
-echo -e "  ${BOLD}${CYAN}⚙️ УСТАНОВКА MEKOPR${NC}"
-echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
-echo ""
-
-# ── Создание директорий ──────────────────────────────────────
-mkdir -p /opt/mtpr-simple/proxys
-
-# ── Асинхронное скачивание ──────────────────────────────────
+# ── Функция скачивания файла ─────────────────────────────────
 download_file() {
     local file="$1"
+    local dest="$2"
     local url="$BASE_URL/$file"
-    local dest="/opt/mtpr-simple/$file"
-    local name=$(basename "$file")
     
-    # Получаем размер файла
-    local size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
-    local size_str="?"
-    if [ -n "$size" ] && [ "$size" -gt 0 ] 2>/dev/null; then
-        if [ "$size" -gt 1048576 ]; then
-            local mb=$((size / 1048576))
-            local remainder=$(((size % 1048576) / 104857))
-            if [ "$remainder" -gt 0 ]; then
-                size_str="${mb}.${remainder} MB"
-            else
-                size_str="${mb} MB"
-            fi
-        elif [ "$size" -gt 1024 ]; then
-            size_str="$((size / 1024)) KB"
-        else
-            size_str="$size B"
-        fi
-    fi
-    
-    # Показываем процесс загрузки
-    echo -e "  ${CYAN}⏳${NC} Загрузка ${BOLD}${name}${NC}..."
+    mkdir -p "$(dirname "$dest")"
     
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
-        echo -e "  ${GREEN}✓${NC} ${BOLD}${name}${NC} (${size_str})"
+        chmod +x "$dest" 2>/dev/null || true
+        return 0
     else
-        echo -e "  ${RED}✗${NC} ${BOLD}${name}${NC} — ошибка загрузки"
+        return 1
     fi
 }
-export -f download_file
-export BASE_URL
 
-# ── Запуск параллельной загрузки ────────────────────────────
-echo -e "  ${BOLD}Загрузка файлов...${NC}"
+# ── Функция проверки и загрузки файла ────────────────────────
+ensure_file() {
+    local file="$1"
+    local dest="$INSTALL_DIR/$file"
+    
+    if [ ! -f "$dest" ]; then
+        log_info "Скачивание $file..."
+        if download_file "$file" "$dest"; then
+            log_success "$file загружен"
+        else
+            log_error "Не удалось загрузить $file"
+            return 1
+        fi
+    fi
+    chmod +x "$dest" 2>/dev/null || true
+    return 0
+}
+
+# ── Очистка экрана и шапка ────────────────────────────────────
+clear
 echo ""
-
-printf "%s\n" "${FILES[@]}" | xargs -P 6 -I {} bash -c 'download_file "$@"' _ {}
-
-# ── Установка прав и создание ссылки ────────────────────────
+echo -e "  ${BOLD}${CYAN}⚙️ ${BOLD}${NC}Установка фикса ${BOLD}${CYAN}MEKO v0.1 ${BOLD}${CYAN}⚙️${NC}"
+echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
-echo -ne "  ${CYAN}[+]${NC} Установка прав выполнения... "
-chmod +x /opt/mtpr-simple/main.sh && chmod +x /opt/mtpr-simple/proxys/*.sh && echo -e "${GREEN}✓${NC}"
-
-echo -ne "  ${CYAN}[+]${NC} Создание ссылки ${BOLD}mekopr${NC}... "
-ln -sf /opt/mtpr-simple/main.sh /usr/local/bin/mekopr && echo -e "${GREEN}✓${NC}"
-
-# ── Завершение ───────────────────────────────────────────────
+echo -e "  ${BOLD}Выберите способ установки:${NC}"
 echo ""
-echo -e "  ${BOLD}${GREEN}✅ Установка MEKOPR успешно завершена!${NC}"
-echo -e "  ${DIM}─────────────────────────────────────────────────────${NC}"
+echo -e "  ${GREEN}[1]${NC}  ${BOLD}Стандартная установка${NC}  ${GREEN}${BOLD}(рекомендуется)${NC}"
+echo -e "      ${DIM}Установит MEKO Launcher и все необходимые файлы${NC}"
 echo ""
-echo -e "  Для открытия меню при дальнейшей работе используйте команду ${BOLD}${GREEN}mekopr${NC}"
+echo -e "  ${CYAN}[2]${NC}  ${BOLD}Автоустановка${NC}  ${DIM}${BOLD}(для новичков)${NC}"
+echo -e "      ${DIM}Установит фикс и сам прокси с нуля в два клика${NC}"
 echo ""
+echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Ручная установка${NC}  ${NC}${BOLD}(режим разработчика)${NC}"
+echo -e "      ${DIM}Выдаст список команд для ручного выполнения фикса/установки${NC}"
+echo ""
+echo -e "  ${RED}[0]${NC}  ${BOLD}${RED}Выход${NC}"
+echo ""
+echo -en "  ${NC}${BOLD}Выбор (${GREN}${BOLD}Enter${NC}${BOLD} - стандартная установка):${NC} "
+read -r choice
 
-if [ -r /dev/tty ]; then
-    exec /opt/mtpr-simple/main.sh </dev/tty
-fi
-
-echo -e "  ${YELLOW}[!]${NC} Интерактивный терминал недоступен, меню не запущено."
-echo -e "  Запустите ${BOLD}sudo mekopr${NC}, чтобы открыть меню вручную."
+case "$choice" in
+    0)
+        echo ""
+        log_info "Выход..."
+        exit 0
+        ;;
+    2)
+        echo ""
+        log_info "Запуск автоустановки..."
+        
+        # Скачиваем и запускаем install_auto.sh
+        if ensure_file "install_auto.sh"; then
+            exec "$INSTALL_DIR/install_auto.sh"
+        else
+            log_error "Не удалось загрузить install_auto.sh"
+            exit 1
+        fi
+        ;;
+    3)
+        echo ""
+        log_info "Запуск ручной установки..."
+        
+        # Скачиваем и запускаем install_manual.sh
+        if ensure_file "install_manual.sh"; then
+            exec "$INSTALL_DIR/install_manual.sh"
+        else
+            log_error "Не удалось загрузить install_manual.sh"
+            exit 1
+        fi
+        ;;
+    *)
+        # 1 или Enter — стандартная установка
+        echo ""
+        log_info "Запуск стандартной установки MEKO Launcher..."
+        
+        # Скачиваем и запускаем install_main.sh (бывший install.sh)
+        if ensure_file "install_main.sh"; then
+            exec "$INSTALL_DIR/install_main.sh"
+        else
+            log_error "Не удалось загрузить install_main.sh"
+            exit 1
+        fi
+        ;;
+esac
