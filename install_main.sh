@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-BASE_URL="https://raw.githubusercontent.comMekotofeuka/MTPROTO_FIX_By_MEKO/main"
+BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
 MANIFEST_URL="$BASE_URL/data/manifest.txt"
 MANIFEST_FILE="/tmp/manifest.txt"
 INSTALL_DIR="/opt/mtpr-simple"
@@ -33,7 +33,7 @@ echo -e "  ${BOLD}${DIM}══════════════════�
 echo ""
 
 # ── Получение манифеста ──────────────────────────────────────
-echo -e "  ${BLUE}[i]${NC} Загрузка dados..."
+echo -e "  ${BLUE}[i]${NC} Загрузка данных..."
 if ! curl -fsSL "$MANIFEST_URL" -o "$MANIFEST_FILE"; then
     echo -e "  ${RED}[✗]${NC} Не удалось загрузить информацию о необходимых файлах"
     exit 1
