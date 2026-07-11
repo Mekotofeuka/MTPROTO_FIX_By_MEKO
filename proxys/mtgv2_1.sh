@@ -67,7 +67,6 @@ get_mtg_port() {
         echo ""
         return 1
     fi
-    # Сначала ищем bind-to, потом port (если есть)
     local _port
     _port=$(grep -E '^bind-to[[:space:]]*=' "$_cfg" 2>/dev/null | head -1 | sed -E 's/^[[:space:]]*bind-to[[:space:]]*=[[:space:]]*"//; s/".*$//' | awk -F: '{print $2}')
     if [ -z "$_port" ]; then
@@ -102,22 +101,119 @@ get_public_ip() {
     echo "$_ip"
 }
 
+# ── Функция скачивания и установки бинарника MTG ────────────
+install_mtg_binary() {
+    echo -e "  ${BLUE}[i]${NC} Скачивание и установка MTG..."
+
+    # Определяем архитектуру
+    local arch
+    arch=$(uname -m)
+    local mtg_arch=""
+    case "$arch" in
+        x86_64)  mtg_arch="amd64" ;;
+        aarch64) mtg_arch="arm64" ;;
+        armv7l)  mtg_arch="armv7" ;;
+        armv6l)  mtg_arch="armv6" ;;
+        *)
+            echo -e "  ${RED}[✗] Неподдерживаемая архитектура: $arch${NC}"
+            return 1
+            ;;
+    esac
+
+    # Скачиваем последнюю версию
+    local tmp_dir=$(mktemp -d)
+    cd "$tmp_dir"
+
+    echo -e "  ${BLUE}[i]${NC} Загрузка MTG для архитектуры ${mtg_arch}..."
+    
+    # Получаем URL последней версии
+    local download_url
+    download_url=$(curl -s https://api.github.com/repos/9seconds/mtg/releases/latest | grep -o "https://.*mtg-.*-linux-${mtg_arch}.*\.tar\.gz" | head -1)
+    
+    if [ -z "$download_url" ]; then
+        echo -e "  ${RED}[✗] Не удалось найти последнюю версию MTG${NC}"
+        cd / && rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    echo -e "  ${BLUE}[i]${NC} Скачивание: ${download_url##*/}"
+    
+    if ! curl -fsSL --max-time 60 "$download_url" -o mtg.tar.gz; then
+        echo -e "  ${RED}[✗] Ошибка скачивания MTG${NC}"
+        cd / && rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    # Распаковываем
+    tar -xzf mtg.tar.gz
+    local mtg_bin
+    mtg_bin=$(find . -type f -name "mtg" ! -path "*/.*" 2>/dev/null | head -1)
+    
+    if [ -z "$mtg_bin" ]; then
+        echo -e "  ${RED}[✗] Бинарник mtg не найден в архиве${NC}"
+        cd / && rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    # Устанавливаем
+    mv "$mtg_bin" /usr/local/bin/mtg
+    chmod +x /usr/local/bin/mtg
+
+    cd / && rm -rf "$tmp_dir"
+
+    # Проверяем установку
+    if command -v mtg >/dev/null 2>&1; then
+        local version=$(mtg --version 2>/dev/null | head -1 | awk '{print $2}')
+        echo -e "  ${GREEN}✓${NC} MTG успешно установлен (версия: ${version})"
+        return 0
+    else
+        echo -e "  ${RED}[✗] Ошибка установки MTG${NC}"
+        return 1
+    fi
+}
+
+# ── Функция тихого удаления MTG (без подтверждения) ─────────
+purge_mtg_silent() {
+    systemctl stop mtg.service 2>/dev/null || true
+    systemctl disable mtg.service 2>/dev/null || true
+    rm -f /etc/systemd/system/mtg.service
+    systemctl daemon-reload 2>/dev/null || true
+    rm -f /usr/local/bin/mtg
+    rm -f /etc/mtg.toml
+    rm -f "$CONFIG_PATH_FILE"
+    rm -f mtg-latest.tar.gz 2>/dev/null || true
+    rm -f mtg-*.tar.gz 2>/dev/null || true
+    rm -rf mtg-*/ 2>/dev/null || true
+}
+
 # ── Функция установки MTG ────────────────────────────────────
 install_mtg() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Установка MTG"
 
-    # Проверяем, установлен ли уже (просто показываем, что установка начата)
+    # Проверяем, установлен ли уже бинарник
     local already_installed=false
     if is_mtg_installed; then
         already_installed=true
         local current_version=$(get_mtg_version)
         echo -e "  ${YELLOW}[!] Обнаружена старая версия MTG: ${current_version}${NC}"
-        echo -e "  ${YELLOW}[!] Будет выполнена переустановка (старая версия будет удалена)${NC}"
+        echo -e "  ${YELLOW}[!] Будет выполнена переустановка${NC}"
         echo ""
         # Удаляем старую версию без подтверждения
         purge_mtg_silent
     fi
+
+    # 1. Сначала устанавливаем бинарник mtg
+    if ! install_mtg_binary; then
+        echo ""
+        echo -e "  ${RED}[✗] Не удалось установить MTG${NC}"
+        echo ""
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+        read -rsn1
+        return 1
+    fi
+
+    # Теперь mtg установлен, можно генерировать секрет
 
     # Запрос порта
     local default_port="443"
@@ -153,15 +249,14 @@ install_mtg() {
         if [ -z "$SECRET" ]; then
             SECRET=$(mtg generate-secret --hex "$domain" 2>/dev/null)
             if [ -z "$SECRET" ]; then
-                echo -e "  ${RED}[✗] Не удалось сгенерировать секрет. Убедитесь, что mtg установлен.${NC}"
-                echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                read -rsn1
-                return 1
+                echo -e "  ${RED}[✗] Не удалось сгенерировать секрет. Попробуйте ввести вручную.${NC}"
+                SECRET=""
             fi
         fi
         
-        echo -e "  ${DIM}Сгенерирован секрет: ${CYAN}${SECRET}${NC}"
+        if [ -n "$SECRET" ]; then
+            echo -e "  ${DIM}Сгенерирован секрет: ${CYAN}${SECRET}${NC}"
+        fi
         echo ""
         echo -e "  ${BOLD}Варианты:${NC}"
         echo -e "  ${GREEN}Enter/Y${NC} — использовать сгенерированный секрет"
@@ -181,15 +276,17 @@ install_mtg() {
             echo ""
             echo -e "  ${GREEN}✓${NC} Новый секрет: ${CYAN}${SECRET}${NC}"
             echo ""
-            # Показываем меню снова с новым секретом
             continue
         elif [[ -n "$secret_input" ]] && [[ ! "$secret_input" =~ ^[yY]$ ]]; then
-            # Ввели что-то кроме gen, enter, y, Y — считаем это ручным вводом секрета
             SECRET="$secret_input"
             echo ""
             echo -e "  ${GREEN}✓${NC} Использован секрет: ${CYAN}${SECRET}${NC}"
             echo ""
             break
+        elif [ -z "$SECRET" ]; then
+            # Секрета нет, а пользователь нажал Enter без секрета
+            echo -e "  ${YELLOW}[!] Секрет не сгенерирован. Попробуйте ввести 'gen' или введите вручную.${NC}"
+            continue
         else
             # Enter или y/Y
             echo ""
@@ -255,7 +352,7 @@ EOF
         systemctl start mtg.service
         echo -e "  ${GREEN}✓${NC} Служба mtg.service установлена и запущена."
     else
-        echo -e "  ${YELLOW}[!] systemd не установлен. Для запуска используйте: mtg run /etc/mtg.toml${NC}"
+        echo -e "  ${YELLOW}[!] Для запуска используйте: mtg run /etc/mtg.toml${NC}"
     fi
 
     echo ""
@@ -263,20 +360,6 @@ EOF
     echo ""
     echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
     read -rsn1
-}
-
-# ── Функция тихого удаления MTG (без подтверждения) ─────────
-purge_mtg_silent() {
-    systemctl stop mtg.service 2>/dev/null || true
-    systemctl disable mtg.service 2>/dev/null || true
-    rm -f /etc/systemd/system/mtg.service
-    systemctl daemon-reload 2>/dev/null || true
-    rm -f /usr/local/bin/mtg
-    rm -f /etc/mtg.toml
-    rm -f "$CONFIG_PATH_FILE"
-    rm -f mtg-latest.tar.gz 2>/dev/null || true
-    rm -f mtg-*.tar.gz 2>/dev/null || true
-    rm -rf mtg-*/ 2>/dev/null || true
 }
 
 # ── Функция открытия конфига ─────────────────────────────────
@@ -457,14 +540,14 @@ show_link() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}MTG меню v0.12${NC}"
+    echo -e "  ${BOLD}MTG меню v0.13${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
     if is_mtg_installed; then
         echo -e "  ${NC}${BOLD}MTG:${NC}${GREEN} установлен${NC}"
         version=$(get_mtg_version)
-        if [ -n "$version" ] && [ "$version" != "go1.26.1:" ]; then
+        if [ -n "$version" ] && [[ "$version" != "go1.26.1:"* ]]; then
             echo -e "  ${NC}${BOLD}Версия:${NC} ${GREEN}${version}${NC}"
         fi
         config_path=$(get_config_path)
