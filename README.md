@@ -181,18 +181,12 @@ SOL SPL
 Gn7w3EBkZqPjPDcbkTaxspip42TuhoGqaaEqHAxhG9V1
 ```
 
-СБП
-
-<img width="300" height="300" alt="dalink-qr-code" src="https://github.com/user-attachments/assets/5ec29f8c-8926-4df1-b031-d4ef768b0cb2" />
-
-https://dalink.to/mekome
-
-
-
 Также вы можете поддержать меня, воспользовавшись моим сервисом:
 
 [<img width="300" height="300" alt="MEKO bot" src="https://github.com/user-attachments/assets/8db41a95-79f2-40d6-9777-50b6ffb6fa48" />](https://t.me/projectmeko_bot)
 
+
+dalink.to/mekome
 
 
 
