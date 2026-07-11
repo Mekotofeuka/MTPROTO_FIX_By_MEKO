@@ -1,0 +1,17 @@
+install_auto.sh|Авто-установщик
+install_manual.sh|Ручной-установщик
+install.sh|Главный файл установки 
+
+main.sh|Главное меню лаунчера
+
+proxys/proxymenu.sh|Меню выбора прокси
+
+proxys/telemt1.sh|Меню Telemt
+
+proxys/mtgv2_1.sh|Меню MTG
+
+proxys/mtprotozig1.sh|Меню MTProtoZig
+
+proxys/telemt_in_docker1.sh|Установка Telemt в Docker
+
+proxy_checker.py|Проверка SNI
