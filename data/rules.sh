@@ -294,20 +294,15 @@ install_syn_fix() {
             ports_input="443"
         fi
     else
-        # Если порты уже переданы через переменную окружения FORCED_PORTS
-        if [ -n "$FORCED_PORTS" ]; then
-            ports_input="$FORCED_PORTS"
-            log_info "Используем порты из переменной: $ports_input"
-        else
-            echo ""
-            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080):${NC} "
-            ports_input=$(read_input)
-            if [ -z "$ports_input" ]; then
-                ports_input="443"
-            fi
+        echo ""
+        echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080):${NC} "
+        read -r ports_input
+        if [ -z "$ports_input" ]; then
+            ports_input="443"
+        fi
 
-            echo ""
-            echo -e "  ${BOLD}Выберите тип SYN FIX:${NC}"
+        echo ""
+        echo -e "  ${BOLD}Выберите тип SYN FIX:${NC}"
         echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}рекомендуется${NC}"
         echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
@@ -315,10 +310,10 @@ install_syn_fix() {
         echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
-        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${NC}${BOLD} - рекомендуется для nftables${NC}"
+        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${GREEN}${BOLD} - рекомендуется${NC}${BOLD} (работает с Docker)${NC}"
         echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
-        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}"
+        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}" ${NC}${BOLD} (работает с Docker)
         echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
