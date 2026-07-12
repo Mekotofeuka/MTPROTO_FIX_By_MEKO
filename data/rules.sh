@@ -298,10 +298,10 @@ install_syn_fix() {
         echo ""
         # Используем /dev/tty для ввода
         if [ -r /dev/tty ]; then
-            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080(${GREEN}${BOLD}Enter - 443)${NC}${BOLD}):${NC} "
+            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080${GREEN}${BOLD}(Enter - 443)${NC}${BOLD}):${NC} "
             read -r ports_input </dev/tty
         else
-            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080(${GREEN}${BOLD}Enter - 443)${NC}${BOLD}):${NC} "
+            echo -en "  ${BOLD}Введите порты для SYN FIX (через запятую, например: 443,8443,8080${GREEN}${BOLD}(Enter - 443)${NC}${BOLD}):${NC} "
             read -r ports_input
         fi
         if [ -z "$ports_input" ]; then
@@ -311,21 +311,21 @@ install_syn_fix() {
         echo ""
         echo -e "  ${BOLD}Выберите тип SYN FIX:${NC}"
         echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}рекомендуется${NC}"
-        echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
+        echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
         echo -e "  ${CYAN}[2]${NC}  ${BOLD}Старый вариант(iptables)${NC} (Разделение устройств определяя их TTL+Length)"
-        echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
+        echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
         echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${GREEN}${BOLD} - рекомендуется (Совместим с Docker)${NC}"
-        echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
+        echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
         echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}${NC}${BOLD} (Совместим с Docker)"
-        echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
+        echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
         if [ -r /dev/tty ]; then
-            echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}):${NC} "
+            echo -en "  ${NC}${BOLD}Ввод (Поумолчанию - ${GREEN}${BOLD}1 или enter${NC}${BOLD}:${NC} "
             read -r fix_choice </dev/tty
         else
             echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Поумолчанию - 1(Enter)${NC}${BOLD}):${NC} "
@@ -334,16 +334,16 @@ install_syn_fix() {
 
         if [ -z "$fix_choice" ] || [ "$fix_choice" = "1" ]; then
             FIX_TYPE="new"
-            log_info "Выбран новый вариант фикса"
+            log_info "Выбран новый iptables"
         elif [ "$fix_choice" = "2" ]; then
             FIX_TYPE="old"
-            log_info "Выбран старый вариант фикса"
+            log_info "Выбран старый iptables"
         elif [ "$fix_choice" = "3" ]; then
             FIX_TYPE="docker_smart"
-            log_info "Выбран nftables Smart By-MEKO"
+            log_info "Выбран nftables новый"
         elif [ "$fix_choice" = "4" ]; then
             FIX_TYPE="docker_classic"
-            log_info "Выбран nftables Classic"
+            log_info "Выбран nftables старый"
         else
             log_warning "Неверный выбор, используем новый вариант"
             FIX_TYPE="new"
