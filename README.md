@@ -55,9 +55,10 @@
 - Медиа грузят практически с прежней скоростью
 -  **Ставится в один клик**
 <div align="center">
-<img width="550" height="400" alt="image" src="https://github.com/user-attachments/assets/4268e1aa-7941-4676-9f80-13fd2f3b4803" />
+<img width="550" height="400" alt="image" src="https://github.com/user-attachments/assets/69290da8-c3b3-4961-b584-46a0450159d2" />
 <img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/3296a6c6-c097-4e5a-bd05-7c9f64154f79" />
-<img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/64dd8fe0-c8ee-4b6d-8ee8-b02782f556cd" />
+<img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/8f07e4ea-3a99-43a4-8232-ad7f7ece634e" />
+
 
 </div>
 
