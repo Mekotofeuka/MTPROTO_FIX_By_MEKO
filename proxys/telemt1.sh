@@ -571,7 +571,7 @@ install_telemt() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Установка Telemt версии ${display_version}..."
     echo ""
-    
+    cd /tmp
     if [ "$install_version" = "latest" ]; then
         if curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh; then
             echo ""
