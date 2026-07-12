@@ -325,10 +325,10 @@ install_syn_fix() {
         echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
         if [ -r /dev/tty ]; then
-            echo -en "  ${NC}${BOLD}Ввод (Поумолчанию - ${GREEN}${BOLD}1 или enter${NC}${BOLD}:${NC} "
+            echo -en "  ${NC}${BOLD}Ввод (По умолчанию - ${GREEN}${BOLD}1 или enter${NC}${BOLD}):${NC} "
             read -r fix_choice </dev/tty
         else
-            echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Поумолчанию - 1(Enter)${NC}${BOLD}):${NC} "
+            echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}По умолчанию - 1(Enter)${NC}${BOLD}):${NC} "
             read -r fix_choice
         fi
 
