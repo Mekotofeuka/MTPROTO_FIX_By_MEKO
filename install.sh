@@ -76,23 +76,10 @@ ensure_file() {
     return 0
 }
 
-# ── Функция чтения ввода с терминала ──────────────────────────
-read_input() {
-    local input
-    # Пытаемся прочитать с /dev/tty (реальный терминал)
-    if [ -r /dev/tty ]; then
-        read -r input </dev/tty
-        echo "$input"
-    else
-        # Если /dev/tty недоступен — ничего не делаем
-        echo ""
-    fi
-}
-
 # ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}1 ${CYAN}${BOLD}⚙️${NC}"
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}2 ${CYAN}${BOLD}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Выберите способ установки:${NC}"
@@ -107,8 +94,12 @@ echo -e "  ${RED}${BOLD}[0]${NC}  ${RED}${BOLD}Выход${NC}"
 echo ""
 echo -en "  ${NC}${BOLD}Выбор (${GREEN}${BOLD}Enter${NC}${BOLD} - стандартная установка):${NC} "
 
-# ── Читаем выбор с терминала ──────────────────────────────────
-choice=$(read_input)
+# ── Читаем выбор с терминала, если не удалось — выходим ────
+if ! read -r choice </dev/tty 2>/dev/null; then
+    echo ""
+    echo -e "  ${RED}[✗]${NC} Не удалось прочитать ввод. Запустите скрипт интерактивно."
+    exit 1
+fi
 
 case "$choice" in
     0)
@@ -121,7 +112,8 @@ case "$choice" in
         log_info "Запуск автоустановки..."
         
         if ensure_file "install_auto.sh"; then
-            exec "$INSTALL_DIR/install_auto.sh"
+            bash "$INSTALL_DIR/install_auto.sh"
+            exit 0
         else
             log_error "Не удалось загрузить install_auto.sh"
             exit 1
@@ -132,7 +124,8 @@ case "$choice" in
         log_info "Запуск ручной установки..."
         
         if ensure_file "install_manual.sh"; then
-            exec "$INSTALL_DIR/install_manual.sh"
+            bash "$INSTALL_DIR/install_manual.sh"
+            exit 0
         else
             log_error "Не удалось загрузить install_manual.sh"
             exit 1
@@ -144,9 +137,7 @@ case "$choice" in
         log_info "Запуск стандартной установки MEKO Launcher..."
         
         if ensure_file "install_main.sh"; then
-            # Запускаем install_main.sh с перенаправлением stdin на /dev/tty
-            # и ждём его завершения, после чего выходим
-            "$INSTALL_DIR/install_main.sh" </dev/tty
+            bash "$INSTALL_DIR/install_main.sh"
             exit 0
         else
             log_error "Не удалось загрузить install_main.sh"
