@@ -1,7 +1,7 @@
 <div align="center">
 
 
-# MEKO | MTProto Launcher and fixer
+# MEKO | MTProto Installer, Launcher and fixer
 
 <a href="https://t.me/meko_mtprotofix">
 <img width="300" height="300" alt="Без имени-1" src="https://github.com/user-attachments/assets/8decca32-f96a-4b00-9e6c-1bf16bf94d33" />
