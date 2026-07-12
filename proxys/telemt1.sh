@@ -571,7 +571,11 @@ install_telemt() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Установка Telemt версии ${display_version}..."
     echo ""
-    echo "DEBUG: INSTALL_DIR=$INSTALL_DIR" >&2
+
+    # ── ПЕРЕХОДИМ В /tmp И УБИРАЕМ INSTALL_DIR ──
+    cd /tmp
+    unset INSTALL_DIR
+
     if [ "$install_version" = "latest" ]; then
         if curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh; then
             echo ""
@@ -1064,7 +1068,7 @@ manage_mss() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}Telemt меню v0.76${NC}"
+    echo -e "  ${BOLD}Telemt меню v0.77${NC}"
     echo -e "  ${DIM}===========================${NC}"
     
     # Показываем информацию о Telemt, если установлен
