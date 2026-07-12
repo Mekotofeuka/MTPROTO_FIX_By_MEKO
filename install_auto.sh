@@ -104,7 +104,7 @@ ensure_proxy_file() {
 }
 
 clear
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.18${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.19${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
@@ -116,6 +116,7 @@ echo ""
 
 run_syn_fix
 
+clear
 # ── Меню выбора прокси ──────────────────────────────────────
 while true; do
     echo ""
@@ -129,7 +130,7 @@ while true; do
     echo -e "  ${YELLOW}[5]${NC}  ${BOLD}Пропустить установку прокси${NC}  ${DIM}(если уже установлен)${NC}"
     echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
     echo ""
-    echo -en "  ${BOLD}Выбор (По умолчанию 1(Enter)):${NC} "
+    echo -en "  ${BOLD}Выбор (Поумолчанию ${GREEN}${BOLD}1(Enter)${NC}${BOLD}):${NC} "
 
     proxy_choice=$(read_input)
     [ -z "$proxy_choice" ] && proxy_choice="1"
