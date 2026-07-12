@@ -80,10 +80,10 @@ download_file() {
         fi
     fi
     
-    echo -e "  ${CYAN}⏳${NC} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})"
+    echo -e "  ${CYAN}⏳${NC}${BOLD} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})"
     
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
-        echo -e "  ${GREEN}${BOLD}✓ Скачан успешно:${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
+        echo -e "  ${GREEN}${BOLD}✓${NC}${BOLD} Скачан успешно:${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
         return 0
     else
         echo -e "  ${RED}✗${NC} ${RED}${name}${NC} — ошибка загрузки"
@@ -154,7 +154,7 @@ ln -sf "$INSTALL_DIR/main.sh" /usr/local/bin/mekopr && echo -e "${GREEN}✓${NC}
 
 # ── Завершение ───────────────────────────────────────────────
 echo ""
-echo -e "  ${BOLD}${GREEN}✅ Установка MEKOPR успешно завершена!${NC}"
+echo -e "  ${BOLD}${GREEN}✅ Установка MEKO | MTProto Launcher успешно завершена!${NC}"
 echo -e "  ${DIM}─────────────────────────────────────────────────────${NC}"
 echo ""
 echo -e "  Для открытия меню при дальнейшей работе используйте команду ${BOLD}${GREEN}mekopr${NC}"
