@@ -130,7 +130,7 @@ while true; do
     echo -e "  ${YELLOW}[5]${NC}  ${BOLD}Пропустить установку прокси${NC}  ${DIM}(если уже установлен)${NC}"
     echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
     echo ""
-    echo -en "  ${BOLD}Выбор (Поумолчанию ${GREEN}${BOLD}1(Enter)${NC}${BOLD}):${NC} "
+    echo -en "  ${BOLD}Выбор (По умолчанию ${GREEN}${BOLD}1(Enter)${NC}${BOLD}):${NC} "
 
     proxy_choice=$(read_input)
     [ -z "$proxy_choice" ] && proxy_choice="1"
