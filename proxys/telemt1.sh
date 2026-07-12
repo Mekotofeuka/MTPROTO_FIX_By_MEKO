@@ -1064,7 +1064,7 @@ manage_mss() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}Telemt меню v0.74${NC}"
+    echo -e "  ${BOLD}Telemt меню v0.75${NC}"
     echo -e "  ${DIM}===========================${NC}"
     
     # Показываем информацию о Telemt, если установлен
