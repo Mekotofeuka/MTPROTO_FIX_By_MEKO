@@ -15,7 +15,7 @@
 </div>
 
 <p align="center">
-  · <a href="#Быстрый-старт">Установка в 1 клик</a> · <a href="#Как-работает-фикс">Как работает то?</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README_eng.md">English</a> ·
+  · <a href="#Быстрый-старт">Установка в 1 клик</a> · <a href="#Как-работает-фикс">Как работает то?</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главну страницу</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README_eng.md">English</a> ·
 <p align="center">
   · <a href="#Возможные-проблемыпочему-у-меня-может-не-работать">Решение проблем(если не работает ios - прочитай этот пункт!)</a> 
   
@@ -88,6 +88,8 @@
 ## Процессы
 
 **TCP-рукопожатие (TCP handshake)** — трёхэтапный процесс установления TCP-соединения (SYN -> SYN-ACK -> ACK).
+
+· <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главну страницу</a> ·
 
 **Мёртвое соединение** — Сокет, который сервер держит открытым, но клиент уже не активен (например, при сворачивании приложения). Фикс обрывает такие соединения за 2 минуты вместо нескольких часов простоя.
 
