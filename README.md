@@ -60,10 +60,11 @@
 -  **Ставится в один клик**
 <div align="center">
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/c2d9fa4f-e741-4d75-a54c-18ba138d8db3" />
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/69290da8-c3b3-4961-b584-46a0450159d2" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/93bf6fbd-db3f-4f93-adb2-0c68c912fcfe" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/3296a6c6-c097-4e5a-bd05-7c9f64154f79" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/8f07e4ea-3a99-43a4-8232-ad7f7ece634e" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/b385ebfd-496c-4fa8-8a95-dff36c3304bd" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/f6fa1001-99c3-4ef2-bc52-e678b1c91529" />
 
 
 </div>
