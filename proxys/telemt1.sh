@@ -15,7 +15,7 @@ NC='\033[0m'
 # ── Файл для сохранения пути к конфигу (используем общий с main.sh) ──
 CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
 
-# ── Функция обрезки пробелов (скопирована из main.sh) ──────
+# ── Функция обрезки пробелов  ──────
 trim() {
     local var="$1"
     var="${var#"${var%%[![:space:]]*}"}"
@@ -1068,7 +1068,7 @@ manage_mss() {
 while true; do
     clear
     echo ""
-    echo -e "  ${BOLD}Telemt меню v0.77${NC}"
+    echo -e "  ${BOLD}Telemt меню v0.78${NC}"
     echo -e "  ${DIM}===========================${NC}"
     
     # Показываем информацию о Telemt, если установлен
@@ -1143,7 +1143,10 @@ while true; do
     fi
     
     echo -e "  ${RED}[9]${NC}  ${BOLD}Удалить Telemt обычный/Telemt в докере${NC}"
-    echo -e "  ${CYAN}[0]${NC}  ${BOLD}Назад в прокси меню${NC}"
+    echo ""
+    echo -e "  ${CYAN}[a]${NC}  ${BOLD}Открыть меню панели Telemt${NC}"
+    echo ""
+    echo -e "  ${RED}${BOLD}[0]${NC}  ${BOLD}Назад в прокси меню${NC}"
     echo ""
     
     if ! is_telemt_installed; then
@@ -1185,6 +1188,16 @@ while true; do
             ;;
         9)
             purge_telemt_menu
+            ;;
+        a|A)
+            if [ -f "/opt/mtpr-simple/proxys/telemt_panel_amirotin.sh" ]; then
+                exec /opt/mtpr-simple/proxys/telemt_panel_amirotin.sh
+            else
+                echo ""
+                echo "  [✗] Файл /opt/mtpr-simple/proxys/telemt_panel_amirotin.sh не найден"
+                echo -e "  ${GRAY}Нажмите любую клавишу для возврата${NC}"
+                read -rsn1
+            fi
             ;;
         0)
             exec /opt/mtpr-simple/proxys/proxymenu.sh
