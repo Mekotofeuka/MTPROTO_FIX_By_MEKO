@@ -220,6 +220,8 @@ dalink.to/mekome
 - https://assyoucandy.github.io/telemt-server-guide/telemt-keepalive-guide.html
 - https://h1de0x.github.io/telemt-tune/
 
-## Оригинальные репозитории прокси
+## Оригинальные репозитории
 - Telemt https://github.com/telemt/telemt
+- MTG https://github.com/9seconds/mtg
 - Mtproto.zig https://github.com/sleep3r/mtproto.zig
+- telemt_panel https://github.com/amirotin/telemt_panel
