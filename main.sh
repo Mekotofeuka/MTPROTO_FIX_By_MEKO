@@ -1154,7 +1154,7 @@ get_online_count() {
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.7${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.74${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
@@ -1620,60 +1620,140 @@ main_menu() {
 
 # ── Обновление скрипта ──────────────────────────────────────────
 update_script() {
-    local url="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/main.sh"
+    local BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
+    local MANIFEST_URL="$BASE_URL/data/manifest.txt"
+    local MANIFEST_FILE="/tmp/manifest_update.txt"
+    local INSTALL_DIR="/opt/mtpr-simple"
+    local url="$BASE_URL/main.sh"
     local temp="/tmp/$(basename "$0").new.$$"
 
     echo ""
     echo -e "  ${GREEN}[✓]${NC} Скачиваем новую версию main.sh..."
     if curl -fsSL "$url" -o "$temp"; then
         chmod +x "$temp"
-
-        echo -e "  ${GREEN}[✓]${NC} Скачиваем все необходимые файлы..."
-        
-        # Все файлы которые нужно скачать (как в install.sh)
-        local all_files=(
-            "proxys/proxymenu.sh"
-            "proxys/telemt1.sh"
-            "proxys/mtprotozig1.sh"
-            "proxys/telemt_in_docker1.sh"
-            "proxys/mtgv2_1.sh"
-            "proxy_checker.py"
-        )
-        
-        mkdir -p /opt/mtpr-simple/proxys
-        
-        local all_ok=true
-        for pfile in "${all_files[@]}"; do
-            if curl -fsSL "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/$pfile" -o "/opt/mtpr-simple/$pfile"; then
-                echo -e "    ${GREEN}✓${NC} $(basename "$pfile")"
-            else
-                echo -e "    ${RED}✗${NC} $(basename "$pfile") — ошибка"
-                all_ok=false
-            fi
-        done
-        
-        if [ "$all_ok" = true ]; then
-            chmod +x /opt/mtpr-simple/proxys/*.sh 2>/dev/null || true
-            chmod +x /opt/mtpr-simple/proxy_checker.py 2>/dev/null || true
-        fi
-
-        if mv "$temp" "$0"; then
-            echo -e "  ${GREEN}[✓]${NC} Обновление успешно!"
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            read -rsn1
-            # Перезапускаем скрипт без авто-установки
-            exec "$0"
-        else
-            echo -e "  ${RED}[✗]${NC} Не удалось перезаписать файл"
-            rm -f "$temp"
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            read -rsn1
-            return 1
-        fi
     else
         echo -e "  ${RED}[✗]${NC} Ошибка скачивания main.sh"
+        rm -f "$temp"
+        return 1
+    fi
+
+    echo -e "  ${BLUE}[i]${NC} Загрузка данных..."
+    if ! curl -fsSL "$MANIFEST_URL" -o "$MANIFEST_FILE"; then
+        echo -e "  ${RED}[✗]${NC} Не удалось загрузить информацию о необходимых файлах"
+        rm -f "$MANIFEST_FILE"
+        rm -f "$temp"
+        return 1
+    fi
+
+    # Определяем имя текущего скрипта
+    SCRIPT_NAME=$(basename "$0")
+
+    echo -e "  ${BLUE}[i]${NC} Исполняемый файл: ${SCRIPT_NAME}"
+    echo ""
+
+    mkdir -p "$INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR/proxys"
+
+    # ── Функция скачивания файла ─────────────────────────────────
+    download_file() {
+        local file="$1"
+        local desc="$2"
+        local url="$BASE_URL/$file"
+        local dest="$INSTALL_DIR/$file"
+        local name=$(basename "$file")
+        
+        # Получаем размер файла
+        local size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
+        local size_str="?"
+        if [ -n "$size" ] && [ "$size" -gt 0 ] 2>/dev/null; then
+            if [ "$size" -gt 1048576 ]; then
+                local mb=$((size / 1048576))
+                local remainder=$(((size % 1048576) / 104857))
+                if [ "$remainder" -gt 0 ]; then
+                    size_str="${mb}.${remainder} MB"
+                else
+                    size_str="${mb} MB"
+                fi
+            elif [ "$size" -gt 1024 ]; then
+                size_str="$((size / 1024)) KB"
+            else
+                size_str="$size B"
+            fi
+        fi
+        
+        echo -e "  ${CYAN}⏳${NC}${BOLD} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})"
+        
+        if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
+            echo -e "  ${GREEN}${BOLD}✓${NC}${BOLD} Скачан успешно:${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
+            chmod +x "$dest" 2>/dev/null || true
+            return 0
+        else
+            echo -e "  ${RED}✗${NC} ${RED}${name}${NC} — ошибка загрузки"
+            return 1
+        fi
+    }
+    export -f download_file
+    export BASE_URL INSTALL_DIR
+
+    # ── Чтение манифеста и исключение себя ──────────────────────
+    echo -e "  ${BOLD}Чтение файлов из репозитория для загрузки и подготовка к установке...${NC}"
+    echo ""
+
+    FILES_TO_DOWNLOAD=()
+    while IFS='|' read -r file_path description; do
+
+        [[ "$file_path" =~ ^[[:space:]]*#.*$ ]] && continue
+        [ -z "$file_path" ] && continue
+
+        file_path=$(echo "$file_path" | xargs)
+        description=$(echo "$description" | xargs)
+        
+        file_name=$(basename "$file_path")
+        
+        if [ "$file_name" = "$SCRIPT_NAME" ]; then
+            echo -e "  ${DIM}⊘ Пропускаем себя: ${file_name}${NC}"
+            continue
+        fi
+        
+        FILES_TO_DOWNLOAD+=("$file_path|$description")
+        
+    done < "$MANIFEST_FILE"
+
+    # ── Вывод списка файлов для загрузки ────────────────────────
+    echo -e "  ${BOLD}Файлы для загрузки (${#FILES_TO_DOWNLOAD[@]} шт.):${NC}"
+    for entry in "${FILES_TO_DOWNLOAD[@]}"; do
+        file_path=$(echo "$entry" | cut -d'|' -f1)
+        desc=$(echo "$entry" | cut -d'|' -f2)
+        echo -e "    ${DIM}• ${file_path}${NC} (${desc})"
+    done
+    echo ""
+
+    # ── Загрузка файлов ──────────────────────────────────────────
+    echo -e "  ${BOLD}Загрузка файлов...${NC}"
+    echo ""
+
+    printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 6 -I {} bash -c '
+        IFS="|" read -r file_path description <<< "$1"
+        download_file "$file_path" "$description"
+    ' _ {}
+
+    # ── Установка прав ──────────────────────────────────────────
+    echo ""
+    echo -ne "  ${CYAN}[+]${NC} Установка прав выполнения... "
+    chmod +x "$INSTALL_DIR/proxys/"*.sh 2>/dev/null || true
+    chmod +x "$INSTALL_DIR"/*.py 2>/dev/null || true
+    echo -e "${GREEN}✓${NC}"
+
+    rm -f "$MANIFEST_FILE"
+
+    if mv "$temp" "$0"; then
+        echo -e "  ${GREEN}[✓]${NC} Обновление успешно!"
+        echo ""
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+        read -rsn1
+        exec "$0"
+    else
+        echo -e "  ${RED}[✗]${NC} Не удалось перезаписать файл"
         rm -f "$temp"
         echo ""
         echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
