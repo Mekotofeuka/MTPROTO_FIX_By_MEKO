@@ -8,6 +8,8 @@ proxys/proxymenu.sh|Меню выбора прокси
 
 proxys/telemt1.sh|Меню Telemt
 
+proxys/telemt_panel_amirotin.sh|Меню упр панелью для Telemt от amirotin
+
 proxys/mtgv2_1.sh|Меню MTG
 
 proxys/mtprotozig1.sh|Меню MTProtoZig
