@@ -2,7 +2,6 @@
 
 
 # MEKO | MTProto Installer, Launcher and fixer
-Universal launcher app for mtproto proxy Telegram
 
 
 <a href="https://t.me/meko_mtprotofix">
