@@ -151,6 +151,10 @@ _Полные правила и IPTABLES и NFTABLES прописаны в [rule
 
 5. **Если домен не поддерживает гибридное шифрование, но вам нужен именно он** — включите MSS (урезание размера пакетов), но учтите, что это сильно замедлит загрузку медиа.
 
+<a>
+<img width="512" height="384" alt="image" src="https://github.com/user-attachments/assets/4932063e-4dd3-4ec8-a2f1-a63c2f77500c" />
+</a>
+
 ---
 
 · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главну страницу</a> ·
