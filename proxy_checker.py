@@ -4,6 +4,7 @@ import re
 import subprocess
 import socket
 import sys
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── Цвета ─────────────────────────────────────────────────────
@@ -18,8 +19,78 @@ BOLD = '\033[1m'
 DIM = '\033[2m'
 
 TIMEOUT = 10
-OPENSSL_BIN = "/usr/bin/openssl"
 
+# ── Функция поиска подходящего OpenSSL ──────────────────────
+def _find_openssl():
+    """
+    Ищет бинарник OpenSSL, который поддерживает группу X25519MLKEM768.
+    Возвращает путь к подходящему бинарнику, либо fallback (первый найденный),
+    либо '/usr/bin/openssl' как последняя надежда.
+    """
+    # Приоритетные пути (обычно свежие сборки ставятся сюда)
+    candidates = [
+        "/opt/openssl-3.5/bin/openssl",
+        "/opt/openssl-3.6/bin/openssl",
+        "/opt/openssl/bin/openssl",
+        "/usr/local/ssl/bin/openssl",
+        "/usr/local/bin/openssl",
+        shutil.which("openssl"),
+        "/usr/bin/openssl",
+    ]
+
+    seen = set()
+    fallback = None
+    for path in candidates:
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        if not os.path.isfile(path):
+            continue
+        if fallback is None:
+            fallback = path
+
+        # Проверяем, знает ли этот бинарник группу X25519MLKEM768
+        try:
+            proc = subprocess.run(
+                [path, "list", "-tls-groups"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if "X25519MLKEM768" in proc.stdout:
+                return path  # нашли подходящий
+        except (subprocess.SubprocessError, OSError):
+            continue
+
+    # Если не нашли подходящий, возвращаем fallback или /usr/bin/openssl
+    return fallback or "/usr/bin/openssl"
+
+# ── Определяем путь к OpenSSL и флаг поддержки PQ ───────────
+OPENSSL_BIN = _find_openssl()
+OPENSSL_SUPPORTS_PQ = False
+
+# Проверяем, поддерживает ли выбранный бинарник группу X25519MLKEM768
+try:
+    proc = subprocess.run(
+        [OPENSSL_BIN, "list", "-tls-groups"],
+        capture_output=True, text=True, timeout=5,
+    )
+    if "X25519MLKEM768" in proc.stdout:
+        OPENSSL_SUPPORTS_PQ = True
+except (subprocess.SubprocessError, OSError):
+    pass
+
+# Если не поддерживает – выведем предупреждение при первом вызове check_one
+_WARNED_PQ = False
+
+def print_warning_pq():
+    global _WARNED_PQ
+    if not _WARNED_PQ:
+        _WARNED_PQ = True
+        print(f"{YELLOW}⚠️  Локальный OpenSSL ({OPENSSL_BIN}) не поддерживает X25519MLKEM768.{NC}")
+        print(f"{YELLOW}    Результат PQ-проверки недостоверен. Требуется OpenSSL >= 3.5.{NC}")
+        print(f"{YELLOW}    Установите свежую версию в /opt/openssl-3.5/bin/openssl{NC}")
+        print()
+
+# ── Остальные функции (без изменений) ──────────────────────
 def print_info(text):
     print(f"{BLUE}ℹ️ {text}{NC}")
 
@@ -121,18 +192,72 @@ def extract_cert_details(full_output):
 def check_ip(ip, port, sni):
     """Проверяет один IP-адрес, возвращает краткий результат."""
     connect = f"{ip}:{port}"
-    
-    # PQ-проверка
+
+    # ── Если OpenSSL не поддерживает X25519MLKEM768 ──────────
+    if not OPENSSL_SUPPORTS_PQ:
+        # Пропускаем PQ-проверку, сразу переходим к обычному TLS
+        std = run_openssl([
+            "s_client", "-connect", connect,
+            "-servername", sni,
+            "-brief",
+        ])
+        if "CONNECTION ESTABLISHED" not in std:
+            return {
+                "ip": ip,
+                "pq_supported": False,
+                "has_marker": False,
+                "proto": "",
+                "cipher": "",
+                "temp_key": "",
+                "error": True,
+                "pq_output": "SKIPPED (openssl не поддерживает группу)",
+                "std_output": std,
+                "pq_skipped": True
+            }
+        proto = parse_field(std, "Protocol version")
+        cipher = parse_field(std, "Ciphersuite")
+        temp = parse_field(std, "Peer Temp Key")
+        # Маркер: PQ не поддерживается + Peer Temp Key = X25519
+        has_marker = temp.startswith("X25519")
+        return {
+            "ip": ip,
+            "pq_supported": False,
+            "has_marker": has_marker,
+            "proto": proto,
+            "cipher": cipher,
+            "temp_key": temp,
+            "pq_output": "SKIPPED",
+            "std_output": std,
+            "pq_skipped": True
+        }
+
+    # ── PQ-проверка (если OpenSSL поддерживает группу) ──────
     pq = run_openssl([
         "s_client", "-connect", connect,
         "-servername", sni,
         "-groups", "X25519MLKEM768",
         "-brief",
     ])
-    
-    pq_supported = "CONNECTION ESTABLISHED" in pq
-    
-    if pq_supported:
+
+    # Проверяем, не вернулась ли ошибка от самого openssl (например, gid_cb)
+    if "gid_cb" in pq or "invalid argument" in pq or "cannot be set" in pq:
+        # Это означает, что наш бинарник не смог обработать группу (хотя ранее проверка прошла?)
+        # На всякий случай сообщаем о проблеме
+        return {
+            "ip": ip,
+            "pq_supported": False,
+            "has_marker": False,
+            "proto": "",
+            "cipher": "",
+            "temp_key": "",
+            "error": True,
+            "pq_output": pq,
+            "std_output": "",
+            "pq_skipped": True,
+            "pq_error": "openssl не смог применить группу (возможно, несовместимость)"
+        }
+
+    if "CONNECTION ESTABLISHED" in pq:
         proto = parse_field(pq, "Protocol version")
         cipher = parse_field(pq, "Ciphersuite")
         return {
@@ -143,14 +268,14 @@ def check_ip(ip, port, sni):
             "cipher": cipher,
             "pq_output": pq
         }
-    
+
     # PQ не поддерживается — проверяем обычный TLS
     std = run_openssl([
         "s_client", "-connect", connect,
         "-servername", sni,
         "-brief",
     ])
-    
+
     if "CONNECTION ESTABLISHED" not in std:
         return {
             "ip": ip,
@@ -163,14 +288,11 @@ def check_ip(ip, port, sni):
             "pq_output": pq,
             "std_output": std
         }
-    
+
     proto = parse_field(std, "Protocol version")
     cipher = parse_field(std, "Ciphersuite")
     temp = parse_field(std, "Peer Temp Key")
-    
-    # Маркер: PQ не поддерживается + Peer Temp Key = X25519
     has_marker = temp.startswith("X25519")
-    
     return {
         "ip": ip,
         "pq_supported": False,
@@ -183,21 +305,20 @@ def check_ip(ip, port, sni):
     }
 
 def check_one(domain):
+    # Если OpenSSL не поддерживает PQ, выводим предупреждение
+    if not OPENSSL_SUPPORTS_PQ:
+        print_warning_pq()
+
     raw_input = domain.strip()
     
     # ── Обработка tg://proxy ссылок ──────────────────────────
-    # Пример: tg://proxy?server=155.212.137.124&port=443&secret=...
     if raw_input.startswith('tg://'):
-        # Парсим параметры из URL
         import urllib.parse
         parsed = urllib.parse.urlparse(raw_input)
         params = urllib.parse.parse_qs(parsed.query)
-        
         server = params.get('server', [None])[0]
         port = params.get('port', ['443'])[0]
-        
         if server:
-            # Возвращаем в формате server:port для дальнейшей обработки
             target = f"{server}:{port}"
         else:
             return "❌ Не удалось извлечь server из tg:// ссылки"
@@ -215,19 +336,15 @@ def check_one(domain):
         host = target
         port = "443"
 
-    # Получаем все IP
     ips = resolve_all_ips(host)
     lines = [f"{BOLD}🔎 {host}:{port}{NC}"]
-    
     ip_str = ", ".join(ips) if ips else "не удалось определить"
     lines.append(f"{CYAN}🌐 IP: {NC}{ip_str}")
     lines.append("")
 
-    # Если IP-адресов несколько или это домен (не IP)
     is_domain = not re.match(r'^\d+\.\d+\.\d+\.\d+$', host)
     
     if len(ips) > 1 or is_domain:
-        # Проверяем все IP параллельно
         results = []
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = {executor.submit(check_ip, ip, port, host): ip for ip in ips}
@@ -235,18 +352,26 @@ def check_one(domain):
                 result = future.result()
                 if not result.get("error", False):
                     results.append(result)
-        
-        # Сортируем по маркеру (сначала с маркером)
         results.sort(key=lambda x: (not x["has_marker"] if x["pq_supported"] == False else True))
-        
         lines.append(f"{CYAN}━━━ Короткая проверка по IP ━━━{NC}")
         lines.append(f"  SNI: {host}")
         
         for r in results:
-            if r["pq_supported"]:
+            if r.get("pq_skipped", False):
+                # Если PQ была пропущена из-за отсутствия поддержки бинарника
+                marker_icon = "🟡"
+                marker_text = "PQ не проверялась (клиент не поддерживает)"
+                details = f"{r.get('proto', '?')} | {r.get('cipher', '?')}"
+                if r.get("temp_key"):
+                    details += f" | {r['temp_key']}"
+                lines.append(f"  {marker_icon} {r['ip']} — {marker_text}")
+                lines.append(f"    {details}")
+            elif r["pq_supported"]:
                 marker_icon = "🟢"
                 marker_text = "PQ OK"
                 details = f"{r.get('proto', '?')} | {r.get('cipher', '?')}"
+                lines.append(f"  {marker_icon} {r['ip']} — {marker_text}")
+                lines.append(f"    {details}")
             else:
                 if r["has_marker"]:
                     marker_icon = "🔴"
@@ -257,12 +382,11 @@ def check_one(domain):
                 details = f"{r.get('proto', '?')} | {r.get('cipher', '?')}"
                 if r.get("temp_key"):
                     details += f" | {r['temp_key']}"
-            
-            lines.append(f"  {marker_icon} {r['ip']} — {marker_text}")
-            lines.append(f"    {details}")
+                lines.append(f"  {marker_icon} {r['ip']} — {marker_text}")
+                lines.append(f"    {details}")
         
         # Проверяем, есть ли маркеры
-        has_any_marker = any(r.get("has_marker", False) for r in results)
+        has_any_marker = any(r.get("has_marker", False) for r in results if not r.get("pq_skipped", False))
         if has_any_marker:
             lines.append("")
             lines.append(f"{YELLOW}⚠️ Один из IP-адресов домена имеет маркер!{NC}")
@@ -270,7 +394,7 @@ def check_one(domain):
         
         lines.append("")
         
-        # Детальный вывод — берём IP с маркером, если есть, иначе первый
+        # Детальный вывод
         detail_ip = None
         for r in results:
             if r.get("has_marker", False):
@@ -282,53 +406,146 @@ def check_one(domain):
         if detail_ip:
             detail_connect = f"{detail_ip}:{port}"
             
-            # Детальная проверка для выбранного IP
-            detail_pq = run_openssl([
-                "s_client", "-connect", detail_connect,
-                "-servername", host,
-                "-groups", "X25519MLKEM768",
-                "-brief",
-            ])
-            
-            detail_std = run_openssl([
-                "s_client", "-connect", detail_connect,
-                "-servername", host,
-                "-brief",
-            ])
-            
-            # PQ блок
-            lines.append(f"{CYAN}━━━ PQ-подключение ━━━{NC}")
-            if "CONNECTION ESTABLISHED" in detail_pq:
-                lines.append(f"{GREEN}✅ Статус: поддерживается{NC}")
+            if not OPENSSL_SUPPORTS_PQ:
+                lines.append(f"{CYAN}━━━ PQ-подключение пропущено ━━━{NC}")
+                lines.append(f"{YELLOW}⚠️ Локальный OpenSSL не поддерживает X25519MLKEM768, PQ-проверка невозможна.{NC}")
+                lines.append("")
+                # Показываем обычный TLS для этого IP
+                std = run_openssl([
+                    "s_client", "-connect", detail_connect,
+                    "-servername", host,
+                    "-brief",
+                ])
+                lines.append(f"{CYAN}━━━ Обычное TLS-подключение ━━━{NC}")
+                if "CONNECTION ESTABLISHED" in std:
+                    lines.append(f"{GREEN}🔹 Статус: OK{NC}")
+                    proto = parse_field(std, "Protocol version")
+                    cipher = parse_field(std, "Ciphersuite")
+                    cert_cn = parse_field(std, "Peer certificate")
+                    sig = parse_field(std, "Signature type")
+                    verify = parse_field(std, "Verification")
+                    temp = parse_field(std, "Peer Temp Key")
+                    hash_used = parse_field(std, "Hash used")
+                    if proto:
+                        lines.append(f"  Протокол: {proto}")
+                    if cipher:
+                        lines.append(f"  Шифронабор: {cipher}")
+                    if temp:
+                        lines.append(f"  Peer Temp Key: {temp}")
+                    if cert_cn:
+                        lines.append(f"  Сертификат: {cert_cn}")
+                    if sig:
+                        lines.append(f"  Подпись: {sig}")
+                    if hash_used:
+                        lines.append(f"  Хэш: {hash_used}")
+                    if verify:
+                        lines.append(f"  Верификация: {verify}")
+                    lines.append("")
+                    lines.append(f"{YELLOW}━━━ ВЕРДИКТ ━━━{NC}")
+                    lines.append(f"{YELLOW}🟡 PQ-проверка невозможна из-за клиентского OpenSSL.{NC}")
+                    lines.append(f"{YELLOW}   Установите OpenSSL >= 3.5 в /opt/openssl-3.5/bin/openssl{NC}")
+                else:
+                    lines.append(f"{RED}❌ Обычное TLS не удалось{NC}")
             else:
-                lines.append(f"{RED}🔸 Статус: не поддерживается{NC}")
-                reason = ""
-                for ln in detail_pq.splitlines():
-                    if "alert" in ln or "error:" in ln:
-                        reason = ln.strip()
-                        break
-                if reason:
-                    lines.append(f"  Причина: {GRAY}{reason}{NC}")
-            
-            # Обычный TLS блок
-            lines.append("")
-            lines.append(f"{CYAN}━━━ Обычное TLS-подключение ━━━{NC}")
-            if "CONNECTION ESTABLISHED" in detail_std:
-                lines.append(f"{GREEN}🔹 Статус: OK{NC}")
-                proto = parse_field(detail_std, "Protocol version")
-                cipher = parse_field(detail_std, "Ciphersuite")
-                cert_cn = parse_field(detail_std, "Peer certificate")
-                sig = parse_field(detail_std, "Signature type")
-                verify = parse_field(detail_std, "Verification")
-                temp = parse_field(detail_std, "Peer Temp Key")
-                hash_used = parse_field(detail_std, "Hash used")
+                # Полная PQ-проверка для детального IP
+                detail_pq = run_openssl([
+                    "s_client", "-connect", detail_connect,
+                    "-servername", host,
+                    "-groups", "X25519MLKEM768",
+                    "-brief",
+                ])
+                detail_std = run_openssl([
+                    "s_client", "-connect", detail_connect,
+                    "-servername", host,
+                    "-brief",
+                ])
                 
+                lines.append(f"{CYAN}━━━ PQ-подключение ━━━{NC}")
+                if "CONNECTION ESTABLISHED" in detail_pq:
+                    lines.append(f"{GREEN}✅ Статус: поддерживается{NC}")
+                else:
+                    lines.append(f"{RED}🔸 Статус: не поддерживается{NC}")
+                    reason = ""
+                    for ln in detail_pq.splitlines():
+                        if "alert" in ln or "error:" in ln:
+                            reason = ln.strip()
+                            break
+                    if reason:
+                        lines.append(f"  Причина: {GRAY}{reason}{NC}")
+                
+                lines.append("")
+                lines.append(f"{CYAN}━━━ Обычное TLS-подключение ━━━{NC}")
+                if "CONNECTION ESTABLISHED" in detail_std:
+                    lines.append(f"{GREEN}🔹 Статус: OK{NC}")
+                    proto = parse_field(detail_std, "Protocol version")
+                    cipher = parse_field(detail_std, "Ciphersuite")
+                    cert_cn = parse_field(detail_std, "Peer certificate")
+                    sig = parse_field(detail_std, "Signature type")
+                    verify = parse_field(detail_std, "Verification")
+                    temp = parse_field(detail_std, "Peer Temp Key")
+                    hash_used = parse_field(detail_std, "Hash used")
+                    if proto:
+                        lines.append(f"  Протокол: {proto}")
+                    if cipher:
+                        lines.append(f"  Шифронабор: {cipher}")
+                    if temp:
+                        lines.append(f"  Peer Temp Key: {temp}")
+                    if cert_cn:
+                        lines.append(f"  Сертификат: {cert_cn}")
+                    if sig:
+                        lines.append(f"  Подпись: {sig}")
+                    if hash_used:
+                        lines.append(f"  Хэш: {hash_used}")
+                    if verify:
+                        lines.append(f"  Верификация: {verify}")
+                    
+                    lines.append("")
+                    pq_supported_for_detail = "CONNECTION ESTABLISHED" in detail_pq
+                    if pq_supported_for_detail:
+                        lines.append(f"{GREEN}━━━ ВЕРДИКТ ━━━{NC}")
+                        lines.append(f"{GREEN}🟢 Маркер: НЕТ — сервер принимает X25519MLKEM768{NC}")
+                    elif temp and temp.startswith("X25519"):
+                        lines.append(f"{RED}━━━ ВЕРДИКТ ━━━{NC}")
+                        lines.append(f"{RED}🔴 МАРКЕР: ДА{NC}")
+                        lines.append(f"{RED}PQ не поддерживается + Peer Temp Key = X25519{NC}")
+                        lines.append(f"{YELLOW}⚠️ Риск блокировки proxy на ios (используйте другой домен!){NC}")
+                    else:
+                        lines.append(f"{GREEN}━━━ ВЕРДИКТ ━━━{NC}")
+                        lines.append(f"{GREEN}🟢 Маркер: НЕТ{NC}")
+                        lines.append(f"{GREEN}PQ не поддерживается, но Peer Temp Key не X25519{NC}")
+                else:
+                    lines.append(f"{RED}❌ Обычное TLS не удалось{NC}")
+        
+        return "\n".join(lines)
+    
+    else:
+        # Один IP — старый формат вывода
+        connect = f"{host}:{port}"
+        
+        if not OPENSSL_SUPPORTS_PQ:
+            # Пропускаем PQ, только обычный TLS
+            lines.append(f"{CYAN}━━━ PQ-подключение пропущено ━━━{NC}")
+            lines.append(f"{YELLOW}⚠️ Локальный OpenSSL не поддерживает X25519MLKEM768, PQ-проверка невозможна.{NC}")
+            lines.append("")
+            std = run_openssl([
+                "s_client", "-connect", connect,
+                "-servername", host,
+                "-brief",
+            ])
+            lines.append(f"{CYAN}━━━ Обычное TLS-подключение ━━━{NC}")
+            if "CONNECTION ESTABLISHED" in std:
+                lines.append(f"{GREEN}🔹 Статус: OK{NC}")
+                proto = parse_field(std, "Protocol version")
+                cipher = parse_field(std, "Ciphersuite")
+                cert_cn = parse_field(std, "Peer certificate")
+                sig = parse_field(std, "Signature type")
+                verify = parse_field(std, "Verification")
+                temp = parse_field(std, "Peer Temp Key")
+                hash_used = parse_field(std, "Hash used")
                 if proto:
                     lines.append(f"  Протокол: {proto}")
                 if cipher:
                     lines.append(f"  Шифронабор: {cipher}")
-                if temp:
-                    lines.append(f"  Peer Temp Key: {temp}")
                 if cert_cn:
                     lines.append(f"  Сертификат: {cert_cn}")
                 if sig:
@@ -337,35 +554,15 @@ def check_one(domain):
                     lines.append(f"  Хэш: {hash_used}")
                 if verify:
                     lines.append(f"  Верификация: {verify}")
-                
-                # ── ИСПРАВЛЕННЫЙ ВЕРДИКТ ДЛЯ ДЕТАЛЬНОГО IP ──
                 lines.append("")
-                
-                # Проверяем, поддерживается ли PQ для детального IP
-                pq_supported_for_detail = "CONNECTION ESTABLISHED" in detail_pq
-                
-                if pq_supported_for_detail:
-                    lines.append(f"{GREEN}━━━ ВЕРДИКТ ━━━{NC}")
-                    lines.append(f"{GREEN}🟢 Маркер: НЕТ — сервер принимает X25519MLKEM768{NC}")
-                elif temp and temp.startswith("X25519"):
-                    lines.append(f"{RED}━━━ ВЕРДИКТ ━━━{NC}")
-                    lines.append(f"{RED}🔴 МАРКЕР: ДА{NC}")
-                    lines.append(f"{RED}PQ не поддерживается + Peer Temp Key = X25519{NC}")
-                    lines.append(f"{YELLOW}⚠️Риск блокировки proxy на ios(используйте другой домен!){NC}")
-                else:
-                    lines.append(f"{GREEN}━━━ ВЕРДИКТ ━━━{NC}")
-                    lines.append(f"{GREEN}🟢 Маркер: НЕТ{NC}")
-                    lines.append(f"{GREEN}PQ не поддерживается, но Peer Temp Key не X25519{NC}")
+                lines.append(f"{YELLOW}━━━ ВЕРДИКТ ━━━{NC}")
+                lines.append(f"{YELLOW}🟡 PQ-проверка невозможна из-за клиентского OpenSSL.{NC}")
+                lines.append(f"{YELLOW}   Установите OpenSSL >= 3.5 в /opt/openssl-3.5/bin/openssl{NC}")
             else:
                 lines.append(f"{RED}❌ Обычное TLS не удалось{NC}")
-        
-        return "\n".join(lines)
-    
-    else:
-        # Один IP — старый формат вывода
-        connect = f"{host}:{port}"
-        
-        # PQ-проверка
+            return "\n".join(lines)
+
+        # Старая логика (если PQ поддерживается)
         pq = run_openssl([
             "s_client", "-connect", connect,
             "-servername", host,
@@ -403,7 +600,6 @@ def check_one(domain):
                 "-groups", "X25519MLKEM768",
             ])
             cert_info = extract_cert_details(full)
-
             if cert_info:
                 lines.append("")
                 lines.append(f"{CYAN}━━━ Сертификат ━━━{NC}")
@@ -424,7 +620,6 @@ def check_one(domain):
         # PQ не прошёл
         lines.append(f"{CYAN}━━━ PQ-подключение ━━━{NC}")
         lines.append(f"{RED}🔸 Статус: не поддерживается{NC}")
-
         reason = ""
         for ln in pq.splitlines():
             if "alert" in ln or "error:" in ln:
@@ -433,7 +628,6 @@ def check_one(domain):
         if reason:
             lines.append(f"  Причина: {GRAY}{reason}{NC}")
 
-        # Обычный TLS
         std = run_openssl([
             "s_client", "-connect", connect,
             "-servername", host,
@@ -503,7 +697,7 @@ def check_one(domain):
             lines.append(f"{RED}━━━ ВЕРДИКТ ━━━{NC}")
             lines.append(f"{RED}🔴 МАРКЕР: ДА{NC}")
             lines.append(f"{RED}PQ не поддерживается + Peer Temp Key = X25519{NC}")
-            lines.append(f"{YELLOW}⚠️Риск блокировки proxy на ios(используйте другой домен!){NC}")
+            lines.append(f"{YELLOW}⚠️ Риск блокировки proxy на ios (используйте другой домен!){NC}")
         else:
             lines.append(f"{GREEN}━━━ ВЕРДИКТ ━━━{NC}")
             lines.append(f"{GREEN}🟢 Маркер: НЕТ{NC}")
@@ -512,16 +706,14 @@ def check_one(domain):
         return "\n".join(lines)
 
 def main():
-    # Если передан аргумент — проверяем и выходим (для вызова из меню)
     if len(sys.argv) > 1:
         print(check_one(sys.argv[1]))
         sys.exit(0)
     
-    # Интерактивный режим
     while True:
         os.system('clear' if os.name == 'posix' else 'cls')
         print("")
-        print(f"  {BOLD}{CYAN}🔍 ПРОВЕРКА ПРОКСИ,ДОМЕНА,АЙПИ НА ВАЛИД ЧЕРЕЗ TLS И PQ-БЕЗОПАСНОСТЬ v1.15 {NC}")
+        print(f"  {BOLD}{CYAN}🔍 ПРОВЕРКА ПРОКСИ,ДОМЕНА,АЙПИ НА ВАЛИД ЧЕРЕЗ TLS И PQ-БЕЗОПАСНОСТЬ v1.16 {NC}")
         print(f"  {DIM}═════════════════════════════════════════════════{NC}")
         print("")
         print("  Краткое пояснение:")
