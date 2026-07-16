@@ -454,20 +454,20 @@ install_syn_fix() {
         echo ""
         echo -e "  ${BOLD}Выберите тип SYN FIX:${NC}"
         echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}рекомендуется${NC}"
-        echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
+        echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
         echo -e "  ${CYAN}[2]${NC}  ${BOLD}Старый вариант(iptables)${NC} (Разделение устройств определяя их TTL+Length)"
-        echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
+        echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
-        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${NC}${BOLD} - рекомендуется для nftables${NC}"
-        echo -e "${NC}  Если совпало -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
-        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}"
-        echo -e "${NC}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
-        echo -e "${NC}  Иначе -> это другое ус-во и ставим SYN 1/s"
+        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${GREEN}${BOLD} - рекомендуется (Совместим с Docker)${NC}"
+        echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1/s"
+        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}${NC}${BOLD} (Совместим с Docker)"
+        echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1/s"
         echo ""
-        echo -en "  ${NC}${BOLD}Ввод (Новый - ${GREEN}${BOLD}1 или enter${NC}${BOLD}, старый - ${RED}${BOLD}2${NC}${BOLD}, nftables Новый - ${YELLOW}${BOLD}3${NC}${BOLD}, nftables старый - ${RED}${BOLD}4${NC}${BOLD}):${NC} "
+        echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}По умолчанию - 1(Enter)${NC}${BOLD}):${NC} "
         read -r fix_choice
 
         if [ -z "$fix_choice" ] || [ "$fix_choice" = "1" ]; then
@@ -1154,7 +1154,7 @@ get_online_count() {
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.74${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.75${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
