@@ -924,9 +924,6 @@ for PORT in "${PORT_ARRAY[@]}"; do
         -j REJECT --reject-with tcp-reset
 done
 
-# обратно в INPUT
-iptables -t filter -A "$CHAIN" -j RETURN
-
 APPLY_SCRIPT_EOF
     else
         # Новый вариант (u32 + ACCEPT без лимита)
@@ -985,9 +982,6 @@ for PORT in "${PORT_ARRAY[@]}"; do
     iptables -t filter -A "$CHAIN" -p tcp --dport "$PORT" --syn \
         -j REJECT --reject-with tcp-reset
 done
-
-# обратно в INPUT
-iptables -t filter -A "$CHAIN" -j RETURN
 
 APPLY_SCRIPT_EOF
     fi
@@ -1154,7 +1148,7 @@ get_online_count() {
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.75${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.77${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
