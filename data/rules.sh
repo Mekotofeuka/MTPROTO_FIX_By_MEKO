@@ -303,7 +303,8 @@ install_syn_fix() {
         fi
 
         echo ""
-        echo -e "  ${BOLD}Выберите тип SYN FIX:${NC}"
+        echo -e "  ${BOLD}Меню SYN FIX V1.1"
+        echo -e "  ${BOLD}Меню SYN FIX Выберите тип SYN FIX:${NC}"
         echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}рекомендуется${NC}"
         echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
@@ -707,6 +708,12 @@ remove_syn_fix() {
         iptables -F "$SYNFIX_CHAIN"
         iptables -X "$SYNFIX_CHAIN"
         log_info "Цепочка $SYNFIX_CHAIN удалена"
+    fi
+
+    # ── Удаляем правило маркировки iOS из mangle (новый вариант) ──
+    if iptables -t mangle -C PREROUTING -m u32 --u32 "32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000" -j MARK --set-mark 0x400 2>/dev/null; then
+        iptables -t mangle -D PREROUTING -m u32 --u32 "32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000" -j MARK --set-mark 0x400
+        log_info "Правило маркировки iOS (mangle) удалено"
     fi
 
     rm -f "$PORT_FILE"
