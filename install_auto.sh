@@ -150,7 +150,7 @@ auto_install_mode() {
     
     # Информация о предстоящей установке (теперь версия выводится корректно)
     echo -e "  ${BOLD}Будет выполнена установка:${NC}"
-    echo -e "  • Telemt версии ${GREEN}${telemt_version}${NC} на домен ${CYAN}$domain${NC}, порт ${CYAN}$port${NC}"
+    echo -e "  • Telemt версии ${GREEN}${telemt_version}${NC} на домен ${GREEN}$domain${NC}, порт ${CYAN}$port${NC}"
     echo -e "  • SYN FIX (новый iptables, вариант 1) на порт ${CYAN}$port${NC}"
     echo -e "  • IP-адрес сервера: ${CYAN}$server_ip${NC}"
     echo ""
@@ -344,8 +344,10 @@ show_mode_menu() {
     echo -e "  ${CYAN}[1]${NC}  ${BOLD}Автоустановка${NC}  ${NC}"
     echo -e "  ${DIM}Выведет параметры с которыми будет установлен прокси и фикс"
 	echo -e "  ${DIM}Запросит подтверждение и выполнит установку"
+	echo -e ""
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${NC}"
 	echo -e "  ${DIM}Спросит порт, версию фикса, версию телемт и выполнит установку "
+	echo -e ""
     echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
     echo ""
     echo -en "  ${BOLD}Выбор (по умолчанию ${GREEN}${BOLD}1 или Enter${NC}${BOLD}):${NC} "
