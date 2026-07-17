@@ -292,14 +292,16 @@ install_syn_fix() {
         echo ""
         # Используем /dev/tty для ввода
         if [ -r /dev/tty ]; then
-            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX (например: 443 (Enter - 443) ${NC}${BOLD})"
-            echo -e "  ${NC}${BOLD}Либо введите порты через запятую (например: 443,8443${GREEN}${BOLD} "
-			echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}):${NC}"
+            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX ${DIM}(например: 443 (Enter - 443) "
+            echo -e "  ${NC}${BOLD}Либо введите порты через запятую ${DIM}(например: 443,8443) "
+			echo -e ""
+			echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
             read -r ports_input </dev/tty
         else
-            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX (например: 443 (Enter - 443) ${NC}${BOLD})"
-            echo -e "  ${NC}${BOLD}Либо введите порты через запятую (например: 443,8443${GREEN}${BOLD} "
-			echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}):${NC}"
+            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX (например: 443 (Enter - 443) "
+            echo -e "  ${NC}${BOLD}Либо введите порты через запятую (например: 443,8443) "
+			echo -e ""
+			echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
             read -r ports_input
         fi
         if [ -z "$ports_input" ]; then
