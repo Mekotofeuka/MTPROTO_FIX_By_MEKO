@@ -175,18 +175,9 @@ _Полные правила и IPTABLES и NFTABLES прописаны в [rule
 # Как сделать прокси из РФ напрямую, с работающим MiddleProxy(полезно для тех, кто использует "канал спонсор")
 
 В данном мануале описан способ для запуска прокси напрямую на сервере, доступ с которого к ME/DC серверам телеграм ограничен. Работает с android/ios/desktop
-1. Ставим MTPROTO ZIG
-```Bash
-curl -fsSL https://raw.githubusercontent.com/sleep3r/mtproto.zig/main/deploy/bootstrap.sh | sudo bash
-```
-```Bash
-sudo mtbuddy install --port 443 --domain rutube.ru --no-tcpmss --middle-proxy --yes
-```
-2. Ставим скрипт MEKO
-```Bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash
-```
-3. Пропускаем информацию про Telemt, открывается меню скрипта, жмём **1** и жмём y
+1. Ставим скрипт MEKO
+2. Ставим MTPROTO ZIG
+3. Применяем фикс кнопочкой **1** и жмём y
 4. Подключаемся к прокси и пользуемся
 
 ---
