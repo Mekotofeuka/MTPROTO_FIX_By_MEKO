@@ -71,10 +71,6 @@ ensure_rules_loaded() {
 # ── ОСТАЛЬНЫЕ ПЕРЕМЕННЫЕ И ФУНКЦИИ (НЕ ИЗ RULES.SH) ──────────
 CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
 
-# ── Функция обрезки пробелов (дублируется в rules.sh, но оставляем для надёжности) ──
-# Можно удалить, если уверены, что rules.sh загружен, но для безопасности оставим.
-# В rules.sh уже есть trim, поэтому эта не будет конфликтовать.
-
 # ── Функции для работы с TOML ──────────────────────────────
 _toml_get_value() {
     local _key="$1" _file="$2"
@@ -331,20 +327,13 @@ else
     fi
 fi
 
-# ── Функция перезапуска сервиса (не из rules.sh) ────────────
-restart_syn_fix_service() {
-    log_info "Перезапуск сервиса mtpr-synfix.service..."
-    systemctl restart mtpr-synfix.service
-    log_success "Сервис успешно перезапущен"
-}
-
 # ── ОСТАЛЬНОЙ КОД (БЕЗ ИЗМЕНЕНИЙ) ───────────────────────────
 # Здесь идут функции: apply_basic_optimization, remove_mekopr, clear_screen,
-# is_mtprotozig_installed, get_mtprotozig_online, get_online_count,
+# is_mtprotozig_installed, get_mtprotozig_online,
 # show_header, is_optimization_applied, open_proxy_menu, check_censor,
 # main_menu, update_script и т.д.
 # Они остаются без изменений, так как не дублируют rules.sh.
-# Ниже я приведу их целиком для полноты, но они идентичны оригиналу.
+# Ниже я приведу их целиком для полноты.
 
 # ── Пункт 3: Базовая оптимизация ───────────────────────────
 apply_basic_optimization() {
@@ -476,21 +465,10 @@ get_mtprotozig_online() {
     fi
 }
 
-get_online_count() {
-    local port="443"
-    if [ -n "$CONFIG_TELEMT" ] && [ -f "$CONFIG_TELEMT" ]; then
-        local config_port=$(grep -E '^port[[:space:]]*=' "$CONFIG_TELEMT" | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
-        if [[ "$config_port" =~ ^[0-9]+$ ]]; then
-            port="$config_port"
-        fi
-    fi
-    ss -tnp 2>/dev/null | grep ":${port}" | grep -v '0.0.0.0' | awk '{print $5}' | cut -d: -f1 | sort -u | wc -l | tr -d ' '
-}
-
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.80${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.81${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
@@ -801,13 +779,6 @@ main_menu() {
     fi
 
     while true; do
-        local show_iptables_rules=false
-        if [ -f /etc/iptables/rules.v4 ]; then
-            if grep -q "MTPR_SYNFIX" /etc/iptables/rules.v4 2>/dev/null; then
-                show_iptables_rules=true
-            fi
-        fi
-        
         show_header
         echo ""
 
@@ -841,11 +812,6 @@ main_menu() {
         echo -e "  ${CYAN}[5]${NC}  ${NC}${BOLD}Проверить доступ к сайтам с сервера(тг,ютуб,инст, и тд.)${NC}"
         echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить домен/прокси на ios-валидность${YELLOW}${BOLD}(Необходим: OpenSSL 3.5+)  ${NC}"
         echo -e "  ${CYAN}[7]${NC}  ${RED}${BOLD}Удалить полностью MEKOpr${NC}"
-        
-        if [ "$show_iptables_rules" = true ]; then
-            echo -e "  ${RED}[8]${NC}  Удалить правила iptables-persistent"
-        fi
-        
         echo -e "  ${CYAN}[0]${NC}  Выход"
         echo ""
         echo -en "  ${BOLD}Выбор:${NC} "
@@ -950,19 +916,6 @@ main_menu() {
             ;;
         7)
             remove_mekopr
-            ;;
-        8)
-            echo ""
-            if ! ensure_rules_loaded; then
-                log_error "Невозможно удалить правила: rules.sh не загружен"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                read -rsn1
-                continue
-            fi
-            remove_iptables_rules
-            echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            read -rsn1
             ;;
         0 | q | Q)
             echo ""
