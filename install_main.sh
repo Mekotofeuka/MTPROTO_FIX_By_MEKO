@@ -28,7 +28,7 @@ fi
 clear
 # ── Шапка ─────────────────────────────────────────────────────
 echo ""
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.16${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.19${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
@@ -49,9 +49,8 @@ fi
 echo -e "  ${BLUE}[i]${NC} Исполняемый файл: ${SCRIPT_NAME}"
 echo ""
 
-# ── Создание директорий ──────────────────────────────────────
+# ── Создание базовой директории ─────────────────────────────
 mkdir -p "$INSTALL_DIR"
-mkdir -p "$INSTALL_DIR/proxys"
 
 # ── Функция скачивания файла ─────────────────────────────────
 download_file() {
@@ -60,6 +59,9 @@ download_file() {
     local url="$BASE_URL/$file"
     local dest="$INSTALL_DIR/$file"
     local name=$(basename "$file")
+    
+    # ── ИСПРАВЛЕНИЕ: создаём родительскую папку для файла ──
+    mkdir -p "$(dirname "$dest")"
     
     # Получаем размер файла
     local size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
@@ -126,11 +128,11 @@ for entry in "${FILES_TO_DOWNLOAD[@]}"; do
 done
 echo ""
 
-# ── Загрузка файлов ──────────────────────────────────────────
+# ── Загрузка файлов (параллельно, 6 потоков) ───────────────
 echo -e "  ${BOLD}Загрузка файлов...${NC}"
 echo ""
 
-printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 2 -I {} bash -c '
+printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 6 -I {} bash -c '
     IFS="|" read -r file_path description <<< "$1"
     download_file "$file_path" "$description"
 ' _ {}
