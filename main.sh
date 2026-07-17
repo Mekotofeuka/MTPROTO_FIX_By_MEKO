@@ -18,6 +18,14 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 
+# ── Функция обрезки пробелов ──────────────────────────────
+trim() {
+    local var="$1"
+    var="${var#"${var%%[![:space:]]*}"}"
+    var="${var%"${var##*[![:space:]]}"}"
+    printf '%s' "$var"
+}
+
 # ── Проверка root ────────────────────────────────────────────
 check_root() {
     if [ "$(id -u)" -ne 0 ]; then
@@ -482,7 +490,7 @@ get_online_count() {
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.78${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.79${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
