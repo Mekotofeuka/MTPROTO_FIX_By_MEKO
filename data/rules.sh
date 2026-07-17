@@ -309,7 +309,9 @@ install_syn_fix() {
         fi
 
         echo ""
-        echo -e "  ${BOLD}Меню SYN FIX V1.1"
+        echo -e "  ${BOLD}Меню SYN FIX V1.12 | Выберите тип правил ниже"
+		echo -e "${DIM}══════════════════════════"
+		echo -e ""
         echo -e "  ${BOLD}Меню SYN FIX Выберите тип SYN FIX:${NC}"
         echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}рекомендуется${NC}"
         echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
