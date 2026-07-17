@@ -103,79 +103,237 @@ ensure_proxy_file() {
     return 0
 }
 
-clear
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.19${NC}"
-echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
-echo ""
+# ── Функция получения публичного IP ──────────────────────────
+get_public_ip() {
+    local _ip=""
+    _ip=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null) ||
+    _ip=$(curl -4 -fsS --max-time 5 https://ifconfig.me 2>/dev/null) ||
+    _ip=$(curl -4 -fsS --max-time 5 https://icanhazip.com 2>/dev/null) ||
+    _ip=""
+    echo "$_ip"
+}
 
-# ── 1. Установка SYN FIX ──────────────────────────────────────
-echo ""
-echo -e "  ${BOLD}${CYAN}🔧 УСТАНОВКА SYN FIX${NC}"
-echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
-echo ""
-
-run_syn_fix
-
-clear
-# ── Меню выбора прокси ──────────────────────────────────────
-while true; do
+# ── Режим автоустановки (БЕЗ ЗАПРОСОВ) ─────────────────────
+auto_install_mode() {
+    clear
     echo ""
-    echo -e "  ${BOLD}${CYAN}📦 ВЫБОР ПРОКСИ ДЛЯ УСТАНОВКИ${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
-    echo -e "  ${GREEN}[1]${NC}  ${BOLD}Установить TELEMT${NC}  ${DIM}(стандартный)${NC}"
-    echo -e "  ${GREEN}[2]${NC}  ${BOLD}Установить TELEMT в Docker${NC}"
-    echo -e "  ${GREEN}[3]${NC}  ${BOLD}Установить MTG${NC}"
-    echo -e "  ${GREEN}[4]${NC}  ${BOLD}Установить MTProtoZig${NC}"
-    echo -e "  ${YELLOW}[5]${NC}  ${BOLD}Пропустить установку прокси${NC}  ${DIM}(если уже установлен)${NC}"
+    
+    # Параметры по умолчанию (НИЧЕГО НЕ ЗАПРАШИВАЕМ)
+    local domain="ozon.ru"
+    local port="443"
+    local server_ip=$(get_public_ip)
+    [ -z "$server_ip" ] && server_ip="не определено"
+    
+    # Информация о предстоящей установке
+    echo -e "  ${BOLD}Будет выполнена установка:${NC}"
+    echo -e "  • Telemt ${GREEN}последней версии${NC} на домен ${CYAN}$domain${NC}, порт ${CYAN}$port${NC}"
+    echo -e "  • SYN FIX (новый iptables, вариант 1) на порт ${CYAN}$port${NC}"
+    echo -e "  • IP-адрес сервера: ${CYAN}$server_ip${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Для изменения параметров используйте полуавтоматическую установку${NC}"
+    echo ""
+    echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+    local confirm
+    confirm=$(read_input)
+    if [[ ! "$confirm" =~ ^[yY]$ ]]; then
+        log_info "Установка отменена"
+        sleep 1
+        return
+    fi
+    
+    echo ""
+    log_info "Начинаем автоустановку..."
+    echo ""
+    
+    # 1. Установка Telemt (последняя версия, русский язык)
+    log_info "Установка Telemt последней версии на домен $domain, порт $port..."
+    if curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- -l 2 -d "$domain" -p "$port"; then
+        log_success "Telemt установлен успешно"
+    else
+        log_error "Ошибка установки Telemt"
+        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
+        read -rsn1
+        return
+    fi
+    
+    # 2. Установка SYN FIX (автоматически, вариант 1, порт)
+    log_info "Установка SYN FIX (новый iptables, порт $port)..."
+    if install_syn_fix -auto_install "$port"; then
+        log_success "SYN FIX установлен успешно"
+    else
+        log_error "Ошибка установки SYN FIX"
+        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
+        read -rsn1
+        return
+    fi
+    
+    echo ""
+    log_success "Автоустановка завершена успешно!"
+    echo -e "  ${BOLD}Данные для подключения:${NC}"
+    echo -e "  • Домен: ${CYAN}$domain${NC}"
+    echo -e "  • Порт: ${CYAN}$port${NC}"
+    echo -e "  • IP: ${CYAN}$server_ip${NC}"
+    echo -e "  • Секрет: (сгенерирован автоматически, смотрите логи Telemt)"
+    echo ""
+    echo -e "  ${GRAY}Нажмите любую клавишу для выхода...${NC}"
+    read -rsn1
+    exit 0
+}
+
+# ── Режим полуавтоматической установки ─────────────────────
+semi_auto_install_mode() {
+    clear
+    echo ""
+    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}${NC}"
+    echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+    echo ""
+    log_info "Запуск стандартного установщика..."
+    sleep 1
+    
+    # ── Установка SYN FIX ──────────────────────────────────────
+    echo ""
+    echo -e "  ${BOLD}${CYAN}🔧 УСТАНОВКА SYN FIX${NC}"
+    echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+    echo ""
+    
+    run_syn_fix
+    
+    clear
+    # ── Меню выбора прокси ──────────────────────────────────────
+    while true; do
+        echo ""
+        echo -e "  ${BOLD}${CYAN}📦 ВЫБОР ПРОКСИ ДЛЯ УСТАНОВКИ${NC}"
+        echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Установить TELEMT${NC}  ${DIM}(стандартный)${NC}"
+        echo -e "  ${GREEN}[2]${NC}  ${BOLD}Установить TELEMT в Docker${NC}"
+        echo -e "  ${GREEN}[3]${NC}  ${BOLD}Установить MTG${NC}"
+        echo -e "  ${GREEN}[4]${NC}  ${BOLD}Установить MTProtoZig${NC}"
+        echo -e "  ${YELLOW}[5]${NC}  ${BOLD}Пропустить установку прокси${NC}  ${DIM}(если уже установлен)${NC}"
+        echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
+        echo ""
+        echo -en "  ${BOLD}Выбор (По умолчанию ${GREEN}${BOLD}1(Enter)${NC}${BOLD}):${NC} "
+
+        proxy_choice=$(read_input)
+        [ -z "$proxy_choice" ] && proxy_choice="1"
+
+        case "$proxy_choice" in
+            1)
+                echo ""
+                log_info "Установка TELEMT..."
+                if ensure_proxy_file "proxys/telemt1.sh"; then
+                    exec "$INSTALL_DIR/proxys/telemt1.sh" </dev/tty
+                else
+                    exit 1
+                fi
+                ;;
+            2)
+                echo ""
+                log_info "Установка TELEMT в Docker..."
+                if ensure_proxy_file "proxys/telemt_in_docker1.sh"; then
+                    exec "$INSTALL_DIR/proxys/telemt_in_docker1.sh" </dev/tty
+                else
+                    exit 1
+                fi
+                ;;
+            3)
+                echo ""
+                log_info "Установка MTG..."
+                if ensure_proxy_file "proxys/mtgv2_1.sh"; then
+                    exec "$INSTALL_DIR/proxys/mtgv2_1.sh" </dev/tty
+                else
+                    exit 1
+                fi
+                ;;
+            4)
+                echo ""
+                log_info "Установка MTProtoZig..."
+                if ensure_proxy_file "proxys/mtprotozig1.sh"; then
+                    exec "$INSTALL_DIR/proxys/mtprotozig1.sh" </dev/tty
+                else
+                    exit 1
+                fi
+                ;;
+            5)
+                echo ""
+                log_info "Установка прокси пропущена."
+                break
+                ;;
+            0)
+                echo ""
+                log_info "Выход..."
+                exit 0
+                ;;
+            *)
+                echo ""
+                log_warning "Неверный выбор, попробуйте снова"
+                sleep 1
+                ;;
+        esac
+    done
+
+    # ── Финальное меню ──────────────────────────────────────────
+    while true; do
+        echo ""
+        echo -e "  ${BOLD}${GREEN}✅ Установка завершена${NC}"
+        echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM}(для работы/отслеживания прокси)${NC}"
+        echo -e "  ${RED}[0]${NC}  ${BOLD}Закрыть меню установки${NC}"
+        echo ""
+        echo -en "  ${BOLD}Выбор (Enter - установить лаунчер):${NC} "
+
+        final_choice=$(read_input)
+        [ -z "$final_choice" ] && final_choice="1"
+
+        case "$final_choice" in
+            0)
+                echo ""
+                log_info "Выход..."
+                exit 0
+                ;;
+            1)
+                echo ""
+                log_info "Установка MEKO Launcher..."
+                curl -fsSL "$BASE_URL/install_main.sh" | sudo bash
+                break
+                ;;
+            *)
+                echo ""
+                log_warning "Неверный выбор, попробуйте снова"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# ── Главное меню выбора режима ──────────────────────────────
+show_mode_menu() {
+    clear
+    echo ""
+    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.26${NC}"
+    echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${BOLD}Выберите режим установки:${NC}"
+    echo ""
+    echo -e "  ${GREEN}[1]${NC}  ${BOLD}Автоустановка${NC}  ${DIM}(всё автоматически, без вопросов)${NC}"
+    echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${DIM}(ручной выбор параметров)${NC}"
     echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
     echo ""
-    echo -en "  ${BOLD}Выбор (По умолчанию ${GREEN}${BOLD}1(Enter)${NC}${BOLD}):${NC} "
-
-    proxy_choice=$(read_input)
-    [ -z "$proxy_choice" ] && proxy_choice="1"
-
-    case "$proxy_choice" in
+    echo -en "  ${BOLD}Выбор (по умолчанию ${GREEN}${BOLD}1${NC}${BOLD}):${NC} "
+    local mode_choice
+    mode_choice=$(read_input)
+    [ -z "$mode_choice" ] && mode_choice="1"
+    
+    case "$mode_choice" in
         1)
-            echo ""
-            log_info "Установка TELEMT..."
-            if ensure_proxy_file "proxys/telemt1.sh"; then
-                exec "$INSTALL_DIR/proxys/telemt1.sh" </dev/tty
-            else
-                exit 1
-            fi
+            auto_install_mode
             ;;
         2)
-            echo ""
-            log_info "Установка TELEMT в Docker..."
-            if ensure_proxy_file "proxys/telemt_in_docker1.sh"; then
-                exec "$INSTALL_DIR/proxys/telemt_in_docker1.sh" </dev/tty
-            else
-                exit 1
-            fi
-            ;;
-        3)
-            echo ""
-            log_info "Установка MTG..."
-            if ensure_proxy_file "proxys/mtgv2_1.sh"; then
-                exec "$INSTALL_DIR/proxys/mtgv2_1.sh" </dev/tty
-            else
-                exit 1
-            fi
-            ;;
-        4)
-            echo ""
-            log_info "Установка MTProtoZig..."
-            if ensure_proxy_file "proxys/mtprotozig1.sh"; then
-                exec "$INSTALL_DIR/proxys/mtprotozig1.sh" </dev/tty
-            else
-                exit 1
-            fi
-            ;;
-        5)
-            echo ""
-            log_info "Установка прокси пропущена."
-            break
+            semi_auto_install_mode
             ;;
         0)
             echo ""
@@ -183,43 +341,12 @@ while true; do
             exit 0
             ;;
         *)
-            echo ""
             log_warning "Неверный выбор, попробуйте снова"
             sleep 1
+            show_mode_menu
             ;;
     esac
-done
+}
 
-# ── Финальное меню ──────────────────────────────────────────
-while true; do
-    echo ""
-    echo -e "  ${BOLD}${GREEN}✅ Установка завершена${NC}"
-    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM}(для работы/отслеживания прокси)${NC}"
-    echo -e "  ${RED}[0]${NC}  ${BOLD}Закрыть меню установки${NC}"
-    echo ""
-    echo -en "  ${BOLD}Выбор (Enter - установить лаунчер):${NC} "
-
-    final_choice=$(read_input)
-    [ -z "$final_choice" ] && final_choice="1"
-
-    case "$final_choice" in
-        0)
-            echo ""
-            log_info "Выход..."
-            exit 0
-            ;;
-        1)
-            echo ""
-            log_info "Установка MEKO Launcher..."
-            curl -fsSL "$BASE_URL/install_main.sh" | sudo bash
-            break
-            ;;
-        *)
-            echo ""
-            log_warning "Неверный выбор, попробуйте снова"
-            sleep 1
-            ;;
-    esac
-done
+# ── Точка входа ──────────────────────────────────────────────
+show_mode_menu
