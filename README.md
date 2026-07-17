@@ -118,33 +118,13 @@ mekopr
 
 **Если ничего не понял - вперёд читать** <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">Словарь для чайников</a>, там описаны все встречающиеся термины простыми словами
 
-# Как сделать прокси из РФ напрямую, с работающим MiddleProxy(полезно для тех, кто использует "канал спонсор")
 
-В данном мануале описан способ для запуска прокси напрямую на сервере, доступ с которого к ME/DC серверам телеграм ограничен. Работает с android/ios/desktop
-1. Ставим MTPROTO ZIG
-```Bash
-curl -fsSL https://raw.githubusercontent.com/sleep3r/mtproto.zig/main/deploy/bootstrap.sh | sudo bash
-```
-```Bash
-sudo mtbuddy install --port 443 --domain rutube.ru --no-tcpmss --middle-proxy --yes
-```
-2. Ставим скрипт MEKO
-```Bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash
-```
-3. Пропускаем информацию про Telemt, открывается меню скрипта, жмём **1** и жмём y
-4. Подключаемся к прокси и пользуемся
 
 ## Возможные проблемы("почему у меня может не работать?")
 
 - Возможно порт/айпи/подсеть уже были заблокированы ранее и необходимо их заменить(часто не работающий на 443 прокси спокойно работает на 9443 к примеру.)
 - При использовании фикса v2, который определяет устройство по TTL + Length подключаясь с ios, соединение проходя от вашего устройства до сервера может пройти через ряд балансировщиков, TTL становится больше указанного лимита, что встречается нередко, из-за чего скрипт в итоге и определяет устройство как десктоп/андроид, а не айфон, в таком случае необходимо использовать фикс v3.
 - При использовании любого другого фикса или же v3 варианта, который определяет ios по его полному отпечатку(порядку байтов) или фикса определяющего устройства по TTL+Length, а не лимитируя MSS(разрезая пакеты, что приводит к ухудшении загрузки медиа), **необходимо убедиться в том, что домен, используемый для Fake TLS имеет поддержку постквантового гибридного алгоритма обмена ключами, сочетающего классическую эллиптическую кривую (X25519 MLKEM768)**, проверить это вы можете **с помощью встроенной функции чека домена**(работает на ос с OpenSSL 3.5 и выше) **либо через бота: @Sni_checker_bot** отправив ему домен. **Если выбранный домен этого не поддерживает - с огромной вероятностью после попытки подключения с ios прилетит блокировка и подключение не удастся.**
-  - Ряд популярных доменов, которые имееют и не имееют поддержку данного алгоритма(_P.S. не надо использовать домен клаудфлеера как говорит ИИ, это плохая затея!_):
-
-  ❌ rutube.ru, vk.com, github.com, habr.com, yandex.ru, steamcommunity.com, amazon.com, microsoft.com, amazonaws.com, mail.ru, dzen.ru, linkedin.com, live.com, office.com, amazon.com, azure.com, bing.com, github.com, fastly.net, netflix.com, sharepoint.com, skype.com, gandi.net, cloud.microsoft, yahoo.com, msn.com, tiktok.com, roblox.com, spotify.com, adobe.com, ntp.org, myfritz.net, qq.com, baidu.com, nginx.org, windows.com, yandex.net, tiktokv.com, mozilla.org, nic.ru, opera.com, samsung.com, sentry.io
-
-  ✅ cloudflare.com, rutube.ru, my.aeza.ru, wb.ru, ozon.ru, steamcommunity.com, youtube.com, apple.com, openai.com, anthropic.com, meta.com, facebook.com, x.com, wikipedia.org, stackoverflow.com, rust-lang.org, crates.io, docs.rs, instagram.com, fbcdn.net, twitter.com, googletagmanager.com, whatsapp.net, doubleclick.net, googleusercontent.com, appsflyersdk.com, wordpress.org, digicert.com, youtu.be, pinterest.com, goo.gl, x.com, whatsapp.com, icloud.com, googlesyndication.com, cloudflare.net, googledomains.com, wa.me, chatgpt.com, vimeo.com, zoom.us, workers.dev, cloudflare-dns.com, wordpress.com, reddit.com, 
 
 - **Если вы используете SelfSteal вариацию, а не какой-либо популярный домен, то убедитесь, что используемый вами nginx был собран на OpenSSL3.5**(если вы собирали его на своем сервере, то проверьте какая версия стоит у вас.), **иначе у вас будут наблюдаться переодические проблемы с подключением к прокси с ios**. Для корректной работы SelfSteal поставьте себе nginx собранный на 3.5 либо обновите версию OpenSSL на вашем сервере до 3.5 и пересоберите nginx
     - Альтернатива1: использовать caddy
