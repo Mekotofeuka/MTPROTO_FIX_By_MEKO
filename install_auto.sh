@@ -17,11 +17,11 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-# ── Логирование ─────────────────────────────────────────────
-log_info() { echo -e "  ${BLUE}[i]${NC} $1"; }
-log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
+# ── Логирование (все сообщения в stderr, чтобы не ломать подстановки) ──
+log_info() { echo -e "  ${BLUE}[i]${NC} $1" >&2; }
+log_success() { echo -e "  ${GREEN}[✓]${NC} $1" >&2; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
-log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
+log_warning() { echo -e "  ${YELLOW}[!]${NC} $1" >&2; }
 
 # ── Проверка root ────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
@@ -116,16 +116,17 @@ get_public_ip() {
 # ── Функция получения последней версии Telemt из релизов ─────
 get_latest_telemt_version() {
     local version=""
-    # Пробуем получить через GitHub API
-    version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases/latest" 2>/dev/null | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4)
+    # Пробуем получить через GitHub API с помощью awk (надёжный парсер)
+    version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases/latest" 2>/dev/null | awk -F'"' '/"tag_name"/ {print $4}')
     # Если не получилось — пробуем через список релизов
     if [ -z "$version" ]; then
-        version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases" 2>/dev/null | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4)
+        version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases" 2>/dev/null | awk -F'"' '/"tag_name"/ {print $4; exit}')
     fi
-    # Если всё равно пусто — используем fallback (последняя известная стабильная)
+    # Если всё равно пусто — используем fallback (3.4.23)
     if [ -z "$version" ]; then
-        version="3.4.24"
-        log_warning "Не удалось определить последнюю версию Telemt, используем $version"
+        version="3.4.23"
+        # Предупреждение выводим отдельной строкой в stderr
+        log_warning "Не удалось определить последнюю версию Telemt, используем $version" >&2
     fi
     echo "$version"
 }
@@ -134,7 +135,7 @@ get_latest_telemt_version() {
 auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.21${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.24${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     
@@ -144,16 +145,16 @@ auto_install_mode() {
     local server_ip=$(get_public_ip)
     [ -z "$server_ip" ] && server_ip="не определено"
     
-    # Получаем последнюю версию Telemt
+    # Получаем последнюю версию Telemt (без мусора в stdout)
     local telemt_version=$(get_latest_telemt_version)
     
-    # Информация о предстоящей установке
+    # Информация о предстоящей установке (теперь версия выводится корректно)
     echo -e "  ${BOLD}Будет выполнена установка:${NC}"
     echo -e "  • Telemt версии ${GREEN}${telemt_version}${NC} на домен ${CYAN}$domain${NC}, порт ${CYAN}$port${NC}"
     echo -e "  • SYN FIX (новый iptables, вариант 1) на порт ${CYAN}$port${NC}"
     echo -e "  • IP-адрес сервера: ${CYAN}$server_ip${NC}"
     echo ""
-    echo -e "  ${YELLOW}Установка с кастомными параметрами доступна в полуавтоматическом или стандартном режиме${NC}"
+    echo -e "  ${YELLOW}Установка с кастомными параметрами доступна в полуавтоматическом режиме${NC}"
     echo ""
     echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
     local confirm
@@ -208,7 +209,7 @@ auto_install_mode() {
 semi_auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.21${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.24${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     log_info "Запуск стандартного установщика..."
@@ -335,7 +336,7 @@ semi_auto_install_mode() {
 show_mode_menu() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.21${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.24${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${BOLD}Выберите режим установки:${NC}"
@@ -344,7 +345,7 @@ show_mode_menu() {
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${DIM}(ручной выбор параметров)${NC}"
     echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
     echo ""
-    echo -en "  ${BOLD}Выбор (по умолчанию ${GREEN}${BOLD}1${NC}${BOLD}):${NC} "
+    echo -en "  ${BOLD}Выбор (по умолчанию ${GREEN}${BOLD}1 или Enter${NC}${BOLD}):${NC} "
     local mode_choice
     mode_choice=$(read_input)
     [ -z "$mode_choice" ] && mode_choice="1"
