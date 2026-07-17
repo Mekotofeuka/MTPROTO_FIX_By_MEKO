@@ -198,7 +198,6 @@ auto_install_mode() {
     echo -e "  • Порт: ${CYAN}$port${NC}"
     echo -e "  • IP: ${CYAN}$server_ip${NC}"
     echo -e "  • Версия Telemt: ${GREEN}${telemt_version}${NC}"
-    echo -e "  • Секрет: (сгенерирован автоматически, смотрите логи Telemt)"
     echo ""
     echo -e "  ${GRAY}Нажмите любую клавишу для выхода...${NC}"
     read -rsn1
