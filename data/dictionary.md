@@ -165,6 +165,30 @@ _Полные правила и IPTABLES и NFTABLES прописаны в [rule
 <img width="512" height="384" alt="image" src="https://github.com/user-attachments/assets/4932063e-4dd3-4ec8-a2f1-a63c2f77500c" />
 </a>
 
+- Ряд популярных доменов, которые имееют и не имееют поддержку гибридного шифрования(_P.S. не надо использовать домен клаудфлеера как говорит ИИ, это плохая затея!_):
+
+  ❌ rutube.ru, vk.com, github.com, habr.com, yandex.ru, steamcommunity.com, amazon.com, microsoft.com, amazonaws.com, mail.ru, dzen.ru, linkedin.com, live.com, office.com, amazon.com, azure.com, bing.com, github.com, fastly.net, netflix.com, sharepoint.com, skype.com, gandi.net, cloud.microsoft, yahoo.com, msn.com, tiktok.com, roblox.com, spotify.com, adobe.com, ntp.org, myfritz.net, qq.com, baidu.com, nginx.org, windows.com, yandex.net, tiktokv.com, mozilla.org, nic.ru, opera.com, samsung.com, sentry.io
+
+  ✅ cloudflare.com, rutube.ru, my.aeza.ru, wb.ru, ozon.ru, steamcommunity.com, youtube.com, apple.com, openai.com, anthropic.com, meta.com, facebook.com, x.com, wikipedia.org, stackoverflow.com, rust-lang.org, crates.io, docs.rs, instagram.com, fbcdn.net, twitter.com, googletagmanager.com, whatsapp.net, doubleclick.net, googleusercontent.com, appsflyersdk.com, wordpress.org, digicert.com, youtu.be, pinterest.com, goo.gl, x.com, whatsapp.com, icloud.com, googlesyndication.com, cloudflare.net, googledomains.com, wa.me, chatgpt.com, vimeo.com, zoom.us, workers.dev, cloudflare-dns.com, wordpress.com, reddit.com, 
+
+
+# Как сделать прокси из РФ напрямую, с работающим MiddleProxy(полезно для тех, кто использует "канал спонсор")
+
+В данном мануале описан способ для запуска прокси напрямую на сервере, доступ с которого к ME/DC серверам телеграм ограничен. Работает с android/ios/desktop
+1. Ставим MTPROTO ZIG
+```Bash
+curl -fsSL https://raw.githubusercontent.com/sleep3r/mtproto.zig/main/deploy/bootstrap.sh | sudo bash
+```
+```Bash
+sudo mtbuddy install --port 443 --domain rutube.ru --no-tcpmss --middle-proxy --yes
+```
+2. Ставим скрипт MEKO
+```Bash
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash
+```
+3. Пропускаем информацию про Telemt, открывается меню скрипта, жмём **1** и жмём y
+4. Подключаемся к прокси и пользуемся
+
 ---
 
 · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главну страницу</a> ·
