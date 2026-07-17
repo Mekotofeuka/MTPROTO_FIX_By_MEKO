@@ -113,27 +113,47 @@ get_public_ip() {
     echo "$_ip"
 }
 
+# ── Функция получения последней версии Telemt из релизов ─────
+get_latest_telemt_version() {
+    local version=""
+    # Пробуем получить через GitHub API
+    version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases/latest" 2>/dev/null | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4)
+    # Если не получилось — пробуем через список релизов
+    if [ -z "$version" ]; then
+        version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases" 2>/dev/null | grep -o '"tag_name":"[^"]*"' | head -1 | cut -d'"' -f4)
+    fi
+    # Если всё равно пусто — используем fallback (последняя известная стабильная)
+    if [ -z "$version" ]; then
+        version="3.4.24"
+        log_warning "Не удалось определить последнюю версию Telemt, используем $version"
+    fi
+    echo "$version"
+}
+
 # ── Режим автоустановки (БЕЗ ЗАПРОСОВ) ─────────────────────
 auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.21${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     
-    # Параметры по умолчанию (НИЧЕГО НЕ ЗАПРАШИВАЕМ)
+    # Параметры по умолчанию
     local domain="ozon.ru"
     local port="443"
     local server_ip=$(get_public_ip)
     [ -z "$server_ip" ] && server_ip="не определено"
     
+    # Получаем последнюю версию Telemt
+    local telemt_version=$(get_latest_telemt_version)
+    
     # Информация о предстоящей установке
     echo -e "  ${BOLD}Будет выполнена установка:${NC}"
-    echo -e "  • Telemt ${GREEN}последней версии${NC} на домен ${CYAN}$domain${NC}, порт ${CYAN}$port${NC}"
+    echo -e "  • Telemt версии ${GREEN}${telemt_version}${NC} на домен ${CYAN}$domain${NC}, порт ${CYAN}$port${NC}"
     echo -e "  • SYN FIX (новый iptables, вариант 1) на порт ${CYAN}$port${NC}"
     echo -e "  • IP-адрес сервера: ${CYAN}$server_ip${NC}"
     echo ""
-    echo -e "  ${YELLOW}Для изменения параметров используйте полуавтоматическую установку${NC}"
+    echo -e "  ${YELLOW}Установка с кастомными параметрами доступна в полуавтоматическом или стандартном режиме${NC}"
     echo ""
     echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
     local confirm
@@ -148,12 +168,12 @@ auto_install_mode() {
     log_info "Начинаем автоустановку..."
     echo ""
     
-    # 1. Установка Telemt (последняя версия, русский язык)
-    log_info "Установка Telemt последней версии на домен $domain, порт $port..."
-    if curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- -l 2 -d "$domain" -p "$port"; then
-        log_success "Telemt установлен успешно"
+    # 1. Установка Telemt (конкретная версия, русский язык)
+    log_info "Установка Telemt версии ${telemt_version} на домен $domain, порт $port..."
+    if curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- "$telemt_version" -l 2 -d "$domain" -p "$port"; then
+        log_success "Telemt ${telemt_version} установлен успешно"
     else
-        log_error "Ошибка установки Telemt"
+        log_error "Ошибка установки Telemt ${telemt_version}"
         echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
         read -rsn1
         return
@@ -176,6 +196,7 @@ auto_install_mode() {
     echo -e "  • Домен: ${CYAN}$domain${NC}"
     echo -e "  • Порт: ${CYAN}$port${NC}"
     echo -e "  • IP: ${CYAN}$server_ip${NC}"
+    echo -e "  • Версия Telemt: ${GREEN}${telemt_version}${NC}"
     echo -e "  • Секрет: (сгенерирован автоматически, смотрите логи Telemt)"
     echo ""
     echo -e "  ${GRAY}Нажмите любую клавишу для выхода...${NC}"
@@ -187,7 +208,7 @@ auto_install_mode() {
 semi_auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.21${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     log_info "Запуск стандартного установщика..."
@@ -314,7 +335,7 @@ semi_auto_install_mode() {
 show_mode_menu() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.26${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.21${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${BOLD}Выберите режим установки:${NC}"
