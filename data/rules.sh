@@ -1,5 +1,5 @@
 #!/bin/bash
-# data/rules.sh – все функции для работы с SYN FIX (iptables/nftables)
+# data/rules.sh – все функции и наборы для работы с SYN FIX (iptables/nftables)
 
 # ── Цвета ─────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -339,7 +339,7 @@ install_syn_fix() {
             FIX_TYPE="docker_classic"
             log_info "Выбран nftables старый"
         else
-            log_warning "Неверный выбор, используем новый вариант"
+            log_warning "Неверный выбор, используем новый вариант(1)"
             FIX_TYPE="new"
         fi
     fi
@@ -411,10 +411,10 @@ install_syn_fix() {
             log_warning "${BOLD}ВНИМАНИЕ:${NC} Данная настройка изменит файрвол системы."
             echo ""
             if [ -r /dev/tty ]; then
-                echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+                echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
                 read -r confirm </dev/tty
             else
-                echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+                echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
                 read -r confirm
             fi
             if [[ ! "$confirm" =~ ^[yY]$ ]]; then
@@ -535,10 +535,10 @@ SERVICE_NFT_EOF
         log_warning "${BOLD}ВНИМАНИЕ:${NC} Данная настройка изменит файрвол системы."
         echo ""
         if [ -r /dev/tty ]; then
-            echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+            echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
             read -r confirm </dev/tty
         else
-            echo -en "  ${BOLD}Продолжить установку? [y/N]:${NC} "
+            echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
             read -r confirm
         fi
         if [[ ! "$confirm" =~ ^[yY]$ ]]; then
