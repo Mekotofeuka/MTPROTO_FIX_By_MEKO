@@ -51,7 +51,7 @@ ensure_rules_loaded() {
     fi
 
     # Файла нет — пробуем скачать с таймаутом 5 сек
-    log_warning "Файл $RULES_SCRIPT не найден, пробую скачать с GitHub (таймаут 5 сек)..."
+    log_warning "Файл $RULES_SCRIPT не найден, скачиваю с GitHub..."
     mkdir -p /opt/mtpr-simple/data
     if curl -fsSL --max-time 5 "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/data/rules.sh" -o "$RULES_SCRIPT"; then
         chmod +x "$RULES_SCRIPT"
@@ -490,7 +490,7 @@ get_online_count() {
 show_header() {
     clear_screen
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.79${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.80${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
