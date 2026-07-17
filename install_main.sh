@@ -28,7 +28,7 @@ fi
 clear
 # ── Шапка ─────────────────────────────────────────────────────
 echo ""
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.15${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.16${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
@@ -130,7 +130,7 @@ echo ""
 echo -e "  ${BOLD}Загрузка файлов...${NC}"
 echo ""
 
-printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 3 -I {} bash -c '
+printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 2 -I {} bash -c '
     IFS="|" read -r file_path description <<< "$1"
     download_file "$file_path" "$description"
 ' _ {}
