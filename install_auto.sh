@@ -135,7 +135,7 @@ get_latest_telemt_version() {
 auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.24${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.29${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     
@@ -209,7 +209,7 @@ auto_install_mode() {
 semi_auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.24${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.29${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     log_info "Запуск стандартного установщика..."
@@ -336,13 +336,16 @@ semi_auto_install_mode() {
 show_mode_menu() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.24${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.29${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${BOLD}Выберите режим установки:${NC}"
     echo ""
-    echo -e "  ${GREEN}[1]${NC}  ${BOLD}Автоустановка${NC}  ${DIM}(всё автоматически, без вопросов)${NC}"
-    echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${DIM}(ручной выбор параметров)${NC}"
+    echo -e "  ${CYAN}[1]${NC}  ${BOLD}Автоустановка${NC}  ${NC}"
+    echo -e "  ${DIM}Выведет параметры с которыми будет установлен прокси и фикс"
+	echo -e "  ${DIM}Запросит подтверждение и выполнит установку"
+    echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${NC}"
+	echo -e "  ${DIM}Спросит порт, версию фикса, версию телемт и выполнит установку "
     echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
     echo ""
     echo -en "  ${BOLD}Выбор (по умолчанию ${GREEN}${BOLD}1 или Enter${NC}${BOLD}):${NC} "
