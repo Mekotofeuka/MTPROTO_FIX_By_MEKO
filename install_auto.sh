@@ -135,7 +135,7 @@ get_latest_telemt_version() {
 auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.29${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ АВТОУСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.30${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     
@@ -193,22 +193,54 @@ auto_install_mode() {
     
     echo ""
     log_success "Автоустановка завершена успешно!"
+    
+    # ── ВЫВОДИМ ДАННЫЕ ДЛЯ ПОДКЛЮЧЕНИЯ СРАЗУ (без паузы) ──
     echo -e "  ${BOLD}Данные для подключения:${NC}"
     echo -e "  • Домен: ${CYAN}$domain${NC}"
     echo -e "  • Порт: ${CYAN}$port${NC}"
     echo -e "  • IP: ${CYAN}$server_ip${NC}"
     echo -e "  • Версия Telemt: ${GREEN}${telemt_version}${NC}"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для выхода...${NC}"
-    read -rsn1
-    exit 0
+    
+    # ── ФИНАЛЬНОЕ МЕНЮ (как в полуавтоматическом режиме) ──
+    while true; do
+        echo -e "  ${BOLD}${GREEN}✅ Установка завершена${NC}"
+        echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM}(для работы/отслеживания прокси)${NC}"
+        echo -e "  ${RED}[0]${NC}  ${BOLD}Закрыть меню установки${NC}"
+        echo ""
+        echo -en "  ${BOLD}Выбор (Enter - установить лаунчер):${NC} "
+
+        final_choice=$(read_input)
+        [ -z "$final_choice" ] && final_choice="1"
+
+        case "$final_choice" in
+            0)
+                echo ""
+                log_info "Выход..."
+                exit 0
+                ;;
+            1)
+                echo ""
+                log_info "Установка MEKO Launcher..."
+                curl -fsSL "$BASE_URL/install_main.sh" | sudo bash
+                break
+                ;;
+            *)
+                echo ""
+                log_warning "Неверный выбор, попробуйте снова"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # ── Режим полуавтоматической установки ─────────────────────
 semi_auto_install_mode() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.29${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ ПОЛУАВТОМАТИЧЕСКАЯ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}v0.30${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     log_info "Запуск стандартного установщика..."
@@ -335,18 +367,18 @@ semi_auto_install_mode() {
 show_mode_menu() {
     clear
     echo ""
-    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.29${NC}"
+    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.30${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${BOLD}Выберите режим установки:${NC}"
     echo ""
     echo -e "  ${CYAN}[1]${NC}  ${BOLD}Автоустановка${NC}  ${NC}"
     echo -e "  ${DIM}Выведет параметры с которыми будет установлен прокси и фикс"
-	echo -e "  ${DIM}Запросит подтверждение и выполнит установку"
-	echo -e ""
+    echo -e "  ${DIM}Запросит подтверждение и выполнит установку"
+    echo -e ""
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${NC}"
-	echo -e "  ${DIM}Спросит порт, версию фикса, версию телемт и выполнит установку "
-	echo -e ""
+    echo -e "  ${DIM}Спросит порт, версию фикса, версию телемт и выполнит установку "
+    echo -e ""
     echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
     echo ""
     echo -en "  ${BOLD}Выбор (по умолчанию ${GREEN}${BOLD}1 или Enter${NC}${BOLD}):${NC} "
