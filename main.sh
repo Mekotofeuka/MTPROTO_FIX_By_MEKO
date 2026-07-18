@@ -460,7 +460,6 @@ get_mtprotozig_online() {
 
 show_header() {
     clear_screen
-    # ── Гарантируем загрузку rules.sh ДО использования его переменных ──
     ensure_rules_loaded 2>/dev/null
 
     echo ""
