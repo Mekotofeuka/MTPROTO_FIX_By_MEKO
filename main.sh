@@ -327,13 +327,6 @@ else
     fi
 fi
 
-# ── ОСТАЛЬНОЙ КОД (БЕЗ ИЗМЕНЕНИЙ) ───────────────────────────
-# Здесь идут функции: apply_basic_optimization, remove_mekopr, clear_screen,
-# is_mtprotozig_installed, get_mtprotozig_online,
-# show_header, is_optimization_applied, open_proxy_menu, check_censor,
-# main_menu, update_script и т.д.
-# Они остаются без изменений, так как не дублируют rules.sh.
-# Ниже я приведу их целиком для полноты.
 
 # ── Пункт 3: Базовая оптимизация ───────────────────────────
 apply_basic_optimization() {
@@ -467,8 +460,11 @@ get_mtprotozig_online() {
 
 show_header() {
     clear_screen
+    # ── Гарантируем загрузку rules.sh ДО использования его переменных ──
+    ensure_rules_loaded 2>/dev/null
+
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.81${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.83${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
@@ -782,8 +778,6 @@ main_menu() {
         show_header
         echo ""
 
-        # Получаем статусы, но если rules.sh не загружен, они будут "недоступно" из show_header
-        # Здесь мы просто проверяем, загружен ли rules.sh, чтобы понять, доступны ли функции
         local rules_available=0
         ensure_rules_loaded 2>/dev/null && rules_available=1
 
