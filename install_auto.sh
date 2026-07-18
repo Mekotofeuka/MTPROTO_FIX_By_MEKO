@@ -207,10 +207,10 @@ auto_install_mode() {
         echo -e "  ${BOLD}${GREEN}✅ Установка завершена${NC}"
         echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
         echo ""
-        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM}(для работы/отслеживания прокси)${NC}"
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Установить MEKO Launcher${NC}  ${DIM}(для управления и отслеживанием прокси)${NC}"
         echo -e "  ${RED}[0]${NC}  ${BOLD}Закрыть меню установки${NC}"
         echo ""
-        echo -en "  ${BOLD}Выбор (Enter - установить лаунчер):${NC} "
+        echo -en "  ${BOLD}Ввод (Enter - установить лаунчер):${NC} "
 
         final_choice=$(read_input)
         [ -z "$final_choice" ] && final_choice="1"
@@ -334,10 +334,10 @@ semi_auto_install_mode() {
         echo -e "  ${BOLD}${GREEN}✅ Установка завершена${NC}"
         echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
         echo ""
-        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM}(для работы/отслеживания прокси)${NC}"
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Поставить MEKO Launcher${NC}  ${DIM}(для управления и отслеживания работы прокси)${NC}"
         echo -e "  ${RED}[0]${NC}  ${BOLD}Закрыть меню установки${NC}"
         echo ""
-        echo -en "  ${BOLD}Выбор (Enter - установить лаунчер):${NC} "
+        echo -en "  ${BOLD}Ввод (Enter - установить лаунчер):${NC} "
 
         final_choice=$(read_input)
         [ -z "$final_choice" ] && final_choice="1"
