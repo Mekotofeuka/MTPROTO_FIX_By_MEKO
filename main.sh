@@ -70,6 +70,7 @@ ensure_rules_loaded() {
 
 # ── ОСТАЛЬНЫЕ ПЕРЕМЕННЫЕ И ФУНКЦИИ (НЕ ИЗ RULES.SH) ──────────
 CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
+MTG_CONFIG_PATH_FILE="/opt/mtpr-simple/mtg_config_path"
 
 # ── Функции для работы с TOML ──────────────────────────────
 _toml_get_value() {
@@ -103,6 +104,56 @@ _looks_like_telemt_config() {
     local _file="$1"
     [ -f "$_file" ] || return 1
     grep -qE '^\[access\.users\]|^\[censorship\]|^\[general\.modes\]|^tls_domain[[:space:]]*=' "$_file" 2>/dev/null
+}
+
+# ── Функции для MTG ──────────────────────────────────────────
+
+# Путь к конфигу MTG
+get_mtg_config_path() {
+    if [ -f "$MTG_CONFIG_PATH_FILE" ] && [ -s "$MTG_CONFIG_PATH_FILE" ]; then
+        path=$(cat "$MTG_CONFIG_PATH_FILE")
+        if [ "$path" != "skip" ]; then
+            echo "$path"
+            return 0
+        fi
+    fi
+    echo "/etc/mtg.toml"
+    return 0
+}
+
+# Проверка установки MTG
+is_mtg_installed() {
+    command -v mtg >/dev/null 2>&1
+}
+
+# Получение версии MTG
+get_mtg_version() {
+    if command -v mtg >/dev/null 2>&1; then
+        mtg --version 2>/dev/null | head -1 | awk '{print $1}'
+    else
+        echo ""
+    fi
+}
+
+# Получение порта из конфига MTG
+get_mtg_port() {
+    local _cfg="$1"
+    _cfg=$(trim "$_cfg")
+    if [ -z "$_cfg" ] || [ ! -f "$_cfg" ]; then
+        echo ""
+        return 1
+    fi
+    local _port
+    _port=$(grep -E '^bind-to[[:space:]]*=' "$_cfg" 2>/dev/null | head -1 | sed -E 's/^[[:space:]]*bind-to[[:space:]]*=[[:space:]]*"//; s/".*$//' | awk -F: '{print $2}')
+    if [ -z "$_port" ]; then
+        _port=$(_toml_get_value "port" "$_cfg")
+    fi
+    if [[ "$_port" =~ ^[0-9]+$ ]]; then
+        echo "$_port"
+    else
+        echo ""
+    fi
+    return 0
 }
 
 # ── Функция проверки установки Telemt ──────────────────────
@@ -463,7 +514,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.83${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.85${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
@@ -621,12 +672,16 @@ show_header() {
 
     local telemt_installed=false
     local mtprotozig_installed=false
-    
+    local mtg_installed=false
+
     if is_telemt_installed; then
         telemt_installed=true
     fi
     if is_mtprotozig_installed; then
         mtprotozig_installed=true
+    fi
+    if is_mtg_installed; then
+        mtg_installed=true
     fi
 
     # ── ВЫВОДИМ ВСЕ НАЙДЕННЫЕ КОНФИГИ TELEMT ──────────────────
@@ -706,7 +761,24 @@ show_header() {
         fi
     fi
 
-    if [ "$telemt_installed" = false ] && [ "$mtprotozig_installed" = false ]; then
+    # ── ИНФОРМАЦИЯ О MTG ──────────────────────────────────────
+    if [ "$mtg_installed" = true ]; then
+        local mtg_version=$(get_mtg_version)
+        local mtg_config_path=$(get_mtg_config_path)
+        local mtg_port=""
+        if [ -f "$mtg_config_path" ]; then
+            mtg_port=$(get_mtg_port "$mtg_config_path")
+        fi
+        local version_color="${GREEN}"
+        if [ -n "$mtg_version" ]; then
+            echo -e "  ${BOLD}MTG V:${NC} ${version_color}${mtg_version}${NC}  Port: ${CYAN}${mtg_port:-не определён}${NC}"
+        else
+            echo -e "  ${BOLD}MTG:${NC} ${GREEN}установлен${NC}  Port: ${CYAN}${mtg_port:-не определён}${NC}"
+        fi
+    fi
+
+    # ── ПРОВЕРКА: ЕСТЬ ЛИ ХОТЯ БЫ ОДИН ПРОКСИ ──────────────
+    if [ "$telemt_installed" = false ] && [ "$mtprotozig_installed" = false ] && [ "$mtg_installed" = false ]; then
         echo -e "  ${RED}${BOLD}Прокси не установлены${NC}"
     fi
 
