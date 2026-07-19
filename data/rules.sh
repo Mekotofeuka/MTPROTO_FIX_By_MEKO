@@ -719,9 +719,31 @@ remove_syn_fix() {
     fi
 
     # ── Удаляем правило маркировки iOS из mangle (новый вариант) ──
-    if iptables -t mangle -C PREROUTING -m u32 --u32 "32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000" -j MARK --set-mark 0x400 2>/dev/null; then
-        iptables -t mangle -D PREROUTING -m u32 --u32 "32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000" -j MARK --set-mark 0x400
-        log_info "Правило маркировки iOS (mangle) удалено"
+    local u32_rule="32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000"
+    
+    # 1. Пытаемся удалить через iptables
+    if iptables -t mangle -C PREROUTING -m u32 --u32 "$u32_rule" -j MARK --set-mark 0x400 2>/dev/null; then
+        iptables -t mangle -D PREROUTING -m u32 --u32 "$u32_rule" -j MARK --set-mark 0x400
+        log_info "Правило маркировки iOS (mangle) удалено через iptables"
+    fi
+
+    # 2. Дополнительно удаляем через nftables (на случай, если правило осталось)
+    if command -v nft >/dev/null 2>&1; then
+        # Проверяем наличие правила в nftables
+        if nft list table ip mangle 2>/dev/null | grep -q 'xt match "u32".*meta mark set 0x400'; then
+            # Пытаемся удалить по точному совпадению (разные варианты счётчиков)
+            nft delete rule ip mangle PREROUTING 'xt match "u32" counter meta mark set 0x400' 2>/dev/null || true
+            nft delete rule ip mangle PREROUTING 'xt match "u32" meta mark set 0x400' 2>/dev/null || true
+            
+            # Если не удалось, ищем по handle и удаляем
+            nft -a list chain ip mangle PREROUTING 2>/dev/null | grep 'meta mark set 0x400' | while read -r line; do
+                handle=$(echo "$line" | grep -o 'handle [0-9]*' | awk '{print $2}')
+                if [ -n "$handle" ]; then
+                    nft delete rule ip mangle PREROUTING handle "$handle" 2>/dev/null || true
+                    log_info "Правило маркировки iOS удалено через nftables (handle $handle)"
+                fi
+            done
+        fi
     fi
 
     rm -f "$PORT_FILE"
