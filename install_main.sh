@@ -28,7 +28,7 @@ fi
 clear
 # ── Шапка ─────────────────────────────────────────────────────
 echo ""
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.19${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.20${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
@@ -49,19 +49,18 @@ fi
 echo -e "  ${BLUE}[i]${NC} Исполняемый файл: ${SCRIPT_NAME}"
 echo ""
 
-# ── Создание базовой директории ─────────────────────────────
+# ── СОЗДАНИЕ ВСЕХ НЕОБХОДИМЫХ ПАПОК ЗАРАНЕЕ ────────────────
 mkdir -p "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR/proxys"
+mkdir -p "$INSTALL_DIR/data"
 
-# ── Функция скачивания файла ─────────────────────────────────
+# ── Функция скачивания файла (без создания папок) ──────────
 download_file() {
     local file="$1"
     local desc="$2"
     local url="$BASE_URL/$file"
     local dest="$INSTALL_DIR/$file"
     local name=$(basename "$file")
-    
-    # ── ИСПРАВЛЕНИЕ: создаём родительскую папку для файла ──
-    mkdir -p "$(dirname "$dest")"
     
     # Получаем размер файла
     local size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
