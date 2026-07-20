@@ -293,6 +293,9 @@ install_syn_fix() {
         # Используем /dev/tty для ввода
         if [ -r /dev/tty ]; then
 		    clear
+            echo -e "  ${BOLD}Меню SYN FIX V1.15 | Выберите тип правил ниже"
+		    echo -e "  ${DIM}══════════════════════════════════════════════"
+		    echo -e ""
             echo -e "  ${NC}${BOLD}Введите порт для SYN FIX ${DIM}(Например: 443)"
             echo -e "  ${NC}${BOLD}Либо введите порты через запятую ${DIM}(Например: 443,8443) "
 			echo -e ""
@@ -310,7 +313,6 @@ install_syn_fix() {
         fi
 
         echo ""
-        echo -e "  ${BOLD}Меню SYN FIX V1.13 | Выберите тип правил ниже"
 		echo -e "  ${DIM}══════════════════════════════════════════════"
 		echo -e ""
         echo -e "  ${BOLD}Меню SYN FIX Выберите тип SYN FIX:${NC}"
@@ -421,10 +423,10 @@ install_syn_fix() {
             log_warning "${BOLD}ВНИМАНИЕ:${NC} Данная настройка изменит файрвол системы."
             echo ""
             if [ -r /dev/tty ]; then
-                echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
+                echo -en "  ${BOLD}Продолжить установку? Y/n:${NC} "
                 read -r confirm </dev/tty
             else
-                echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
+                echo -en "  ${BOLD}Продолжить установку? Y/n:${NC} "
                 read -r confirm
             fi
             if [[ -z "$confirm" || "$confirm" =~ ^[yY]$ ]]; then
@@ -765,3 +767,4 @@ remove_syn_fix() {
 
     log_success "SYN FIX (iptables + nftables) удалён"
 }
+ 
