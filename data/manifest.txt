@@ -1,5 +1,5 @@
 install_auto.sh|Авто-установщик
-install_manual.sh|Ручной-установщик
+
 install.sh|Главный файл установки 
 
 main.sh|Главное меню лаунчера
