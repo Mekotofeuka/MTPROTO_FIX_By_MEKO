@@ -514,7 +514,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.86${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.87${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
@@ -1084,13 +1084,9 @@ update_script() {
         file_path=$(echo "$file_path" | xargs)
         description=$(echo "$description" | xargs)
         
-        file_name=$(basename "$file_path")
-        
-        if [ "$file_name" = "$SCRIPT_NAME" ]; then
-            echo -e "  ${DIM}⊘ Пропускаем себя: ${file_name}${NC}"
-            continue
-        fi
-        
+        # ── УДАЛЁН БЛОК ПРОПУСКА САМОГО СЕБЯ ──
+        # Теперь ВСЕ файлы добавляются, включая main.sh
+
         FILES_TO_DOWNLOAD+=("$file_path|$description")
         
     done < "$MANIFEST_FILE"
