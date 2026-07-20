@@ -292,8 +292,9 @@ install_syn_fix() {
         echo ""
         # Используем /dev/tty для ввода
         if [ -r /dev/tty ]; then
-            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX ${DIM}(например: 443 (Enter - 443) "
-            echo -e "  ${NC}${BOLD}Либо введите порты через запятую ${DIM}(например: 443,8443) "
+		    clear
+            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX ${DIM}(Например: 443)"
+            echo -e "  ${NC}${BOLD}Либо введите порты через запятую ${DIM}(Например: 443,8443) "
 			echo -e ""
 			echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
             read -r ports_input </dev/tty
@@ -309,11 +310,11 @@ install_syn_fix() {
         fi
 
         echo ""
-        echo -e "  ${BOLD}Меню SYN FIX V1.12 | Выберите тип правил ниже"
-		echo -e "${DIM}══════════════════════════"
+        echo -e "  ${BOLD}Меню SYN FIX V1.13 | Выберите тип правил ниже"
+		echo -e "  ${DIM}══════════════════════════════════════════════"
 		echo -e ""
         echo -e "  ${BOLD}Меню SYN FIX Выберите тип SYN FIX:${NC}"
-        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}рекомендуется${NC}"
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}${BOLD}рекомендуется${NC}"
         echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
         echo -e "  ${CYAN}[2]${NC}  ${BOLD}Старый вариант(iptables)${NC} (Разделение устройств определяя их TTL+Length)"
@@ -420,13 +421,15 @@ install_syn_fix() {
             log_warning "${BOLD}ВНИМАНИЕ:${NC} Данная настройка изменит файрвол системы."
             echo ""
             if [ -r /dev/tty ]; then
-                echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
+                echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
                 read -r confirm </dev/tty
             else
-                echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
+                echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
                 read -r confirm
             fi
-            if [[ ! "$confirm" =~ ^[yY]$ ]]; then
+            if [[ -z "$confirm" || "$confirm" =~ ^[yY]$ ]]; then
+                : # продолжить
+            else
                 log_info "Установка отменена"
                 sleep 0.5
                 return 1
@@ -531,7 +534,7 @@ SERVICE_NFT_EOF
         return 0
     fi
 
-    # ── Старые iptables режимы (1 и 2) ──────────────────────
+    # ── iptables режимы (1 и 2) ──────────────────────
     if [ "$auto_install" = false ]; then
         echo ""
         log_warning "Будет выполнена установка SYN FIX на порты: $ports_str"
@@ -544,13 +547,15 @@ SERVICE_NFT_EOF
         log_warning "${BOLD}ВНИМАНИЕ:${NC} Данная настройка изменит файрвол системы."
         echo ""
         if [ -r /dev/tty ]; then
-            echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
+            echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
             read -r confirm </dev/tty
         else
-            echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
+            echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
             read -r confirm
         fi
-        if [[ ! "$confirm" =~ ^[yY]$ ]]; then
+        if [[ -z "$confirm" || "$confirm" =~ ^[yY]$ ]]; then
+            : # продолжить
+        else
             log_info "Установка отменена"
             sleep 0.5
             return 1
