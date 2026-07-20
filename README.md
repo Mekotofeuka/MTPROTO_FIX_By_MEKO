@@ -137,45 +137,31 @@ mekopr
 
 ## ⭐ Поддержать проект
 
-**MEKO fix** — создан в свободное время для сообщества.  
-Ваша поддержка поможет проводить дальнейшие тесты;)
+**MEKO Launcher** — создан в свободное время для сообщества.  
+
 
 **Вы можете поддержать проект, поставив ⭐ этому репозиторию (сверху справа этой страницы)**
 
-💰 **Криптовалюта:**  
+Если вы считаете проект полезным и желаете поддержать разработку, направляйте ваши пожертвования на следующие адреса криптокошельков :
 
-[<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/b910c839-ec45-486d-b7f0-05da8de41b74" />
+If you find this project useful and wish to donate here are crypto wallets :
+
+[<img width="150" height="150" alt="image" src="https://github.com/user-attachments/assets/b910c839-ec45-486d-b7f0-05da8de41b74" />
 ](https://t.me/send?start=IVlaFvgWdkxH)
 
-от **0.1 USDT**
+USDT TRC20 ``` TGmBaRYmQwSyC6sRaumaMf9CbEuVAk4Eff ``` 
 
-USDT TRC20
-```Bash
-TGmBaRYmQwSyC6sRaumaMf9CbEuVAk4Eff
-```
-USDT BEP20
-```Bash
-0x2AF1581aA7b696Ca28C70B5D29756Da3ca577D65
-```
+USDT BEP20 ```0x2AF1581aA7b696Ca28C70B5D29756Da3ca577D65``` 
 
-TON(GRAM)
-```Bash
-UQDdT8vtR5DmbwzNvMUiNQnwxlbkFq4ypE2_UzIm6bQ88DbU
-```
+TON(GRAM) ``` UQDdT8vtR5DmbwzNvMUiNQnwxlbkFq4ypE2_UzIm6bQ88DbU ``` 
 
-BTC
-```Bash
-bc1qqfkknfrhhufq6dm7cczmdtjkgv56ma3gnz0utk
-```
+BTC ``` bc1qqfkknfrhhufq6dm7cczmdtjkgv56ma3gnz0utk ``` 
 
-SOL SPL
-```Bash
-Gn7w3EBkZqPjPDcbkTaxspip42TuhoGqaaEqHAxhG9V1
-```
+SOL SPL ``` Gn7w3EBkZqPjPDcbkTaxspip42TuhoGqaaEqHAxhG9V1 ``` 
 
 Также вы можете поддержать меня, воспользовавшись моим сервисом:
 
-[<img width="300" height="300" alt="MEKO bot" src="https://github.com/user-attachments/assets/8db41a95-79f2-40d6-9777-50b6ffb6fa48" />](https://t.me/projectmeko_bot)
+[<img width="150" height="150" alt="projectmeko_bot" src="https://github.com/user-attachments/assets/8db41a95-79f2-40d6-9777-50b6ffb6fa48" />](https://t.me/projectmeko_bot)
 
 
 dalink.to/mekome
