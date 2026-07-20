@@ -28,7 +28,7 @@ fi
 clear
 # ── Шапка ─────────────────────────────────────────────────────
 echo ""
-echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.21${NC}"
+echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Main${NC}${BOLD}) v0.22${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 
@@ -151,8 +151,6 @@ echo ""
 echo -e "  ${BOLD}Загрузка файлов...${NC}"
 echo ""
 
-# Для отладки можно временно убрать параллельность и загружать последовательно,
-# но по условию мы не трогаем многопоточность, оставляем -P 6.
 printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 6 -I {} bash -c '
     IFS="|" read -r file_path description <<< "$1"
     download_file "$file_path" "$description"
@@ -160,7 +158,7 @@ printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 6 -I {} bash -c '
 
 # ── Проверка, что все файлы скачались ───────────────────────
 echo ""
-local failed=0
+failed=0
 for entry in "${FILES_TO_DOWNLOAD[@]}"; do
     IFS='|' read -r file_path description <<< "$entry"
     if [ ! -f "$INSTALL_DIR/$file_path" ]; then
