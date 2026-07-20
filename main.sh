@@ -514,7 +514,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.85${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.86${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
 
@@ -1027,9 +1027,12 @@ update_script() {
     echo -e "  ${BLUE}[i]${NC} Исполняемый файл: ${SCRIPT_NAME}"
     echo ""
 
+    # ── СОЗДАНИЕ ВСЕХ НЕОБХОДИМЫХ ПАПОК ЗАРАНЕЕ ────────────────
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$INSTALL_DIR/proxys"
+    mkdir -p "$INSTALL_DIR/data"
 
+    # ── Функция скачивания файла ─────────────────────────────────
     download_file() {
         local file="$1"
         local desc="$2"
@@ -1069,6 +1072,7 @@ update_script() {
     export -f download_file
     export BASE_URL INSTALL_DIR
 
+    # ── Чтение манифеста и исключение себя ──────────────────────
     echo -e "  ${BOLD}Чтение файлов из репозитория для загрузки и подготовка к установке...${NC}"
     echo ""
 
@@ -1091,6 +1095,7 @@ update_script() {
         
     done < "$MANIFEST_FILE"
 
+    # ── Вывод списка файлов для загрузки ────────────────────────
     echo -e "  ${BOLD}Файлы для загрузки (${#FILES_TO_DOWNLOAD[@]} шт.):${NC}"
     for entry in "${FILES_TO_DOWNLOAD[@]}"; do
         file_path=$(echo "$entry" | cut -d'|' -f1)
@@ -1099,6 +1104,7 @@ update_script() {
     done
     echo ""
 
+    # ── Загрузка файлов (параллельно, 6 потоков) ───────────────
     echo -e "  ${BOLD}Загрузка файлов...${NC}"
     echo ""
 
@@ -1107,7 +1113,27 @@ update_script() {
         download_file "$file_path" "$description"
     ' _ {}
 
+    # ── Проверка, что все файлы скачались ───────────────────────
     echo ""
+    local failed=0
+    for entry in "${FILES_TO_DOWNLOAD[@]}"; do
+        IFS='|' read -r file_path description <<< "$entry"
+        if [ ! -f "$INSTALL_DIR/$file_path" ]; then
+            echo -e "  ${RED}[✗]${NC} Файл не найден: $file_path"
+            failed=1
+        fi
+    done
+
+    if [ $failed -eq 1 ]; then
+        echo -e "  ${RED}[✗]${NC} Обновление не удалось: некоторые файлы не загружены"
+        echo -e "  ${YELLOW}Проверьте подключение к интернету и доступность репозитория.${NC}"
+        echo -e "  ${YELLOW}Попробуйте обновить позже.${NC}"
+        rm -f "$MANIFEST_FILE"
+        rm -f "$temp"
+        return 1
+    fi
+
+    # ── Установка прав ──────────────────────────────────────────
     echo -ne "  ${CYAN}[+]${NC} Установка прав выполнения... "
     chmod +x "$INSTALL_DIR/proxys/"*.sh 2>/dev/null || true
     chmod +x "$INSTALL_DIR"/*.py 2>/dev/null || true
