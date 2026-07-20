@@ -514,8 +514,8 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Launcher  v1.87${NC}"
-    echo -e "  ${DIM}===========================${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.88${NC}"
+    echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
     # ── ПОЛУЧАЕМ ИНФОРМАЦИЮ ОБ ОС ──────────────────────────
@@ -710,9 +710,9 @@ show_header() {
             if [ "$_version" = "3.4.18" ]; then
                 version_color="${GREEN}"
             elif [[ "$(printf '%s\n' "3.4.18" "$_version" | sort -V | head -n1)" != "3.4.18" ]]; then
-                version_color="${RED}"
+                version_color="${GREEN}"
             else
-                version_color="${YELLOW}"
+                version_color="${GREEN}"
             fi
             
             if [ "$first_config" = true ]; then
@@ -856,7 +856,7 @@ main_menu() {
             local iptables_status=$(get_synfix_status)
             local nft_status=$(get_nft_fix_status)
             if [ "$iptables_status" = "inactive" ] && [ "$nft_status" = "inactive" ]; then
-                local item1="${GREEN}${BOLD}Установить SYN FIX${NC}"
+                local item1="${GREEN}${BOLD}Меню установки SYN FIX${NC}"
             else
                 local item1="${RED}${BOLD}Удалить SYN FIX${NC}"
             fi
@@ -875,8 +875,8 @@ main_menu() {
         echo -e "  ${CYAN}[3]${NC}  ${NC}${BOLD}Меню прокси и конфигов${NC}"
         echo -e "  ${CYAN}[4]${NC}  ${NC}${BOLD}Обновить скрипт${NC}"
         echo -e "  ${CYAN}[5]${NC}  ${NC}${BOLD}Проверить доступ к сайтам с сервера(тг,ютуб,инст, и тд.)${NC}"
-        echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить домен/прокси на ios-валидность${YELLOW}${BOLD}(Необходим: OpenSSL 3.5+)  ${NC}"
-        echo -e "  ${CYAN}[7]${NC}  ${RED}${BOLD}Удалить полностью MEKOpr${NC}"
+        echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить работоспособность домена/прокси на ios${YELLOW}${BOLD} (Необходим: OpenSSL 3.5+)  ${NC}"
+        echo -e "  ${CYAN}[7]${NC}  ${RED}${BOLD}Удалить MEKO Manager(вместе с правилами)${NC}"
         echo -e "  ${CYAN}[0]${NC}  Выход"
         echo ""
         echo -en "  ${BOLD}Выбор:${NC} "
