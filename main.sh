@@ -656,9 +656,9 @@ show_header() {
     elif [ "$iptables_status" = "has_chain_only" ]; then
         echo -e "  ${BOLD}SYN FIX iptables:${NC} ${YELLOW}Цепочка есть, сервис не запущен${NC}"
     elif [ "$iptables_status" = "inactive" ]; then
-        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}Не установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}${BOLD}Не установлен${NC}"
     else
-        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}Недоступно${NC}"
+        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}${BOLD}Недоступно${NC}"
     fi
 
     if [ "$nft_status" = "active" ]; then
@@ -666,9 +666,9 @@ show_header() {
     elif [ "$nft_status" = "has_table_only" ]; then
         echo -e "  ${BOLD}SYN FIX nftables:${NC} ${YELLOW}Таблица есть, сервис не запущен${NC}"
     elif [ "$nft_status" = "inactive" ]; then
-        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}Не установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}${BOLD}Не установлен${NC}"
     else
-        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}Недоступно${NC}"
+        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}${BOLD}Недоступно${NC}"
     fi
 
     local telemt_installed=false
@@ -737,7 +737,7 @@ show_header() {
             
             echo ""
             echo -e "  ${BOLD}Telemt V:${NC} ${version_color}${_version}${NC}${port_display}"
-            echo -e "  ${BOLD}Подключено к прокси Telemt:${NC} ${CYAN}${_online}${NC}${BOLD} человек"
+            echo -e "  ${BOLD}Telemt онлайн:${NC} ${CYAN}${_online}${NC}${BOLD} человек"
             echo -e "  ${BOLD}Встроенный MSS:${NC} ${mss_color}${_mss_enabled}${NC}  |  ${BOLD}MSS_BULK:${NC} ${mss_bulk_color}${_mss_bulk_enabled}${NC}  |  ${BOLD}Synlimit:${NC} ${synlimit_color}${_synlimit_enabled}${NC}"
         done
     elif [ "$telemt_installed" = true ] && [ ${#configs_array[@]} -eq 0 ]; then
@@ -759,10 +759,10 @@ show_header() {
         local online_count=$(get_mtprotozig_online)
         if [ -n "$online_count" ] && [ "$online_count" -ge 0 ] 2>/dev/null; then
             echo ""
-            echo -e "  ${BOLD}Подключено к прокси Mtproto.zig:${NC} ${CYAN}$online_count${NC} человек"
+            echo -e "  ${BOLD}Mtproto.zig онлайн:${NC} ${CYAN}$online_count${NC} человек"
         else
             echo ""
-            echo -e "  ${BOLD}Подключено к прокси Mtproto.zig:${NC} ${CYAN}0${NC} человек"
+            echo -e "  ${BOLD}Mtproto.zig онлайн:${NC} ${CYAN}0${NC} человек"
         fi
     fi
 
@@ -876,6 +876,7 @@ main_menu() {
             local item2_text="${GREEN}${BOLD}Выполнить базовую оптимизацию${NC}"
         fi
 
+        echo -e "${DIM}══════════════════════════════"
         echo -e "  ${CYAN}[1]${NC}  $item1"
         echo -e "  ${CYAN}[2]${NC}  $item2_text"
         echo -e "  ${CYAN}[3]${NC}  ${NC}${BOLD}Меню прокси и конфигов${NC}"
