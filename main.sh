@@ -876,7 +876,7 @@ main_menu() {
             local item2_text="${GREEN}${BOLD}Выполнить базовую оптимизацию${NC}"
         fi
 
-        echo -e "${DIM}══════════════════════════════"
+        echo -e "  ${DIM}══════════════════════════════"
         echo -e "  ${CYAN}[1]${NC}  $item1"
         echo -e "  ${CYAN}[2]${NC}  $item2_text"
         echo -e "  ${CYAN}[3]${NC}  ${NC}${BOLD}Меню прокси и конфигов${NC}"
