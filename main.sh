@@ -514,7 +514,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.88${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.89${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
@@ -548,6 +548,26 @@ show_header() {
         echo -e "  ${BOLD}${os_name}:${NC} ${YELLOW}${BOLD}${os_version}${NC}"
     elif [ -n "$os_name" ]; then
         echo -e "  ${BOLD}${os_name}${NC}"
+    fi
+
+    # ── ПОЛУЧАЕМ ВЕРСИЮ OPENSSL (теперь сразу после ОС) ───
+    local openssl_version=""
+    local openssl_display=""
+    local openssl_color=""
+    
+    if command -v openssl &>/dev/null; then
+        openssl_version=$(openssl version 2>/dev/null | awk '{print $2}' | cut -d'-' -f1 | cut -d'+' -f1)
+        
+        if [ -n "$openssl_version" ]; then
+            if [[ "$(printf '%s\n' "3.5" "$openssl_version" | sort -V | head -n1)" = "3.5" ]]; then
+                openssl_color="${GREEN}${BOLD}"
+                openssl_display="${openssl_version}"
+            else
+                openssl_color="${RED}${BOLD}"
+                openssl_display="${openssl_version} ${YELLOW}${BOLD}(не подходит для SelfSteal SNI)${NC}"
+            fi
+            echo -e "  ${BOLD}OpenSSL:${NC} ${openssl_color}${openssl_display}${NC}"
+        fi
     fi
 
     # ── ПОЛУЧАЕМ IP-АДРЕС СЕРВЕРА ──────────────────────────
@@ -584,26 +604,6 @@ show_header() {
 
     echo -e "  ${BOLD}IP:${NC} ${CYAN}${server_ip}${NC}"
     echo -e "  ${BOLD}Порты для прокси:${NC} ${CYAN}${open_ports}${NC}"
-
-    # ── ПОЛУЧАЕМ ВЕРСИЮ OPENSSL ─────────────────────────────
-    local openssl_version=""
-    local openssl_display=""
-    local openssl_color=""
-    
-    if command -v openssl &>/dev/null; then
-        openssl_version=$(openssl version 2>/dev/null | awk '{print $2}' | cut -d'-' -f1 | cut -d'+' -f1)
-        
-        if [ -n "$openssl_version" ]; then
-            if [[ "$(printf '%s\n' "3.5" "$openssl_version" | sort -V | head -n1)" = "3.5" ]]; then
-                openssl_color="${GREEN}${BOLD}"
-                openssl_display="${openssl_version}"
-            else
-                openssl_color="${RED}${BOLD}"
-                openssl_display="${openssl_version} ${YELLOW}${BOLD}(не подходит для SelfSteal SNI)${NC}"
-            fi
-            echo -e "  ${BOLD}OpenSSL:${NC} ${openssl_color}${openssl_display}${NC}"
-        fi
-    fi
 
     # ── ПЕРЕЧИТЫВАЕМ ПУТЬ К КОНФИГУ ──────────────────────────
     local current_config_path=""
@@ -649,7 +649,8 @@ show_header() {
         log_warning "СТАТУС SYN FIX: rules.sh не загружен" >&2
     fi
 
-    # Вывод статусов
+    # Вывод статусов (с изменёнными названиями)
+    echo ""
     if [ "$iptables_status" = "active" ]; then
         echo -e "  ${BOLD}SYN FIX (iptables):${NC} ${GREEN}Установлен${NC}"
     elif [ "$iptables_status" = "has_chain_only" ]; then
@@ -734,6 +735,7 @@ show_header() {
             [ "$_mss_bulk_enabled" = "включен" ] && mss_bulk_color="${RED}"
             [ "$_synlimit_enabled" = "включен" ] && synlimit_color="${RED}"
             
+            echo ""
             echo -e "  ${BOLD}Telemt V:${NC} ${version_color}${_version}${NC}${port_display}"
             echo -e "  ${BOLD}Подключено к прокси Telemt:${NC} ${CYAN}${_online}${NC}${BOLD} человек"
             echo -e "  ${BOLD}Встроенный MSS:${NC} ${mss_color}${_mss_enabled}${NC}  |  ${BOLD}MSS_BULK:${NC} ${mss_bulk_color}${_mss_bulk_enabled}${NC}  |  ${BOLD}Synlimit:${NC} ${synlimit_color}${_synlimit_enabled}${NC}"
@@ -748,6 +750,7 @@ show_header() {
         else
             version_color="${YELLOW}"
         fi
+        echo ""
         echo -e "  ${BOLD}Telemt V:${NC} ${version_color}${_version}${NC} ${YELLOW}(конфиг не найден)${NC}"
     fi
 
@@ -755,8 +758,10 @@ show_header() {
     if [ "$mtprotozig_installed" = true ]; then
         local online_count=$(get_mtprotozig_online)
         if [ -n "$online_count" ] && [ "$online_count" -ge 0 ] 2>/dev/null; then
+            echo ""
             echo -e "  ${BOLD}Подключено к прокси Mtproto.zig:${NC} ${CYAN}$online_count${NC} человек"
         else
+            echo ""
             echo -e "  ${BOLD}Подключено к прокси Mtproto.zig:${NC} ${CYAN}0${NC} человек"
         fi
     fi
@@ -770,6 +775,7 @@ show_header() {
             mtg_port=$(get_mtg_port "$mtg_config_path")
         fi
         local version_color="${GREEN}"
+        echo ""
         if [ -n "$mtg_version" ]; then
             echo -e "  ${BOLD}MTG V:${NC} ${version_color}${mtg_version}${NC}  Port: ${CYAN}${mtg_port:-не определён}${NC}"
         else
