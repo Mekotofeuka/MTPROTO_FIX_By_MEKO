@@ -652,23 +652,23 @@ show_header() {
     # Вывод статусов (с изменёнными названиями)
     echo ""
     if [ "$iptables_status" = "active" ]; then
-        echo -e "  ${BOLD}SYN FIX (iptables):${NC} ${GREEN}Установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${GREEN}Установлен${NC}"
     elif [ "$iptables_status" = "has_chain_only" ]; then
-        echo -e "  ${BOLD}SYN FIX (iptables):${NC} ${YELLOW}Цепочка есть, сервис не запущен${NC}"
+        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${YELLOW}Цепочка есть, сервис не запущен${NC}"
     elif [ "$iptables_status" = "inactive" ]; then
-        echo -e "  ${BOLD}SYN FIX (iptables):${NC} ${RED}Не установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}Не установлен${NC}"
     else
-        echo -e "  ${BOLD}SYN FIX (iptables):${NC} ${RED}Недоступно${NC}"
+        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}Недоступно${NC}"
     fi
 
     if [ "$nft_status" = "active" ]; then
-        echo -e "  ${BOLD}SYN FIX (nftables (работает с Docker)):${NC} ${GREEN}Установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${GREEN}Установлен${NC}"
     elif [ "$nft_status" = "has_table_only" ]; then
-        echo -e "  ${BOLD}SYN FIX (nftables (работает с Docker)):${NC} ${YELLOW}Таблица есть, сервис не запущен${NC}"
+        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${YELLOW}Таблица есть, сервис не запущен${NC}"
     elif [ "$nft_status" = "inactive" ]; then
-        echo -e "  ${BOLD}SYN FIX (nftables (работает с Docker)):${NC} ${RED}Не установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}Не установлен${NC}"
     else
-        echo -e "  ${BOLD}SYN FIX (nftables (работает с Docker)):${NC} ${RED}Недоступно${NC}"
+        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}Недоступно${NC}"
     fi
 
     local telemt_installed=false
@@ -777,9 +777,9 @@ show_header() {
         local version_color="${GREEN}"
         echo ""
         if [ -n "$mtg_version" ]; then
-            echo -e "  ${BOLD}MTG V:${NC} ${version_color}${mtg_version}${NC}  Port: ${CYAN}${mtg_port:-не определён}${NC}"
+            echo -e "  ${BOLD}MTG V:${NC} ${version_color}${mtg_version}${NC}${BOLD}  Port: ${CYAN}${mtg_port:-не определён}${NC}"
         else
-            echo -e "  ${BOLD}MTG:${NC} ${GREEN}установлен${NC}  Port: ${CYAN}${mtg_port:-не определён}${NC}"
+            echo -e "  ${BOLD}MTG:${NC} ${GREEN}установлен${NC}${BOLD}  Port: ${CYAN}${mtg_port:-не определён}${NC}"
         fi
     fi
 
