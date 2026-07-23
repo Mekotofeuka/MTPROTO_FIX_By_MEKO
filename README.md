@@ -1,7 +1,7 @@
 <div align="center">
 
 
-# MEKO | MTProto proxy manager - Installer, Launcher and fixer
+# MEKO | VPN and MTProto proxy manager - Installer, Launcher and fixer
 
 
 <a href="https://t.me/meko_mtprotofix">
@@ -66,7 +66,9 @@ _MEKO использует на данный момент [более точну
 - Корректно определяет и выставляет правила для разных устройств со **100% вероятностью**
 - **Ставится в один клик** и имеет 2 режима: "стандартная установка" с выбором необходимых настроек и "автоматическая" установка, которая скажет что именно выполнит и после подтверждения всё сделает за вас
 <div align="center">
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/c2d9fa4f-e741-4d75-a54c-18ba138d8db3" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/be92a44d-5040-4592-8eda-644d4b182439" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/75abab6b-0419-477c-bab3-7dca9694357e" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/63b88f4b-3d63-48a2-97a4-0f1b67e96307" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/93bf6fbd-db3f-4f93-adb2-0c68c912fcfe" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/3296a6c6-c097-4e5a-bd05-7c9f64154f79" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/8f07e4ea-3a99-43a4-8232-ad7f7ece634e" />
