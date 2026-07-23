@@ -468,14 +468,11 @@ remove_mekopr() {
 
     log_info "Начинаем полное удаление MEKOpr..."
 
-    # Удаление правил требует rules.sh
+    # Удаление правил (если удаётся загрузить rules.sh)
     if ensure_rules_loaded; then
         remove_syn_fix
     else
-        log_error "Невозможно удалить SYN FIX: rules.sh не загружен"
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-        read -rsn1
-        return
+        log_warning "rules.sh не загружен, пропускаем удаление правил"
     fi
 
     log_info "Удаление файлов конфигурации..."
@@ -514,7 +511,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.9${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.90${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
