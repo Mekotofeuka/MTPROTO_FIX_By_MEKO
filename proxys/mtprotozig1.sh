@@ -91,18 +91,18 @@ install_proxy() {
     echo -e "  ${BOLD}Хотите установить с параметрами по умолчанию?${NC}"
     echo ""
     echo -e "  Команда:"
-    echo -e "  ${CYAN}sudo mtbuddy install --port 443 --domain rutube.ru --middle-proxy --no-tcpmss --yes${NC}"
+    echo -e "  ${CYAN}sudo mtbuddy install --port 443 --domain ozon.ru --middle-proxy --no-tcpmss --no-masking --yes${NC}"
     echo ""
     echo -e "  ${BOLD}Параметры:${NC}"
     echo -e "  • Порт: ${GREEN}443${NC}"
-    echo -e "  • TLS домен: ${GREEN}rutube.ru${NC}"
+    echo -e "  • TLS домен: ${GREEN}ozon.ru${NC}"
     echo -e "  • MiddleProxy: ${GREEN}включён${NC}"
     echo -e "  • MSS: ${GREEN}отключён${NC}"
     echo ""
-    echo -e "  ${DIM}Если желаете установить с кастомными параметрами, просто введите команду с вашими параметрами${NC}"
+    echo -e "  ${DIM}Если хотите установить с кастомными параметрами, просто введите команду с ними${NC}"
     echo -e "  ${DIM}Например: sudo mtbuddy install --port 8443 --domain example.com --middle-proxy --no-tcpmss --yes${NC}"
     echo ""
-    echo -en "  ${BOLD}Ваш выбор (Enter/y - установить с параметрами по умолчанию, n - назад, или введите свою команду):${NC} "
+    echo -en "  ${BOLD}Ввод ${DIM} (Enter/y - установить с параметрами по умолчанию, n - назад, или введите свою команду)${NC}${BOLD}:${NC} "
     read -r choice
 
     case "$choice" in
