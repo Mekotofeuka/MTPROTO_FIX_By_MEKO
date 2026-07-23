@@ -514,7 +514,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.89${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.810${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
@@ -925,7 +925,7 @@ main_menu() {
                 local confirm
                 read -r confirm
                 if [[ -z "$confirm" || "$confirm" =~ ^[yY]$ ]]; then
-                    remove_syn_fix
+                    remove_syn_fix || true
                 else
                     log_info "Отмена удаления"
                 fi
