@@ -714,7 +714,7 @@ SERVICE_NFT_EOF
 remove_syn_fix() {
     log_info "Удаление SYN FIX..."
 
-    # Удаляем iptables
+    # Удаляем iptables (если установлен вариант 1 или 2)
     systemctl stop mtpr-synfix.service 2>/dev/null || true
     systemctl disable mtpr-synfix.service 2>/dev/null || true
 
@@ -729,46 +729,53 @@ remove_syn_fix() {
         log_info "Цепочка $SYNFIX_CHAIN удалена"
     fi
 
-    # ── Удаляем правило маркировки iOS из mangle (новый вариант) ──
-    local u32_rule="32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000"
+    # ── Удаляем правила с u32 из mangle (только для iptables-вариантов) ──
+    local u32_filter="32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000"
     
-    # 1. Пытаемся удалить через iptables
-    if iptables -t mangle -C PREROUTING -m u32 --u32 "$u32_rule" -j MARK --set-mark 0x400 2>/dev/null; then
-        iptables -t mangle -D PREROUTING -m u32 --u32 "$u32_rule" -j MARK --set-mark 0x400
-        log_info "Правило маркировки iOS (mangle) удалено через iptables"
+    if iptables -t mangle -L PREROUTING -n 2>/dev/null | grep -q "$u32_filter"; then
+        log_info "Обнаружены правила u32 в mangle (iptables), удаляем..."
+        iptables -t mangle -L PREROUTING --line-numbers 2>/dev/null | grep "$u32_filter" | awk '{print $1}' | tac | while read -r num; do
+            if [ -n "$num" ]; then
+                iptables -t mangle -D PREROUTING "$num" 2>/dev/null && log_info "Удалено правило u32 (номер $num)"
+            fi
+        done
+    else
+        log_info "Правил с нашим u32-фильтром в iptables/mangle не найдено"
     fi
 
-    # 2. Дополнительно удаляем через nftables (на случай, если правило осталось)
+    # ── Удаляем nftables-таблицу (если установлен вариант 3 или 4) ──
     if command -v nft >/dev/null 2>&1; then
-        # Проверяем наличие правила в nftables
-        if nft list table ip mangle 2>/dev/null | grep -q 'xt match "u32".*meta mark set 0x400'; then
-            # Пытаемся удалить по точному совпадению (разные варианты счётчиков)
-            nft delete rule ip mangle PREROUTING 'xt match "u32" counter meta mark set 0x400' 2>/dev/null || true
-            nft delete rule ip mangle PREROUTING 'xt match "u32" meta mark set 0x400' 2>/dev/null || true
-            
-            # Если не удалось, ищем по handle и удаляем
-            nft -a list chain ip mangle PREROUTING 2>/dev/null | grep 'meta mark set 0x400' | while read -r line; do
-                handle=$(echo "$line" | grep -o 'handle [0-9]*' | awk '{print $2}')
-                if [ -n "$handle" ]; then
-                    nft delete rule ip mangle PREROUTING handle "$handle" 2>/dev/null || true
-                    log_info "Правило маркировки iOS удалено через nftables (handle $handle)"
-                fi
+        # Проверяем наличие таблицы inet mtpr_synfix (создаётся при варианте 3/4)
+        if nft list table inet mtpr_synfix &>/dev/null; then
+            log_info "Обнаружена таблица inet mtpr_synfix (nftables), удаляем..."
+            nft delete table inet mtpr_synfix 2>/dev/null && log_info "Таблица inet mtpr_synfix удалена"
+        else
+            log_info "Таблицы inet mtpr_synfix не найдено"
+        fi
+
+        # Также удаляем правила из ip mangle, если они там остались (для старых версий)
+        handles=$(nft -a list chain ip mangle PREROUTING 2>/dev/null | grep 'xt match "u32".*meta mark set 0x400' | grep -o 'handle [0-9]*' | awk '{print $2}')
+        if [ -n "$handles" ]; then
+            log_info "Найдены правила u32 в nftables (ip mangle), удаляем..."
+            for h in $handles; do
+                nft delete rule ip mangle PREROUTING handle "$h" 2>/dev/null && log_info "Удалено правило u32 через nftables (handle $h)"
             done
         fi
+
+        # Дополнительно удаляем таблицу inet mtpr_synfix (если она ещё есть) - дублируем для надёжности
+        nft delete table inet mtpr_synfix 2>/dev/null || true
     fi
 
     rm -f "$PORT_FILE"
     rm -f /etc/systemd/system/mtpr-synfix.service
 
-    # Удаляем nftables
+    # Удаляем nftables-сервис, если он был создан
     systemctl stop mtpr-nft-synfix.service 2>/dev/null || true
     systemctl disable mtpr-nft-synfix.service 2>/dev/null || true
     rm -f /etc/systemd/system/mtpr-nft-synfix.service
-    nft delete table inet mtpr_synfix 2>/dev/null || true
     rm -f /opt/mtpr-simple/mtpr-synfix-nft.sh
 
     systemctl daemon-reload
 
     log_success "SYN FIX (iptables + nftables) удалён"
 }
- 
