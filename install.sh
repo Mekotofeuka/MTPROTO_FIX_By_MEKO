@@ -47,9 +47,7 @@ download_file() {
     local file="$1"
     local dest="$2"
     local url="$BASE_URL/$file"
-    
     mkdir -p "$(dirname "$dest")"
-    
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
         chmod +x "$dest" 2>/dev/null || true
         return 0
@@ -62,7 +60,6 @@ download_file() {
 ensure_file() {
     local file="$1"
     local dest="$INSTALL_DIR/$file"
-    
     if [ ! -f "$dest" ]; then
         log_info "Скачивание $file..."
         if download_file "$file" "$dest"; then
@@ -82,6 +79,8 @@ ITEMS=(
     "Автоматическая установка|Откроет простое меню автоматической и полуавтоматической установки|Полуавтоматический вариант попросит ввести кастомные параметры|Автоматический вариант установит универсальный вариант сам|(для новичков)"
     "Выход|||"
 )
+# Номера для каждого пункта (индекс -> отображаемый номер)
+NUMS=(1 2 0)
 
 # ── Функция рисования меню ─────────────────────────────────────
 draw_menu() {
@@ -96,7 +95,6 @@ draw_menu() {
 
     local idx=0
     for item in "${ITEMS[@]}"; do
-        # Разбираем строку
         IFS='|' read -r title line1 line2 extra <<< "$item"
         local marker=" "
         local color="${NC}"
@@ -104,8 +102,8 @@ draw_menu() {
             marker="${GREEN}${BOLD}▶${NC}"
             color="${GREEN}${BOLD}"
         fi
-        # Выводим строку с цветами через echo -e
-        echo -e "${marker}  ${GREEN}${BOLD}[$idx]${NC}  ${color}${title}${NC}  ${extra}"
+        local num=${NUMS[$idx]}
+        echo -e "${marker}  ${GREEN}${BOLD}[${num}]${NC}  ${color}${title}${NC}  ${extra}"
         if [ -n "$line1" ]; then
             echo -e "       ${DIM}${line1}${NC}"
         fi
@@ -124,66 +122,67 @@ draw_menu() {
 # ── Основная функция меню ─────────────────────────────────────
 show_menu() {
     local current=0
-    local total_items=${#ITEMS[@]}
+    local total=${#ITEMS[@]}
+    local key
 
     while true; do
         draw_menu $current
 
-        # Читаем один символ без эха
-        read -s -n1 key 2>/dev/null || continue
-        # Обработка специальных клавиш
+        # Читаем один символ из терминала
+        IFS= read -r -s -n1 key </dev/tty 2>/dev/null
+        if [ -z "$key" ]; then
+            # Нажат Enter — выбираем текущий пункт
+            break
+        fi
+
+        # Обработка управляющих последовательностей (стрелки)
         if [[ $key == $'\033' ]]; then
-            # Это ESC - читаем остальные символы (стрелки)
-            read -s -n1 -t 0.1 key2 || continue
-            if [[ $key2 == '[' ]]; then
-                read -s -n1 -t 0.1 key3 || continue
+            IFS= read -r -s -n1 key2 </dev/tty 2>/dev/null
+            IFS= read -r -s -n1 key3 </dev/tty 2>/dev/null
+            if [[ "$key2" == '[' ]]; then
                 case "$key3" in
                     'A') # стрелка вверх
                         ((current--))
-                        if [ $current -lt 0 ]; then current=$((total_items-1)); fi
+                        if [ $current -lt 0 ]; then current=$((total-1)); fi
                         ;;
                     'B') # стрелка вниз
                         ((current++))
-                        if [ $current -ge $total_items ]; then current=0; fi
+                        if [ $current -ge $total ]; then current=0; fi
                         ;;
                 esac
             fi
-        else
-            case "$key" in
-                'j'|'J') # вниз
-                    ((current++))
-                    if [ $current -ge $total_items ]; then current=0; fi
-                    ;;
-                'k'|'K') # вверх
-                    ((current--))
-                    if [ $current -lt 0 ]; then current=$((total_items-1)); fi
-                    ;;
-                '0') # выход
-                    current=2
-                    break
-                    ;;
-                '1') # стандартная
-                    current=0
-                    break
-                    ;;
-                '2') # автоматическая
-                    current=1
-                    break
-                    ;;
-                'q'|'Q') # выход
-                    current=2
-                    break
-                    ;;
-                '') # Enter – выбрать текущий
-                    break
-                    ;;
-                *) # любой другой символ – игнорируем
-                    ;;
-            esac
+            continue
         fi
+
+        # Обработка обычных клавиш
+        case "$key" in
+            'j'|'J')
+                ((current++))
+                if [ $current -ge $total ]; then current=0; fi
+                ;;
+            'k'|'K')
+                ((current--))
+                if [ $current -lt 0 ]; then current=$((total-1)); fi
+                ;;
+            '0')
+                current=2
+                break
+                ;;
+            '1')
+                current=0
+                break
+                ;;
+            '2')
+                current=1
+                break
+                ;;
+            'q'|'Q')
+                current=2
+                break
+                ;;
+        esac
     done
 
-    # Возвращаем выбранный индекс
     echo "" > /dev/tty
     return $current
 }
@@ -222,7 +221,6 @@ case "$choice" in
         exit 0
         ;;
     *)
-        # fallback
         echo -e "  ${YELLOW}[!]${NC} Неверный выбор, запускаем стандартную установку"
         sleep 1
         if ensure_file "install_main.sh"; then
