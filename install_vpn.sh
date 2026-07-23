@@ -63,25 +63,10 @@ ensure_file() {
     return 0
 }
 
-# ── Установка 3x-ui ───────────────────────────────────────────
+# ── Установка 3x-ui (без подтверждения) ──────────────────────
 install_3xui() {
     echo ""
     log_info "Установка 3x-ui..."
-
-    echo ""
-    echo -e "  ${YELLOW}[!]${NC} Будет выполнена установка:"
-    echo -e "  • Панель 3x-ui"
-    echo -e "  • 3 ноды"
-    echo -e "  • Фикс xray ядра"
-    echo ""
-    echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
-    local confirm
-    read -r confirm </dev/tty 2>/dev/null
-    if [[ -n "$confirm" && ! "$confirm" =~ ^[yY]$ ]]; then
-        log_info "Установка отменена"
-        return 1
-    fi
-
     echo ""
     log_info "Запуск установки 3x-ui (это может занять несколько минут)..."
     echo ""
@@ -110,24 +95,10 @@ install_3xui() {
     return 0
 }
 
-# ── Установка Remnawave ───────────────────────────────────────
+# ── Установка Remnawave (без подтверждения) ──────────────────
 install_remnawave() {
     echo ""
     log_info "Установка Remnawave..."
-
-    echo ""
-    echo -e "  ${YELLOW}[!]${NC} Будет выполнена установка:"
-    echo -e "  • Remnawave Panel (VPN-панель)"
-    echo -e "  • Выбор режима установки (Full / Panel Only / Node / All-in-One)"
-    echo ""
-    echo -en "  ${BOLD}Продолжить установку? [Y/n]:${NC} "
-    local confirm
-    read -r confirm </dev/tty 2>/dev/null
-    if [[ -n "$confirm" && ! "$confirm" =~ ^[yY]$ ]]; then
-        log_info "Установка отменена"
-        return 1
-    fi
-
     echo ""
     log_info "Запуск установки Remnawave..."
     echo ""
@@ -183,13 +154,10 @@ case "$choice" in
         ;;
     2)
         install_remnawave
-        # После завершения установки Remnawave перезапускаем скрипт, чтобы показать меню снова
         exec "$0"
         ;;
     *)
-        # 1 или Enter — установка 3x-ui
         install_3xui
-        # После завершения установки 3x-ui перезапускаем скрипт, чтобы показать меню снова
         exec "$0"
         ;;
 esac
