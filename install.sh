@@ -76,6 +76,13 @@ ensure_file() {
     return 0
 }
 
+# ── Определяем пункты меню ────────────────────────────────────
+ITEMS=(
+    "Стандартная установка|Установит MEKO Launcher и все необходимые файлы|Для дальнейшей работы и управления Mtproto proxy|(рекомендуется)"
+    "Автоматическая установка|Откроет простое меню автоматической и полуавтоматической установки|Полуавтоматический вариант попросит ввести кастомные параметры|Автоматический вариант установит универсальный вариант сам|(для новичков)"
+    "Выход|||"
+)
+
 # ── Функция рисования меню ─────────────────────────────────────
 draw_menu() {
     local selected=$1
@@ -87,36 +94,25 @@ draw_menu() {
     echo -e "  ${BOLD}Выберите вариант установки:${NC}"
     echo ""
 
-    # Пункты меню: номер, заголовок, описание строки 1, описание строки 2 (может быть пусто)
-    items=(
-        "1|Стандартная установка|Установит MEKO Launcher и все необходимые файлы|Для дальнейшей работы и управления Mtproto proxy|${GREEN}${BOLD}(рекомендуется)${NC}"
-        "2|Автоматическая установка|Откроет простое меню автоматической и полуавтоматической установки|Полуавтоматический вариант попросит ввести кастомные параметры|Автоматический вариант установит универсальный вариант сам|${CYAN}(для новичков)${NC}"
-        "0|Выход|||"
-    )
-
     local idx=0
-    for item in "${items[@]}"; do
-        IFS='|' read -r num title line1 line2 extra <<< "$item"
+    for item in "${ITEMS[@]}"; do
+        # Разбираем строку
+        IFS='|' read -r title line1 line2 extra <<< "$item"
         local marker=" "
         local color="${NC}"
         if [ $idx -eq $selected ]; then
             marker="${GREEN}${BOLD}▶${NC}"
             color="${GREEN}${BOLD}"
         fi
-        # Вывод номера + маркер
-        printf "  %s  " "$marker"
-        if [ -n "$extra" ]; then
-            printf "${GREEN}${BOLD}[%s]${NC}  ${color}%s${NC}  %s\n" "$num" "$title" "$extra"
-        else
-            printf "${GREEN}${BOLD}[%s]${NC}  ${color}%s${NC}\n" "$num" "$title"
+        # Выводим строку с цветами через echo -e
+        echo -e "${marker}  ${GREEN}${BOLD}[$idx]${NC}  ${color}${title}${NC}  ${extra}"
+        if [ -n "$line1" ]; then
+            echo -e "       ${DIM}${line1}${NC}"
         fi
-        if [ -n "$line1" ] && [ -n "$line2" ]; then
-            printf "       ${DIM}%s${NC}\n" "$line1"
-            printf "       ${DIM}%s${NC}\n" "$line2"
-        elif [ -n "$line1" ]; then
-            printf "       ${DIM}%s${NC}\n" "$line1"
+        if [ -n "$line2" ]; then
+            echo -e "       ${DIM}${line2}${NC}"
         fi
-        printf "\n"
+        echo ""
         ((idx++))
     done
 
@@ -128,19 +124,19 @@ draw_menu() {
 # ── Основная функция меню ─────────────────────────────────────
 show_menu() {
     local current=0
-    local total_items=3
+    local total_items=${#ITEMS[@]}
 
     while true; do
         draw_menu $current
 
         # Читаем один символ без эха
-        read -s -n1 key 2>/dev/null
+        read -s -n1 key 2>/dev/null || continue
         # Обработка специальных клавиш
         if [[ $key == $'\033' ]]; then
             # Это ESC - читаем остальные символы (стрелки)
-            read -s -n1 -t 0.1 key2
+            read -s -n1 -t 0.1 key2 || continue
             if [[ $key2 == '[' ]]; then
-                read -s -n1 -t 0.1 key3
+                read -s -n1 -t 0.1 key3 || continue
                 case "$key3" in
                     'A') # стрелка вверх
                         ((current--))
@@ -226,7 +222,7 @@ case "$choice" in
         exit 0
         ;;
     *)
-        # fallback (если что-то пошло не так) – стандартная установка
+        # fallback
         echo -e "  ${YELLOW}[!]${NC} Неверный выбор, запускаем стандартную установку"
         sleep 1
         if ensure_file "install_main.sh"; then
