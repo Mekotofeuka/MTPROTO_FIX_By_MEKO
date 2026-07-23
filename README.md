@@ -194,6 +194,8 @@ dalink.to/mekome
 - MTG https://github.com/9seconds/mtg
 - Mtproto.zig https://github.com/sleep3r/mtproto.zig
 - telemt_panel https://github.com/amirotin/telemt_panel
+- 3x-ui-pro https://github.com/mozaroc/3x-ui-pro
+- remnawave-installer https://github.com/xxphantom/remnawave-installer
 
 
 > *Это независимый информационный обзор.*
