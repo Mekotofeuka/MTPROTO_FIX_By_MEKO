@@ -87,7 +87,7 @@ draw_menu() {
     local selected=$1
     clear 2>/dev/null || printf '\033[2J\033[H'
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}2 ${CYAN}${BOLD}⚙️${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}3 ${CYAN}${BOLD}⚙️${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${BOLD}Выберите вариант установки:${NC}"
