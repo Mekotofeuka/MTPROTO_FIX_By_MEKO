@@ -95,15 +95,17 @@ install_3xui() {
     return 0
 }
 
-# ── Установка Remnawave (без подтверждения) ──────────────────
+# ── Установка Remnawave ──────
 install_remnawave() {
     echo ""
     log_info "Установка Remnawave..."
     echo ""
-    log_info "Запуск установки Remnawave..."
+    log_info "Запуск установщика Remnawave (интерактивный режим)..."
     echo ""
 
-    if sudo bash -c "$(curl -sL https://raw.githubusercontent.com/xxphantom/remnawave-installer/main/install.sh)" @ --lang=ru; then
+    # Скачиваем и запускаем скрипт с sudo, передавая аргумент --lang=ru
+    # Это корректно передаст stdin и позволит работать интерактивному меню
+    if curl -sL https://raw.githubusercontent.com/xxphantom/remnawave-installer/main/install.sh | sudo bash -s -- --lang=ru; then
         log_success "Remnawave установлен"
     else
         log_error "Ошибка установки Remnawave"
