@@ -67,7 +67,7 @@ ensure_file() {
 show_proxy_menu() {
     clear 2>/dev/null || printf '\033[2J\033[H'
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO v1.9 ${CYAN}${BOLD}⚙️${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD} v1.9 ${CYAN}${BOLD}| ${NC}${BOLD}Меню proxy ⚙️${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${BOLD}Выберите вариант установки:${NC}"
