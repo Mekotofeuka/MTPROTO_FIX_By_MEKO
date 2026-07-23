@@ -47,7 +47,9 @@ download_file() {
     local file="$1"
     local dest="$2"
     local url="$BASE_URL/$file"
+    
     mkdir -p "$(dirname "$dest")"
+    
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
         chmod +x "$dest" 2>/dev/null || true
         return 0
@@ -60,6 +62,7 @@ download_file() {
 ensure_file() {
     local file="$1"
     local dest="$INSTALL_DIR/$file"
+    
     if [ ! -f "$dest" ]; then
         log_info "Скачивание $file..."
         if download_file "$file" "$dest"; then
@@ -79,7 +82,6 @@ ITEMS=(
     "Автоматическая установка|Откроет простое меню автоматической и полуавтоматической установки|Полуавтоматический вариант попросит ввести кастомные параметры|Автоматический вариант установит универсальный вариант сам|(для новичков)"
     "Выход|||"
 )
-# Номера для каждого пункта (индекс -> отображаемый номер)
 NUMS=(1 2 0)
 
 # ── Функция рисования меню ─────────────────────────────────────
@@ -87,7 +89,7 @@ draw_menu() {
     local selected=$1
     clear 2>/dev/null || printf '\033[2J\033[H'
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}3 ${CYAN}${BOLD}⚙️${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}2 ${CYAN}${BOLD}⚙️${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
     echo -e "  ${BOLD}Выберите вариант установки:${NC}"
@@ -128,8 +130,13 @@ show_menu() {
     while true; do
         draw_menu $current
 
-        # Читаем один символ из терминала
-        IFS= read -r -s -n1 key </dev/tty 2>/dev/null
+        # Читаем один символ из терминала (исправлено)
+        if ! IFS= read -r -s -n1 key < /dev/tty 2>/dev/null; then
+            # Если не удалось прочитать с /dev/tty (например, нет терминала),
+            # используем обычный read
+            IFS= read -r -s -n1 key 2>/dev/null || break
+        fi
+        
         if [ -z "$key" ]; then
             # Нажат Enter — выбираем текущий пункт
             break
@@ -137,8 +144,8 @@ show_menu() {
 
         # Обработка управляющих последовательностей (стрелки)
         if [[ $key == $'\033' ]]; then
-            IFS= read -r -s -n1 key2 </dev/tty 2>/dev/null
-            IFS= read -r -s -n1 key3 </dev/tty 2>/dev/null
+            IFS= read -r -s -n1 key2 < /dev/tty 2>/dev/null || continue
+            IFS= read -r -s -n1 key3 < /dev/tty 2>/dev/null || continue
             if [[ "$key2" == '[' ]]; then
                 case "$key3" in
                     'A') # стрелка вверх
@@ -183,7 +190,7 @@ show_menu() {
         esac
     done
 
-    echo "" > /dev/tty
+    echo "" > /dev/tty 2>/dev/null || true
     return $current
 }
 
