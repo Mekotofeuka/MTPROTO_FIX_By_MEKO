@@ -478,13 +478,13 @@ remove_mekopr() {
     log_info "Удаление файлов конфигурации..."
     rm -rf /opt/mtpr-simple
 
-    log_info "Удаление скрипта..."
-    rm -f "$0"
-
     log_success "MEKOpr полностью удалён с сервера!"
     echo ""
     log_info "Для завершения работы скрипта нажмите Enter..."
     read -r
+
+    log_info "Удаление скрипта..."
+    rm -f "$0"
     exit 0
 }
 
@@ -511,7 +511,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.90${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.9${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
