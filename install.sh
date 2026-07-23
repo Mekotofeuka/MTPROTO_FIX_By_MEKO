@@ -76,145 +76,44 @@ ensure_file() {
     return 0
 }
 
-# ── Определяем пункты меню ────────────────────────────────────
-ITEMS=(
-    "Стандартная установка|Установит MEKO Launcher и все необходимые файлы|Для дальнейшей работы и управления Mtproto proxy|(рекомендуется)"
-    "Автоматическая установка|Откроет простое меню автоматической и полуавтоматической установки|Полуавтоматический вариант попросит ввести кастомные параметры|Автоматический вариант установит универсальный вариант сам|(для новичков)"
-    "Выход|||"
-)
-NUMS=(1 2 0)
-
-# ── Функция рисования меню ─────────────────────────────────────
-draw_menu() {
-    local selected=$1
-    clear 2>/dev/null || printf '\033[2J\033[H'
-    echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}2 ${CYAN}${BOLD}⚙️${NC}"
-    echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "  ${BOLD}Выберите вариант установки:${NC}"
-    echo ""
-
-    local idx=0
-    for item in "${ITEMS[@]}"; do
-        IFS='|' read -r title line1 line2 extra <<< "$item"
-        local marker=" "
-        local color="${NC}"
-        if [ $idx -eq $selected ]; then
-            marker="${GREEN}${BOLD}▶${NC}"
-            color="${GREEN}${BOLD}"
-        fi
-        local num=${NUMS[$idx]}
-        echo -e "${marker}  ${GREEN}${BOLD}[${num}]${NC}  ${color}${title}${NC}  ${extra}"
-        if [ -n "$line1" ]; then
-            echo -e "       ${DIM}${line1}${NC}"
-        fi
-        if [ -n "$line2" ]; then
-            echo -e "       ${DIM}${line2}${NC}"
-        fi
-        echo ""
-        ((idx++))
-    done
-
-    echo -e "  ${DIM}Используйте ${BOLD}↑↓${NC}${DIM} или ${BOLD}j/k${NC}${DIM} для перемещения, ${BOLD}Enter${NC}${DIM} для выбора, ${BOLD}0/1/2${NC}${DIM} для быстрого выбора${NC}"
-    echo ""
-    echo -en "  ${NC}${BOLD}Ввод: ${NC}"
-}
-
-# ── Основная функция меню ─────────────────────────────────────
-show_menu() {
-    local current=0
-    local total=${#ITEMS[@]}
-    local key
-
-    while true; do
-        draw_menu $current
-
-        # Читаем один символ из терминала (исправлено)
-        if ! IFS= read -r -s -n1 key < /dev/tty 2>/dev/null; then
-            # Если не удалось прочитать с /dev/tty (например, нет терминала),
-            # используем обычный read
-            IFS= read -r -s -n1 key 2>/dev/null || break
-        fi
-        
-        if [ -z "$key" ]; then
-            # Нажат Enter — выбираем текущий пункт
-            break
-        fi
-
-        # Обработка управляющих последовательностей (стрелки)
-        if [[ $key == $'\033' ]]; then
-            IFS= read -r -s -n1 key2 < /dev/tty 2>/dev/null || continue
-            IFS= read -r -s -n1 key3 < /dev/tty 2>/dev/null || continue
-            if [[ "$key2" == '[' ]]; then
-                case "$key3" in
-                    'A') # стрелка вверх
-                        ((current--))
-                        if [ $current -lt 0 ]; then current=$((total-1)); fi
-                        ;;
-                    'B') # стрелка вниз
-                        ((current++))
-                        if [ $current -ge $total ]; then current=0; fi
-                        ;;
-                esac
-            fi
-            continue
-        fi
-
-        # Обработка обычных клавиш
-        case "$key" in
-            'j'|'J')
-                ((current++))
-                if [ $current -ge $total ]; then current=0; fi
-                ;;
-            'k'|'K')
-                ((current--))
-                if [ $current -lt 0 ]; then current=$((total-1)); fi
-                ;;
-            '0')
-                current=2
-                break
-                ;;
-            '1')
-                current=0
-                break
-                ;;
-            '2')
-                current=1
-                break
-                ;;
-            'q'|'Q')
-                current=2
-                break
-                ;;
-        esac
-    done
-
-    echo "" > /dev/tty 2>/dev/null || true
-    return $current
-}
-
-# ── Запуск меню и обработка выбора ──────────────────────────
-show_menu
-choice=$?
-
+# ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}2 ${CYAN}${BOLD}⚙️${NC}"
+echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+echo ""
+echo -e "  ${BOLD}Выберите вариант установки:${NC}"
+echo ""
+echo -e "  ${GREEN}[1]${NC}  ${BOLD}Стандартная установка${NC}  ${GREEN}${BOLD}(рекомендуется)${NC}"
+echo -e "       ${DIM}Установит MEKO Launcher и все необходимые файлы${NC}"
+echo -e "       ${DIM}Для дальнейшей работы и управления Mtproto proxy"
+echo ""
+echo -e "  ${CYAN}[2]${NC}  ${BOLD}Автоматическая установка${NC}  ${CYAN}(для новичков)${NC}"
+echo -e "       ${DIM}Откроет простое меню автоматической и полуавтоматической установки${NC}"
+echo -e "       ${DIM}Полуавтоматический вариант попросит ввести кастомные параметры"
+echo -e "       ${DIM}Автоматический вариант установит универсальный вариант сам"
+echo ""
+echo -e "  ${RED}${BOLD}[0]${NC}  ${RED}${BOLD}Выход${NC}"
+echo ""
+echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Enter${NC}${BOLD} - стандартная установка):${NC} "
+
+# ── Читаем ввод с терминала, если не удалось — выходим ────
+if ! read -r choice </dev/tty 2>/dev/null; then
+    echo ""
+    echo -e "  ${RED}[✗]${NC} Не удалось прочитать ввод. Запустите скрипт интерактивно."
+    exit 1
+fi
+
 case "$choice" in
-    0) # стандартная установка
-        echo -e "  ${GREEN}[✓]${NC} Выбрана стандартная установка"
-        sleep 1
-        if ensure_file "install_main.sh"; then
-            bash "$INSTALL_DIR/install_main.sh"
-            exit 0
-        else
-            log_error "Не удалось загрузить install_main.sh"
-            exit 1
-        fi
+    0)
+        echo ""
+        log_info "Выход..."
+        exit 0
         ;;
-    1) # автоматическая установка
-        echo -e "  ${GREEN}[✓]${NC} Выбрана автоматическая установка"
-        sleep 1
+    2)
+        echo ""
+        log_info "Запуск автоустановки..."
+        
         if ensure_file "install_auto.sh"; then
             bash "$INSTALL_DIR/install_auto.sh"
             exit 0
@@ -223,13 +122,23 @@ case "$choice" in
             exit 1
         fi
         ;;
-    2) # выход
-        echo -e "  ${YELLOW}[!]${NC} Выход..."
-        exit 0
+    3)
+        echo ""
+        log_info "Запуск ручной установки..."
+        
+        if ensure_file "install_manual.sh"; then
+            bash "$INSTALL_DIR/install_manual.sh"
+            exit 0
+        else
+            log_error "Не удалось загрузить install_manual.sh"
+            exit 1
+        fi
         ;;
     *)
-        echo -e "  ${YELLOW}[!]${NC} Неверный выбор, запускаем стандартную установку"
-        sleep 1
+        # 1 или Enter — стандартная установка
+        echo ""
+        log_info "Запуск стандартной установки MEKO Launcher..."
+        
         if ensure_file "install_main.sh"; then
             bash "$INSTALL_DIR/install_main.sh"
             exit 0
