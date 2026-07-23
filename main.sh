@@ -909,7 +909,7 @@ main_menu() {
                 local confirm
                 read -r confirm
                 if [[ -z "$confirm" || "$confirm" =~ ^[yY]$ ]]; then
-                    remove_syn_fix
+                    remove_syn_fix || true
                 else
                     log_info "Отмена удаления"
                 fi
