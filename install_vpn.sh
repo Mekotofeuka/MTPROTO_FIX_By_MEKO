@@ -150,7 +150,7 @@ install_remnawave() {
 # ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Установка VPN ${CYAN}${BOLD}v1.9 ${CYAN}${BOLD}⚙️${NC}"
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню VPN ${CYAN}${BOLD}v1.9 ${CYAN}${BOLD}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Выберите пункт для установки:${NC}"
@@ -158,8 +158,7 @@ echo ""
 echo -e "  ${GREEN}[1]${NC}  ${BOLD}Установка 3x-ui${NC}"
 echo -e "       ${DIM}Установит:${NC}"
 echo -e "       ${DIM}панель 3x-ui и все необходимые файлы${NC}"
-echo -e "       ${DIM}3 ноды${NC}"
-echo -e "       ${DIM}фикс xray ядра${NC}"
+echo -e "       ${DIM}3 ноды и фикс xray ядра${NC}"
 echo ""
 echo -e "  ${CYAN}[2]${NC}  ${BOLD}Установка Remnawave${NC}"
 echo -e "       ${DIM}Откроет меню установки Remnawave для выбора:${NC}"
