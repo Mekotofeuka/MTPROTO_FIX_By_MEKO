@@ -76,75 +76,130 @@ ensure_file() {
     return 0
 }
 
-# ── Очистка экрана и шапка ────────────────────────────────────
-clear 2>/dev/null || printf '\033[2J\033[H'
-echo ""
-echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}2 ${CYAN}${BOLD}⚙️${NC}"
-echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
-echo ""
-echo -e "  ${BOLD}Выберите вариант установки:${NC}"
-echo ""
-echo -e "  ${GREEN}[1]${NC}  ${BOLD}Стандартная установка${NC}  ${GREEN}${BOLD}(рекомендуется)${NC}"
-echo -e "       ${DIM}Установит MEKO Launcher и все необходимые файлы${NC}"
-echo -e "       ${DIM}Для дальнейшей работы и управления Mtproto proxy"
-echo ""
-echo -e "  ${CYAN}[2]${NC}  ${BOLD}Автоматическая установка${NC}  ${CYAN}(для новичков)${NC}"
-echo -e "       ${DIM}Откроет простое меню автоматической и полуавтоматической установки${NC}"
-echo -e "       ${DIM}Полуавтоматический вариант попросит ввести кастомные параметры"
-echo -e "       ${DIM}Автоматический вариант установит универсальный вариант сам"
-echo ""
-echo -e "  ${RED}${BOLD}[0]${NC}  ${RED}${BOLD}Выход${NC}"
-echo ""
-echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Enter${NC}${BOLD} - стандартная установка):${NC} "
-
-# ── Читаем ввод с терминала, если не удалось — выходим ────
-if ! read -r choice </dev/tty 2>/dev/null; then
+# ── СТАРОЕ МЕНЮ (ПРОКСИ) ──────────────────────────────────────
+show_proxy_menu() {
+    clear 2>/dev/null || printf '\033[2J\033[H'
     echo ""
-    echo -e "  ${RED}[✗]${NC} Не удалось прочитать ввод. Запустите скрипт интерактивно."
-    exit 1
-fi
+    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Установка фикса ${CYAN}${BOLD}MEKO ${VERSION}2 ${CYAN}${BOLD}⚙️${NC}"
+    echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "  ${BOLD}Выберите вариант установки:${NC}"
+    echo ""
+    echo -e "  ${GREEN}[1]${NC}  ${BOLD}Стандартная установка${NC}  ${GREEN}${BOLD}(рекомендуется)${NC}"
+    echo -e "       ${DIM}Установит MEKO Launcher и все необходимые файлы${NC}"
+    echo -e "       ${DIM}Для дальнейшей работы и управления Mtproto proxy"
+    echo ""
+    echo -e "  ${CYAN}[2]${NC}  ${BOLD}Автоматическая установка${NC}  ${CYAN}(для новичков)${NC}"
+    echo -e "       ${DIM}Откроет простое меню автоматической и полуавтоматической установки${NC}"
+    echo -e "       ${DIM}Полуавтоматический вариант попросит ввести кастомные параметры"
+    echo -e "       ${DIM}Автоматический вариант установит универсальный вариант сам"
+    echo ""
+    echo -e "  ${RED}${BOLD}[0]${NC}  ${RED}${BOLD}Выход${NC}"
+    echo ""
+    echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Enter${NC}${BOLD} - стандартная установка):${NC} "
 
-case "$choice" in
-    0)
+    if ! read -r choice </dev/tty 2>/dev/null; then
         echo ""
-        log_info "Выход..."
-        exit 0
-        ;;
-    2)
-        echo ""
-        log_info "Запуск автоустановки..."
-        
-        if ensure_file "install_auto.sh"; then
-            bash "$INSTALL_DIR/install_auto.sh"
+        echo -e "  ${RED}[✗]${NC} Не удалось прочитать ввод. Запустите скрипт интерактивно."
+        exit 1
+    fi
+
+    case "$choice" in
+        0)
+            echo ""
+            log_info "Выход..."
             exit 0
-        else
-            log_error "Не удалось загрузить install_auto.sh"
+            ;;
+        2)
+            echo ""
+            log_info "Запуск автоустановки..."
+            if ensure_file "install_auto.sh"; then
+                bash "$INSTALL_DIR/install_auto.sh"
+                exit 0
+            else
+                log_error "Не удалось загрузить install_auto.sh"
+                exit 1
+            fi
+            ;;
+        3)
+            echo ""
+            log_info "Запуск ручной установки..."
+            if ensure_file "install_manual.sh"; then
+                bash "$INSTALL_DIR/install_manual.sh"
+                exit 0
+            else
+                log_error "Не удалось загрузить install_manual.sh"
+                exit 1
+            fi
+            ;;
+        *)
+            # 1 или Enter — стандартная установка
+            echo ""
+            log_info "Запуск стандартной установки MEKO Launcher..."
+            if ensure_file "install_main.sh"; then
+                bash "$INSTALL_DIR/install_main.sh"
+                exit 0
+            else
+                log_error "Не удалось загрузить install_main.sh"
+                exit 1
+            fi
+            ;;
+    esac
+}
+
+# ── НОВОЕ ГЛАВНОЕ МЕНЮ ────────────────────────────────────────
+show_main_menu() {
+    while true; do
+        clear 2>/dev/null || printf '\033[2J\033[H'
+        echo ""
+        echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}MEKO MANAGER ${CYAN}${BOLD}V1.9 ${CYAN}${BOLD}⚙️${NC}"
+        echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  ${BOLD}Выберите вариант установки:${NC}"
+        echo ""
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Меню proxy${NC}"
+        echo -e "       ${DIM}Меню установки MEKO Manager${NC}"
+        echo -e "       ${DIM}Для дальнейшей установки, работы и управления Mtproto proxy"
+        echo ""
+        echo -e "  ${CYAN}[2]${NC}  ${BOLD}Меню VPN${NC}"
+        echo -e "       ${DIM}Меню выбора для автоматической установки${NC}"
+        echo -e "       ${DIM}VPN через 3x-ui или Remnawave"
+        echo ""
+        echo -e "  ${RED}${BOLD}[0]${NC}  ${RED}${BOLD}Выход${NC}"
+        echo ""
+        echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Enter${NC}${BOLD} - установка proxy):${NC} "
+
+        if ! read -r choice </dev/tty 2>/dev/null; then
+            echo ""
+            echo -e "  ${RED}[✗]${NC} Не удалось прочитать ввод."
             exit 1
         fi
-        ;;
-    3)
-        echo ""
-        log_info "Запуск ручной установки..."
-        
-        if ensure_file "install_manual.sh"; then
-            bash "$INSTALL_DIR/install_manual.sh"
-            exit 0
-        else
-            log_error "Не удалось загрузить install_manual.sh"
-            exit 1
-        fi
-        ;;
-    *)
-        # 1 или Enter — стандартная установка
-        echo ""
-        log_info "Запуск стандартной установки MEKO Launcher..."
-        
-        if ensure_file "install_main.sh"; then
-            bash "$INSTALL_DIR/install_main.sh"
-            exit 0
-        else
-            log_error "Не удалось загрузить install_main.sh"
-            exit 1
-        fi
-        ;;
-esac
+
+        case "$choice" in
+            0)
+                echo ""
+                log_info "Выход..."
+                exit 0
+                ;;
+            2)
+                echo ""
+                log_info "Запуск установки VPN..."
+                if ensure_file "install_vpn.sh"; then
+                    bash "$INSTALL_DIR/install_vpn.sh"
+                else
+                    log_error "Не удалось загрузить install_vpn.sh"
+                fi
+                echo ""
+                echo -e "  ${GRAY}Нажмите Enter для возврата в главное меню...${NC}"
+                read -r </dev/tty 2>/dev/null
+                ;;
+            *)
+                # 1 или Enter — меню proxy
+                show_proxy_menu
+                ;;
+        esac
+    done
+}
+
+# ── ЗАПУСК ────────────────────────────────────────────────────
+show_main_menu
