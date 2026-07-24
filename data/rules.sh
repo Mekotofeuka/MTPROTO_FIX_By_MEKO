@@ -754,7 +754,7 @@ remove_syn_fix() {
         fi
 
         # Также удаляем правила из ip mangle, если они там остались (для старых версий)
-        handles=$(nft -a list chain ip mangle PREROUTING 2>/dev/null | grep 'xt match "u32".*meta mark set 0x400' | grep -o 'handle [0-9]*' | awk '{print $2}')
+        handles=$(nft -a list chain ip mangle PREROUTING 2>/dev/null | grep 'xt match "u32".*meta mark set 0x400' | grep -o 'handle [0-9]*' | awk '{print $2}') || true
         if [ -n "$handles" ]; then
             log_info "Найдены правила u32 в nftables (ip mangle), удаляем..."
             for h in $handles; do
