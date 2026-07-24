@@ -168,7 +168,7 @@ _Полные правила и IPTABLES и NFTABLES прописаны в [rule
 <img width="512" height="384" alt="image" src="https://github.com/user-attachments/assets/4932063e-4dd3-4ec8-a2f1-a63c2f77500c" />
 </a>
 
-- Ниже приведены популярные домены. Обратите внимание: один и тот же домен может встречаться в обоих списках, так как поддержка гибридного шифрования зависит от конкретного IP-адреса сервера, которому принадлежит домен. Для корректной работы необходимо использовать такие домены, все IP-адреса которых имеют поддержку гибридного шифрования. (_P.S. не надо использовать домен клаудфлеера как говорит ИИ, это плохая затея! Все домены приведены для ознакомления_):
+- Ниже приведены популярные домены для ознакомления. Обратите внимание: один и тот же домен может встречаться в обоих списках, так как поддержка гибридного шифрования зависит от конкретного IP-адреса сервера, которому принадлежит домен. Для корректной работы необходимо использовать такие домены, все IP-адреса которых имеют поддержку гибридного шифрования. (_P.S. не надо использовать домен клаудфлеера как говорит ИИ, это плохая затея! Все домены приведены для ознакомления_):
 
   ❌ rutube.ru, vk.com, github.com, habr.com, yandex.ru, steamcommunity.com, amazon.com, microsoft.com, amazonaws.com, mail.ru, dzen.ru, linkedin.com, live.com, office.com, amazon.com, azure.com, bing.com, github.com, fastly.net, netflix.com, sharepoint.com, skype.com, gandi.net, cloud.microsoft, yahoo.com, msn.com, tiktok.com, roblox.com, spotify.com, adobe.com, ntp.org, myfritz.net, qq.com, baidu.com, nginx.org, windows.com, yandex.net, tiktokv.com, mozilla.org, nic.ru, opera.com, samsung.com, sentry.io
 
