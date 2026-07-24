@@ -825,7 +825,7 @@ check_censor() {
     echo ""
     log_info "Проверка ограничений на сервере..."
     echo ""
-    wget -qO- censorcheck.tlab.pw | bash
+    wget -qO- https://raw.githubusercontent.com/Nokola-Tesla/censorcheck/main/censorcheck.sh | bash
     echo ""
     echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
     read -rsn1
