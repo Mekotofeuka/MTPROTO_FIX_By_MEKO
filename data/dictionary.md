@@ -72,6 +72,11 @@ _Лаунчер в свою очередь позволяет использов
 <img width="512" height="320" alt="image" src="https://github.com/user-attachments/assets/2fbb73f5-475c-460a-85fb-937f6586286f" />
 
 
+Графическое описание работы фикса (для просмотра тыкни на картинку, она откроется во весь экран) 
+<img width="512" height="890" alt="mermaid" src="https://github.com/user-attachments/assets/bbb2321c-e286-4934-bbe4-46f36ac03836" />
+
+
+
 
 _Полные правила и IPTABLES и NFTABLES прописаны в [rules.sh](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/rules.sh)_
 
