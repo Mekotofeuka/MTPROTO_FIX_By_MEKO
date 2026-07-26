@@ -409,7 +409,7 @@ zapret2_stop() {
 # ── Установка Zapret2 (главная функция) ─────────────────────
 zapret2_install() {
     echo ""
-    echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V 0.1${NC}"
+    echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON${NC}"
     echo ""
     echo -e "  ${DIM}Серверный обход для MTProto прокси.${NC}"
     echo -e "  ${DIM}Метод: disorder + badsum + TCP window control.${NC}"
@@ -644,7 +644,7 @@ show_zapret2_menu() {
     while true; do
         clear
         echo ""
-        echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V0.1${NC}"
+        echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V0.11${NC}"
         echo -e "  ${DIM}Серверный обход: disorder + badsum + window control${NC}"
         echo ""
         echo -e "  Статус: $(zapret2_status)"
