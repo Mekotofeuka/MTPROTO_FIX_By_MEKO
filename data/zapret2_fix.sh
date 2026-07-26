@@ -2,7 +2,6 @@
 # ═══════════════════════════════════════════════════════════════
 #  Zapret2 MTProto fix by CHKRON
 #  (взят из MTproxy-reanimation v1.2.1)
-#  Адаптировано для MTPROTO_FIX_By_MEKO
 # ═══════════════════════════════════════════════════════════════
 
 # ── Цвета ─────────────────────────────────────────────────────
@@ -20,11 +19,6 @@ log_error()   { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 
 # ── Файл с портом (берём из основного скрипта) ─────────────
 PORT_FILE="/opt/mtpr-simple/port"
-
-# ══════════════════════════════════════════════════════════════
-#  Zapret2 MTProto fix by CHKRON
-#  Серверный обход через disorder + badsum + window control
-# ══════════════════════════════════════════════════════════════
 
 # ── Zapret2 настройки по умолчанию ─────────────────────────────
 ZAPRET2_DIR="/opt/zapret2"
@@ -351,19 +345,19 @@ PORT="${_port}"
 QNUM="${ZAPRET2_QNUM}"
 
 # Удаляем старую таблицу если есть
-nft delete table ip "\$TABLE" 2>/dev/null || true
+/usr/sbin/nft delete table ip "\$TABLE" 2>/dev/null || true
 
 # Применяем NFT правила
-nft add table ip "\$TABLE"
+/usr/sbin/nft add table ip "\$TABLE"
 
-nft "add chain ip \$TABLE predefrag { type filter hook output priority -401; policy accept; }"
-nft "add rule ip \$TABLE predefrag meta mark and \$FWMARK != 0x00000000 notrack"
+/usr/sbin/nft "add chain ip \$TABLE predefrag { type filter hook output priority -401; policy accept; }"
+/usr/sbin/nft "add rule ip \$TABLE predefrag meta mark and \$FWMARK != 0x00000000 notrack"
 
-nft "add chain ip \$TABLE postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
-nft "add rule ip \$TABLE postrouting meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT queue flags bypass to \$QNUM"
+/usr/sbin/nft "add chain ip \$TABLE postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
+/usr/sbin/nft "add rule ip \$TABLE postrouting meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT queue flags bypass to \$QNUM"
 
-nft "add chain ip \$TABLE prerouting { type filter hook prerouting priority mangle; policy accept; }"
-nft "add rule ip \$TABLE prerouting meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT queue flags bypass to \$QNUM"
+/usr/sbin/nft "add chain ip \$TABLE prerouting { type filter hook prerouting priority mangle; policy accept; }"
+/usr/sbin/nft "add rule ip \$TABLE prerouting meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT queue flags bypass to \$QNUM"
 
 echo "MTproxy-reanimation: NFT table \$TABLE applied (port=\$PORT qnum=\$QNUM)"
 
@@ -405,25 +399,25 @@ zapret2_apply_nft() {
     _port=$(cat "$PORT_FILE" 2>/dev/null | head -1)
     [ -z "$_port" ] && _port="443"
 
-    nft delete table ip "$_table" 2>/dev/null || true
+    /usr/sbin/nft delete table ip "$_table" 2>/dev/null || true
 
-    nft add table ip "$_table"
+    /usr/sbin/nft add table ip "$_table"
 
-    nft "add chain ip $_table predefrag { type filter hook output priority -401; policy accept; }"
-    nft "add rule ip $_table predefrag meta mark and $_fwmark != 0x00000000 notrack"
+    /usr/sbin/nft "add chain ip $_table predefrag { type filter hook output priority -401; policy accept; }"
+    /usr/sbin/nft "add rule ip $_table predefrag meta mark and $_fwmark != 0x00000000 notrack"
 
-    nft "add chain ip $_table postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
-    nft "add rule ip $_table postrouting meta mark and $_fwmark == 0x00000000 tcp sport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
+    /usr/sbin/nft "add chain ip $_table postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
+    /usr/sbin/nft "add rule ip $_table postrouting meta mark and $_fwmark == 0x00000000 tcp sport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
 
-    nft "add chain ip $_table prerouting { type filter hook prerouting priority mangle; policy accept; }"
-    nft "add rule ip $_table prerouting meta mark and $_fwmark == 0x00000000 tcp dport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
+    /usr/sbin/nft "add chain ip $_table prerouting { type filter hook prerouting priority mangle; policy accept; }"
+    /usr/sbin/nft "add rule ip $_table prerouting meta mark and $_fwmark == 0x00000000 tcp dport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
 
     log_success "NFT таблица ${_table} применена (порт=${_port} qnum=${ZAPRET2_QNUM})"
 }
 
 # ── Удаление NFT правил Zapret2 ─────────────────────────────
 zapret2_remove_nft() {
-    nft delete table ip "${ZAPRET2_NFT_TABLE}" 2>/dev/null || true
+    /usr/sbin/nft delete table ip "${ZAPRET2_NFT_TABLE}" 2>/dev/null || true
     log_success "NFT таблица ${ZAPRET2_NFT_TABLE} удалена"
 }
 
@@ -435,12 +429,13 @@ zapret2_start() {
     fi
     systemctl daemon-reload
     systemctl enable --now "$ZAPRET2_SERVICE" >/dev/null 2>&1 || true
-    sleep 1
+    sleep 2
 
     if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null; then
         ZAPRET2_SERVICE_ENABLED="true"
         zapret2_save_settings
         log_success "zapret2 запущен и добавлен в автозапуск"
+        return 0
     else
         log_error "zapret2 не запустился"
         journalctl -u "$ZAPRET2_SERVICE" -n 10 --no-pager 2>/dev/null || true
@@ -452,7 +447,7 @@ zapret2_start() {
 zapret2_stop() {
     systemctl stop "$ZAPRET2_SERVICE" 2>/dev/null || true
     systemctl disable "$ZAPRET2_SERVICE" 2>/dev/null || true
-    nft delete table ip "${ZAPRET2_NFT_TABLE}" 2>/dev/null || true
+    zapret2_remove_nft
     log_success "zapret2 остановлен"
 }
 
@@ -486,7 +481,6 @@ zapret2_install() {
     zapret2_download_bundle || return 1
 
     # Если SYN FIX активен (проверяем через функции из rules.sh), предлагаем отключить
-    # Используем функции из rules.sh, если они загружены. Если нет — пропускаем.
     if declare -f is_syn_fix_chain_installed &>/dev/null; then
         if is_syn_fix_chain_installed || is_nft_fix_installed; then
             echo ""
@@ -514,7 +508,10 @@ zapret2_install() {
     zapret2_write_conf
     zapret2_write_lua
     zapret2_write_service
-    zapret2_start || return 1
+    if ! zapret2_start; then
+        log_error "Не удалось запустить zapret2. Проверьте логи."
+        return 1
+    fi
 
     ZAPRET2_APPLIED="true"
     ZAPRET2_SERVICE_ENABLED="true"
@@ -685,7 +682,7 @@ show_zapret2_menu() {
     while true; do
         clear
         echo ""
-        echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON${NC}"
+        echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V0.1 ${NC}"
         echo -e "  ${DIM}Серверный обход: disorder + badsum + window control${NC}"
         echo ""
         echo -e "  Статус: $(zapret2_status)"
