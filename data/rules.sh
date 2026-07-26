@@ -292,24 +292,23 @@ install_syn_fix() {
         echo ""
         # Используем /dev/tty для ввода
         if [ -r /dev/tty ]; then
-		    clear
-		    echo -e ""
-		    echo -e ""
-            echo -e "  ${BOLD}Меню SYN FIX V1.15 | Выберите порт(тот же что и у proxy) ниже"
-		    echo -e "  ${DIM}═══════════════════════════════════════════════════════════════"
-			echo -e "  ${DIM}Для работы прокси на ios необходим корректно работающий домен"
-			echo -e "  ${DIM}Подробнее в data/dictionary.md в репозитории. (обязательно к прочтению)"
-		    echo -e ""
+            clear
+            echo -e ""
+            echo -e "  ${BOLD}Меню установки MTPRoto FIX V1.17"
+            echo -e "  ${DIM}═══════════════════════════════════════════════════════════════"
+            echo -e "  ${DIM}Для работы прокси на ios необходим корректно работающий домен"
+            echo -e "  ${DIM}Подробнее в data/dictionary.md в репозитории. (обязательно к прочтению)"
+            echo -e ""
             echo -e "  ${NC}${BOLD}Введите порт для SYN FIX ${DIM}(Например: 443)"
             echo -e "  ${NC}${BOLD}Либо введите порты через запятую ${DIM}(Например: 443,8443) "
-			echo -e ""
-			echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
+            echo -e ""
+            echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
             read -r ports_input </dev/tty
         else
             echo -e "  ${NC}${BOLD}Введите порт для SYN FIX (например: 443 (Enter - 443) "
             echo -e "  ${NC}${BOLD}Либо введите порты через запятую (например: 443,8443) "
-			echo -e ""
-			echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
+            echo -e ""
+            echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
             read -r ports_input
         fi
         if [ -z "$ports_input" ]; then
@@ -318,19 +317,23 @@ install_syn_fix() {
 
         echo ""
         echo -e "  ${BOLD}Выберите вариант правил ниже"
-		echo -e "  ${DIM}══════════════════════════════════════════════"
-		echo -e ""
-        echo -e "  ${GREEN}[1]${NC}  ${BOLD}Новый вариант(iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}${BOLD}рекомендуется${NC}"
+        echo -e "  ${DIM}══════════════════════════════════════════════"
+        echo ""
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}V4 фикс (zapret2) ${NC} — ${GREEN}${BOLD}рекомендуется${NC}"
+        echo -e "${DIM}  Работает с помощью zapret2 на уровне TCP-пакетов: ${NC}"
+		echo -e "${DIM}  disorder + badsum + window control"
+        echo ""
+        echo -e "  ${GREEN}[2]${NC}  ${BOLD}v3 фикс (iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета)${NC}"
         echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
-        echo -e "  ${CYAN}[2]${NC}  ${BOLD}Старый вариант(iptables)${NC} (Разделение устройств определяя их TTL+Length)"
+        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}v2 фикс (iptables)${NC} (Разделение устройств определяя их TTL+Length)"
         echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
         echo ""
-        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}Новый вариант(nftables)${GREEN}${BOLD} - рекомендуется (Совместим с Docker)${NC}"
+        echo -e "  ${GREEN}[4]${NC}  ${BOLD}v3 фикс (nftables)${GREEN}${BOLD} - рекомендуется (Совместим с Docker)${NC}"
         echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
-        echo -e "  ${YELLOW}[4]${NC}  ${BOLD}Старый вариант(nftables)${NC}${BOLD}${NC}${BOLD} (Совместим с Docker)"
+        echo -e "  ${YELLOW}[5]${NC}  ${BOLD}v2 фикс (nftables)${NC}${BOLD}${NC}${BOLD} (Совместим с Docker)"
         echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
         echo ""
@@ -343,21 +346,40 @@ install_syn_fix() {
         fi
 
         if [ -z "$fix_choice" ] || [ "$fix_choice" = "1" ]; then
+            FIX_TYPE="zapret2"
+            log_info "Выбран Zapret2 fix"
+        elif [ "$fix_choice" = "2" ]; then
             FIX_TYPE="new"
             log_info "Выбран новый iptables"
-        elif [ "$fix_choice" = "2" ]; then
+        elif [ "$fix_choice" = "3" ]; then
             FIX_TYPE="old"
             log_info "Выбран старый iptables"
-        elif [ "$fix_choice" = "3" ]; then
+        elif [ "$fix_choice" = "4" ]; then
             FIX_TYPE="docker_smart"
             log_info "Выбран nftables новый"
-        elif [ "$fix_choice" = "4" ]; then
+        elif [ "$fix_choice" = "5" ]; then
             FIX_TYPE="docker_classic"
             log_info "Выбран nftables старый"
         else
-            log_warning "Неверный выбор, используем новый вариант(1)"
-            FIX_TYPE="new"
+            log_warning "Неверный выбор, используем первый вариант"
+            FIX_TYPE="zapret2"
         fi
+    fi
+
+    # ── Если выбран Zapret2 fix ────────────────────────────────
+    if [ "$FIX_TYPE" = "zapret2" ]; then
+        if [ -f "/opt/mtpr-simple/data/zapret2_fix.sh" ]; then
+            source /opt/mtpr-simple/data/zapret2_fix.sh
+            show_zapret2_menu
+        else
+            log_error "zapret2_fix.sh не найден, скачиваю..."
+            mkdir -p /opt/mtpr-simple/data
+            curl -fsSL "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/data/zapret2_fix.sh" -o /opt/mtpr-simple/data/zapret2_fix.sh
+            chmod +x /opt/mtpr-simple/data/zapret2_fix.sh
+            source /opt/mtpr-simple/data/zapret2_fix.sh
+            show_zapret2_menu
+        fi
+        return 0
     fi
 
     # Парсим порты
