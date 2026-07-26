@@ -1,7 +1,6 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
 #  Zapret2 MTProto fix by CHKRON
-#  (взят из MTproxy-reanimation v1.2.1)
 # ═══════════════════════════════════════════════════════════════
 
 # ── Цвета ─────────────────────────────────────────────────────
@@ -42,49 +41,6 @@ ZAPRET2_APPLIED="false"
 ZAPRET2_SERVICE_ENABLED="false"
 ZAPRET2_RELEASE_REPO="Liafanx/MTproxy-reanimation"
 ZAPRET2_RELEASE_TAG="zapret2-bundle"
-
-ZAPRET2_SETTINGS_FILE="/opt/mtpr-simple/zapret2_settings.conf"
-
-# ── Сохранение / загрузка настроек Zapret2 ──────────────────
-zapret2_save_settings() {
-    mkdir -p /opt/mtpr-simple
-    cat > "$ZAPRET2_SETTINGS_FILE" << EOF
-# Zapret2 MTProto fix by CHKRON — настройки
-ZAPRET2_QNUM='${ZAPRET2_QNUM}'
-ZAPRET2_OUT_RANGE='${ZAPRET2_OUT_RANGE}'
-ZAPRET2_IN_RANGE='${ZAPRET2_IN_RANGE}'
-ZAPRET2_SPLIT_LEN='${ZAPRET2_SPLIT_LEN}'
-ZAPRET2_WIN_SYNACK='${ZAPRET2_WIN_SYNACK}'
-ZAPRET2_WIN_ACK='${ZAPRET2_WIN_ACK}'
-ZAPRET2_APPLIED='${ZAPRET2_APPLIED}'
-ZAPRET2_SERVICE_ENABLED='${ZAPRET2_SERVICE_ENABLED}'
-ZAPRET2_RELEASE_REPO='${ZAPRET2_RELEASE_REPO}'
-ZAPRET2_RELEASE_TAG='${ZAPRET2_RELEASE_TAG}'
-ZAPRET2_FWMARK='${ZAPRET2_FWMARK}'
-ZAPRET2_DEBUG='${ZAPRET2_DEBUG}'
-ZAPRET2_DEBUG_LOG='${ZAPRET2_DEBUG_LOG}'
-EOF
-    chmod 600 "$ZAPRET2_SETTINGS_FILE"
-}
-
-zapret2_load_settings() {
-    [ -f "$ZAPRET2_SETTINGS_FILE" ] || return 0
-    while IFS= read -r _line; do
-        [[ "$_line" =~ ^[[:space:]]*# ]] && continue
-        [[ "$_line" =~ ^[[:space:]]*$ ]] && continue
-        if [[ "$_line" =~ ^([A-Z_][A-Z0-9_]*)=\'([^\']*)\'$ ]]; then
-            local _key="${BASH_REMATCH[1]}" _val="${BASH_REMATCH[2]}"
-            case "$_key" in
-                ZAPRET2_QNUM|ZAPRET2_OUT_RANGE|ZAPRET2_IN_RANGE|ZAPRET2_SPLIT_LEN|\
-                ZAPRET2_WIN_SYNACK|ZAPRET2_WIN_ACK|ZAPRET2_FWMARK|\
-                ZAPRET2_APPLIED|ZAPRET2_SERVICE_ENABLED|ZAPRET2_RELEASE_REPO|ZAPRET2_RELEASE_TAG|\
-                ZAPRET2_DEBUG|ZAPRET2_DEBUG_LOG)
-                    printf -v "$_key" '%s' "$_val"
-                    ;;
-            esac
-        fi
-    done < "$ZAPRET2_SETTINGS_FILE"
-}
 
 # ── Проверка статуса Zapret2 ────────────────────────────────
 zapret2_status() {
@@ -429,11 +385,10 @@ zapret2_start() {
     fi
     systemctl daemon-reload
     systemctl enable --now "$ZAPRET2_SERVICE" >/dev/null 2>&1 || true
-    sleep 2
+    sleep 1
 
     if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null; then
         ZAPRET2_SERVICE_ENABLED="true"
-        zapret2_save_settings
         log_success "zapret2 запущен и добавлен в автозапуск"
         return 0
     else
@@ -454,7 +409,7 @@ zapret2_stop() {
 # ── Установка Zapret2 (главная функция) ─────────────────────
 zapret2_install() {
     echo ""
-    echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON${NC}"
+    echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V 0.1${NC}"
     echo ""
     echo -e "  ${DIM}Серверный обход для MTProto прокси.${NC}"
     echo -e "  ${DIM}Метод: disorder + badsum + TCP window control.${NC}"
@@ -508,14 +463,18 @@ zapret2_install() {
     zapret2_write_conf
     zapret2_write_lua
     zapret2_write_service
-    if ! zapret2_start; then
-        log_error "Не удалось запустить zapret2. Проверьте логи."
-        return 1
-    fi
+    zapret2_start || return 1
 
     ZAPRET2_APPLIED="true"
     ZAPRET2_SERVICE_ENABLED="true"
-    zapret2_save_settings
+
+    # СОХРАНЯЕМ В ОБЩИЙ ФАЙЛ НАСТРОЕК (как в репе Васи)
+    if declare -f save_settings &>/dev/null; then
+        save_settings
+        log_success "Статус сохранён в общий settings.conf"
+    else
+        log_warn "Функция save_settings не найдена — статус может не сохраниться"
+    fi
 
     if systemctl is-enabled "$ZAPRET2_SERVICE" >/dev/null 2>&1; then
         log_success "Автозапуск ${ZAPRET2_SERVICE} включён"
@@ -567,7 +526,10 @@ zapret2_remove() {
 
     ZAPRET2_APPLIED="false"
     ZAPRET2_SERVICE_ENABLED="false"
-    zapret2_save_settings
+
+    if declare -f save_settings &>/dev/null; then
+        save_settings
+    fi
 
     log_success "Zapret2 MTProto fix полностью удалён"
 }
@@ -619,12 +581,12 @@ show_zapret2_settings_menu() {
             1)
                 echo -en "  out-range [${ZAPRET2_OUT_RANGE}]: "
                 local _v; read -r _v
-                [ -n "$_v" ] && { ZAPRET2_OUT_RANGE="$_v"; zapret2_save_settings; zapret2_update_config; } ;;
+                [ -n "$_v" ] && { ZAPRET2_OUT_RANGE="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; } ;;
             2)
                 echo -en "  split len [${ZAPRET2_SPLIT_LEN}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 50 ] && [ "$_v" -le 1000 ]; then
-                    ZAPRET2_SPLIT_LEN="$_v"; zapret2_save_settings; zapret2_update_config
+                    ZAPRET2_SPLIT_LEN="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 50..1000"
                 fi ;;
@@ -632,7 +594,7 @@ show_zapret2_settings_menu() {
                 echo -en "  win SYN+ACK [${ZAPRET2_WIN_SYNACK}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 10 ] && [ "$_v" -le 65535 ]; then
-                    ZAPRET2_WIN_SYNACK="$_v"; zapret2_save_settings; zapret2_update_config
+                    ZAPRET2_WIN_SYNACK="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 10..65535"
                 fi ;;
@@ -640,36 +602,36 @@ show_zapret2_settings_menu() {
                 echo -en "  win ACK [${ZAPRET2_WIN_ACK}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 1 ] && [ "$_v" -le 65535 ]; then
-                    ZAPRET2_WIN_ACK="$_v"; zapret2_save_settings; zapret2_update_config
+                    ZAPRET2_WIN_ACK="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 1..65535"
                 fi ;;
             5)
                 echo -en "  in-range [${ZAPRET2_IN_RANGE}]: "
                 local _v; read -r _v
-                [ -n "$_v" ] && { ZAPRET2_IN_RANGE="$_v"; zapret2_save_settings; zapret2_update_config; } ;;
+                [ -n "$_v" ] && { ZAPRET2_IN_RANGE="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; } ;;
             6)
                 echo -en "  NFQUEUE num [${ZAPRET2_QNUM}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 0 ] && [ "$_v" -le 65535 ]; then
-                    ZAPRET2_QNUM="$_v"; zapret2_save_settings; zapret2_remove_nft; zapret2_apply_nft; zapret2_update_config
+                    ZAPRET2_QNUM="$_v"; zapret2_remove_nft; zapret2_apply_nft; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 0..65535"
                 fi ;;
             7)
                 echo -en "  fwmark [${ZAPRET2_FWMARK}]: "
                 local _v; read -r _v
-                [ -n "$_v" ] && { ZAPRET2_FWMARK="$_v"; zapret2_save_settings; zapret2_remove_nft; zapret2_apply_nft; zapret2_update_config; } ;;
+                [ -n "$_v" ] && { ZAPRET2_FWMARK="$_v"; zapret2_remove_nft; zapret2_apply_nft; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; } ;;
             8)
                 if [ "${ZAPRET2_DEBUG:-false}" = "true" ]; then
                     echo -en "  Выключить debug? [Y/n]: "
                     local _yn; read -r _yn
-                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="false"; zapret2_save_settings; zapret2_update_config; }
+                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="false"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; }
                 else
                     echo -e "  ${YELLOW}Debug лог будет записываться в ${ZAPRET2_DEBUG_LOG}${NC}"
                     echo -en "  Включить debug? [Y/n]: "
                     local _yn; read -r _yn
-                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="true"; zapret2_save_settings; zapret2_update_config; }
+                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="true"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; }
                 fi ;;
             0|"") return ;;
         esac
@@ -682,7 +644,7 @@ show_zapret2_menu() {
     while true; do
         clear
         echo ""
-        echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V0.1 ${NC}"
+        echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V0.1${NC}"
         echo -e "  ${DIM}Серверный обход: disorder + badsum + window control${NC}"
         echo ""
         echo -e "  Статус: $(zapret2_status)"
@@ -775,4 +737,10 @@ show_zapret2_menu() {
         esac
         echo ""; read -rsn1 -p "  Нажмите любую клавишу..."
     done
+}
+
+# ── Загрузка настроек Zapret2 (для обратной совместимости) ──
+zapret2_load_settings() {
+    # просто заглушка.
+    return 0
 }
