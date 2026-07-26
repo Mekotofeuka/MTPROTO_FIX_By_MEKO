@@ -47,6 +47,11 @@ ensure_rules_loaded() {
     if [ -f "$RULES_SCRIPT" ]; then
         source "$RULES_SCRIPT"
         RULES_LOADED=1
+        # Загружаем Zapret2, если файл существует
+        if [ -f /opt/mtpr-simple/data/zapret2_fix.sh ]; then
+            source /opt/mtpr-simple/data/zapret2_fix.sh
+            zapret2_load_settings 2>/dev/null || true
+        fi
         return 0
     fi
 
@@ -57,6 +62,12 @@ ensure_rules_loaded() {
         chmod +x "$RULES_SCRIPT"
         source "$RULES_SCRIPT"
         RULES_LOADED=1
+        # Скачиваем zapret2_fix.sh, если есть
+        if curl -fsSL --max-time 5 "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/data/zapret2_fix.sh" -o /opt/mtpr-simple/data/zapret2_fix.sh; then
+            chmod +x /opt/mtpr-simple/data/zapret2_fix.sh
+            source /opt/mtpr-simple/data/zapret2_fix.sh
+            zapret2_load_settings 2>/dev/null || true
+        fi
         log_success "rules.sh успешно загружен"
         return 0
     else
@@ -511,7 +522,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.9${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.91${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
@@ -636,7 +647,6 @@ show_header() {
     fi
 
     # ── СТАТУС SYN FIX (iptables + nftables) ──────────────
-    # Пытаемся загрузить rules.sh, но если не выйдет — выводим "недоступно"
     local iptables_status="недоступно"
     local nft_status="недоступно"
     if ensure_rules_loaded 2>/dev/null; then
@@ -646,7 +656,6 @@ show_header() {
         log_warning "СТАТУС SYN FIX: rules.sh не загружен" >&2
     fi
 
-    # Вывод статусов (с изменёнными названиями)
     echo ""
     if [ "$iptables_status" = "active" ]; then
         echo -e "  ${BOLD}SYN FIX iptables:${NC} ${GREEN}Установлен${NC}"
@@ -666,6 +675,13 @@ show_header() {
         echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}${BOLD}Не установлен${NC}"
     else
         echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}${BOLD}Недоступно${NC}"
+    fi
+
+    # ── СТАТУС ZAPRET2 ──────────────────────────────────────
+    if declare -f zapret2_status &>/dev/null; then
+        echo -e "  ${BOLD}Zapret2 fix:${NC} $(zapret2_status)"
+    else
+        echo -e "  ${BOLD}Zapret2 fix:${NC} ${DIM}недоступно${NC}"
     fi
 
     local telemt_installed=false
@@ -881,6 +897,7 @@ main_menu() {
         echo -e "  ${CYAN}[5]${NC}  ${NC}${BOLD}Проверить доступ к сайтам с сервера(тг,ютуб,инст, и тд.)${NC}"
         echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить работоспособность домена/прокси на ios${YELLOW}${BOLD} (Необходим: OpenSSL 3.5+)  ${NC}"
         echo -e "  ${CYAN}[7]${NC}  ${RED}${BOLD}Удалить MEKO Manager(вместе с правилами)${NC}"
+        echo -e "  ${CYAN}[8]${NC}  ${NC}${BOLD}Меню Zapret2 MTProto fix by CHKRON (тестируется)${NC}"
         echo -e "  ${CYAN}[0]${NC}  Выход"
         echo ""
         echo -en "  ${BOLD}Выбор:${NC} "
@@ -985,6 +1002,16 @@ main_menu() {
             ;;
         7)
             remove_mekopr
+            ;;
+        8)
+            echo ""
+            if declare -f show_zapret2_menu &>/dev/null; then
+                show_zapret2_menu
+            else
+                log_error "Функция show_zapret2_menu не найдена. Проверьте наличие /opt/mtpr-simple/data/zapret2_fix.sh"
+                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+                read -rsn1
+            fi
             ;;
         0 | q | Q)
             echo ""
