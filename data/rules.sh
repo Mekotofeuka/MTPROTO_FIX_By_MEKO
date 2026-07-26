@@ -294,7 +294,7 @@ install_syn_fix() {
         if [ -r /dev/tty ]; then
             clear
             echo -e ""
-            echo -e "  ${BOLD}Меню установки MTPRoto FIX V1.17"
+            echo -e "  ${BOLD}Меню установки MTPRoto FIX V1.2"
             echo -e "  ${DIM}═══════════════════════════════════════════════════════════════"
             echo -e "  ${DIM}Для работы прокси на ios необходим корректно работающий домен"
             echo -e "  ${DIM}Подробнее в data/dictionary.md в репозитории. (обязательно к прочтению)"
@@ -319,21 +319,22 @@ install_syn_fix() {
         echo -e "  ${BOLD}Выберите вариант правил ниже"
         echo -e "  ${DIM}══════════════════════════════════════════════"
         echo ""
-        echo -e "  ${GREEN}[1]${NC}  ${BOLD}V4 фикс (zapret2) ${NC} — ${GREEN}${BOLD}рекомендуется${NC}"
+        echo -e "  ${GREEN}[1]${NC}  ${BOLD}V3 фикс iptables${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}${BOLD}рекомендуется${NC}"
+        echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
+        echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
+		echo -e ""
+        echo -e "  ${CYAN}[2]${NC}  ${BOLD}V4 фикс zapret2 ${NC} — быстрый (на этапе тестирования)${NC}"
         echo -e "${DIM}  Работает с помощью zapret2 на уровне TCP-пакетов: ${NC}"
 		echo -e "${DIM}  disorder + badsum + window control"
         echo ""
-        echo -e "  ${GREEN}[2]${NC}  ${BOLD}v3 фикс (iptables)${NC} (Разделение устройств с помощью u32 по байтам из пакета)${NC}"
-        echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
-        echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
-        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}v2 фикс (iptables)${NC} (Разделение устройств определяя их TTL+Length)"
+        echo -e "  ${YELLOW}[3]${NC}  ${BOLD}v2 фикс iptables${NC} (Разделение устройств определяя их TTL+Length)"
         echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
         echo ""
-        echo -e "  ${GREEN}[4]${NC}  ${BOLD}v3 фикс (nftables)${GREEN}${BOLD} - рекомендуется (Совместим с Docker)${NC}"
+        echo -e "  ${GREEN}[4]${NC}  ${BOLD}v3 фикс nftables${GREEN}${BOLD} - рекомендуется (Совместим с Docker)${NC}"
         echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
-        echo -e "  ${YELLOW}[5]${NC}  ${BOLD}v2 фикс (nftables)${NC}${BOLD}${NC}${BOLD} (Совместим с Docker)"
+        echo -e "  ${YELLOW}[5]${NC}  ${BOLD}v2 фикс nftables${NC}${BOLD}${NC}${BOLD} (Совместим с Docker)"
         echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Иначе -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
         echo ""
@@ -346,23 +347,23 @@ install_syn_fix() {
         fi
 
         if [ -z "$fix_choice" ] || [ "$fix_choice" = "1" ]; then
+            FIX_TYPE="new"
+            log_info "Выбран v3 iptables"
+        elif [ "$fix_choice" = "2" ]; then
             FIX_TYPE="zapret2"
             log_info "Выбран Zapret2 fix"
-        elif [ "$fix_choice" = "2" ]; then
-            FIX_TYPE="new"
-            log_info "Выбран новый iptables"
         elif [ "$fix_choice" = "3" ]; then
             FIX_TYPE="old"
-            log_info "Выбран старый iptables"
+            log_info "Выбран v2 iptables"
         elif [ "$fix_choice" = "4" ]; then
             FIX_TYPE="docker_smart"
-            log_info "Выбран nftables новый"
+            log_info "Выбран v3 nftables"
         elif [ "$fix_choice" = "5" ]; then
             FIX_TYPE="docker_classic"
-            log_info "Выбран nftables старый"
+            log_info "Выбран v3 nftables"
         else
             log_warning "Неверный выбор, используем первый вариант"
-            FIX_TYPE="zapret2"
+            FIX_TYPE="new"
         fi
     fi
 
