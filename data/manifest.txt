@@ -10,6 +10,8 @@ proxys/proxymenu.sh|Меню выбора прокси
 
 data/rules.sh|Основной набор правил
 
+data/zapret2_fix.sh|Меню и настройки zapret2
+
 proxys/telemt1.sh|Меню Telemt
 
 proxys/telemt_panel_amirotin.sh|Меню упр панелью для Telemt от amirotin
