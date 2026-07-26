@@ -1,7 +1,5 @@
 #!/bin/bash
-# ═══════════════════════════════════════════════════════════════
-#  Zapret2 MTProto fix by CHKRON
-# ═══════════════════════════════════════════════════════════════
+# data/zapret2_fix.sh
 
 # ── Цвета ─────────────────────────────────────────────────────
 if [ -z "$RED" ]; then
@@ -16,8 +14,150 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_warn()    { echo -e "  ${YELLOW}[!]${NC} $1" >&2; }
 log_error()   { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 
-# ── Файл с портом (берём из основного скрипта) ─────────────
-PORT_FILE="/opt/mtpr-simple/port"
+# ── Путь к файлу настроек  ─────────────
+INSTALL_DIR="/opt/mtpr-simple"
+SETTINGS_FILE="${INSTALL_DIR}/settings.conf"
+PORT_FILE="${INSTALL_DIR}/port"
+
+# ── Свои save_settings / load_settings ──
+save_settings() {
+    mkdir -p "$INSTALL_DIR"
+    cat > "$SETTINGS_FILE" << EOF
+# MTProto Manager — настройки (дополнено Zapret2)
+SERVER_IP='${SERVER_IP:-}'
+SERVER_PORT='${SERVER_PORT:-}'
+NFT_RATE='${NFT_RATE:-1/second}'
+NFT_BURST='${NFT_BURST:-1}'
+NFT_METER_TIMEOUT='${NFT_METER_TIMEOUT:-60s}'
+NFT_TABLE='${NFT_TABLE:-telemt_limit}'
+NFT_HOOK='${NFT_HOOK:-input}'
+NFT_MODE='${NFT_MODE:-classic}'
+NFT_IOS_RATE='${NFT_IOS_RATE:-15/second}'
+NFT_IOS_BURST='${NFT_IOS_BURST:-30}'
+NFT_OTHER_RATE='${NFT_OTHER_RATE:-54/minute}'
+NFT_OTHER_BURST='${NFT_OTHER_BURST:-1}'
+NFT_IOS_LIMIT_ENABLED='${NFT_IOS_LIMIT_ENABLED:-false}'
+NFT_OTHER_LIMIT_ENABLED='${NFT_OTHER_LIMIT_ENABLED:-true}'
+NFT_OTHER_ACTION='${NFT_OTHER_ACTION:-icmp-host-unreachable}'
+NFT_IOS_DETECT='${NFT_IOS_DETECT:-fingerprint}'
+TUNING_TG_CONNECT='${TUNING_TG_CONNECT:-30}'
+TUNING_CLIENT_HANDSHAKE='${TUNING_CLIENT_HANDSHAKE:-90}'
+TUNING_CLIENT_KEEPALIVE='${TUNING_CLIENT_KEEPALIVE:-120}'
+TUNING_APPLIED='${TUNING_APPLIED:-false}'
+NFT_SERVICE_ENABLED='${NFT_SERVICE_ENABLED:-false}'
+IOS_FIX_APPLIED='${IOS_FIX_APPLIED:-false}'
+IOS_KA_TIME='${IOS_KA_TIME:-60}'
+IOS_KA_INTVL='${IOS_KA_INTVL:-15}'
+IOS_KA_PROBES='${IOS_KA_PROBES:-3}'
+IOS_ORIG_TIME='${IOS_ORIG_TIME:-}'
+IOS_ORIG_INTVL='${IOS_ORIG_INTVL:-}'
+IOS_ORIG_PROBES='${IOS_ORIG_PROBES:-}'
+IOS2_FIX_APPLIED='${IOS2_FIX_APPLIED:-false}'
+IOS2_EXTERNAL_PORT='${IOS2_EXTERNAL_PORT:-4443}'
+IOS2_TARGET_PORT='${IOS2_TARGET_PORT:-}'
+IOS2_MSS='${IOS2_MSS:-92}'
+IOS2_TABLE='${IOS2_TABLE:-mtpr_ios2_fix}'
+DOCKER_BRIDGE_MODE='${DOCKER_BRIDGE_MODE:-simple}'
+BRIDGE_WATCH_INTERVAL='${BRIDGE_WATCH_INTERVAL:-5}'
+EXTRA_RULES_COUNT='${EXTRA_RULES_COUNT:-0}'
+ZAPRET2_QNUM='${ZAPRET2_QNUM:-200}'
+ZAPRET2_OUT_RANGE='${ZAPRET2_OUT_RANGE:--s1}'
+ZAPRET2_IN_RANGE='${ZAPRET2_IN_RANGE:--s1}'
+ZAPRET2_SPLIT_LEN='${ZAPRET2_SPLIT_LEN:-400}'
+ZAPRET2_WIN_SYNACK='${ZAPRET2_WIN_SYNACK:-1400}'
+ZAPRET2_WIN_ACK='${ZAPRET2_WIN_ACK:-10}'
+ZAPRET2_APPLIED='${ZAPRET2_APPLIED:-false}'
+ZAPRET2_SERVICE_ENABLED='${ZAPRET2_SERVICE_ENABLED:-false}'
+ZAPRET2_RELEASE_REPO='${ZAPRET2_RELEASE_REPO:-Liafanx/MTproxy-reanimation}'
+ZAPRET2_RELEASE_TAG='${ZAPRET2_RELEASE_TAG:-zapret2-bundle}'
+ZAPRET2_FWMARK='${ZAPRET2_FWMARK:-0x40000000}'
+ZAPRET2_DEBUG='${ZAPRET2_DEBUG:-false}'
+ZAPRET2_DEBUG_LOG='${ZAPRET2_DEBUG_LOG:-/var/log/nfqws2-mtproto.log}'
+MEKO_OPT_APPLIED='${MEKO_OPT_APPLIED:-false}'
+MEKO_ORIG_KEEPALIVE_TIME='${MEKO_ORIG_KEEPALIVE_TIME:-}'
+MEKO_ORIG_KEEPALIVE_INTVL='${MEKO_ORIG_KEEPALIVE_INTVL:-}'
+MEKO_ORIG_KEEPALIVE_PROBES='${MEKO_ORIG_KEEPALIVE_PROBES:-}'
+MEKO_ORIG_SOMAXCONN='${MEKO_ORIG_SOMAXCONN:-}'
+MEKO_ORIG_TCP_MAX_SYN_BACKLOG='${MEKO_ORIG_TCP_MAX_SYN_BACKLOG:-}'
+MEKO_ORIG_NETDEV_MAX_BACKLOG='${MEKO_ORIG_NETDEV_MAX_BACKLOG:-}'
+MEKO_ORIG_TCP_FASTOPEN='${MEKO_ORIG_TCP_FASTOPEN:-}'
+MEKO_ORIG_FILE_MAX='${MEKO_ORIG_FILE_MAX:-}'
+MEKO_ORIG_DEFAULT_QDISC='${MEKO_ORIG_DEFAULT_QDISC:-}'
+MEKO_ORIG_TCP_CONGESTION='${MEKO_ORIG_TCP_CONGESTION:-}'
+EOF
+    # Сохраняем дополнительные правила
+    for _i in $(seq 1 "$EXTRA_RULES_COUNT"); do
+        cat >> "$SETTINGS_FILE" << EOF
+EXTRA_RULES_${_i}_PORT='${EXTRA_RULES_PORT[$_i]:-}'
+EXTRA_RULES_${_i}_IP='${EXTRA_RULES_IP[$_i]:-}'
+EXTRA_RULES_${_i}_RATE='${EXTRA_RULES_RATE[$_i]:-1/second}'
+EXTRA_RULES_${_i}_BURST='${EXTRA_RULES_BURST[$_i]:-1}'
+EOF
+    done
+    chmod 600 "$SETTINGS_FILE"
+}
+
+load_settings() {
+    [ -f "$SETTINGS_FILE" ] || return 0
+    while IFS= read -r _line; do
+        [[ "$_line" =~ ^[[:space:]]*# ]] && continue
+        [[ "$_line" =~ ^[[:space:]]*$ ]] && continue
+        if [[ "$_line" =~ ^([A-Z_][A-Z0-9_]*)=\'([^\']*)\'$ ]]; then
+            local _key="${BASH_REMATCH[1]}" _val="${BASH_REMATCH[2]}"
+            case "$_key" in
+                SERVER_IP|SERVER_PORT|NFT_RATE|NFT_BURST|NFT_METER_TIMEOUT|\
+                NFT_TABLE|NFT_HOOK|TUNING_TG_CONNECT|TUNING_CLIENT_HANDSHAKE|\
+                NFT_MODE|NFT_IOS_RATE|NFT_IOS_BURST|NFT_OTHER_RATE|NFT_OTHER_BURST|NFT_OTHER_ACTION|NFT_IOS_DETECT|\
+                TUNING_CLIENT_KEEPALIVE|TUNING_APPLIED|NFT_SERVICE_ENABLED|\
+                IOS_FIX_APPLIED|IOS_KA_TIME|IOS_KA_INTVL|IOS_KA_PROBES|\
+                IOS_ORIG_TIME|IOS_ORIG_INTVL|IOS_ORIG_PROBES|\
+                IOS2_FIX_APPLIED|IOS2_EXTERNAL_PORT|\
+                IOS2_TARGET_PORT|IOS2_MSS|IOS2_TABLE|\
+                DOCKER_BRIDGE_MODE|BRIDGE_WATCH_INTERVAL|EXTRA_RULES_COUNT|\
+                ZAPRET2_QNUM|ZAPRET2_OUT_RANGE|ZAPRET2_IN_RANGE|ZAPRET2_SPLIT_LEN|\
+                ZAPRET2_WIN_SYNACK|ZAPRET2_WIN_ACK|ZAPRET2_FWMARK|\
+                ZAPRET2_APPLIED|ZAPRET2_SERVICE_ENABLED|ZAPRET2_RELEASE_REPO|ZAPRET2_RELEASE_TAG|\
+                ZAPRET2_DEBUG|ZAPRET2_DEBUG_LOG|\
+                MEKO_OPT_APPLIED|\
+                MEKO_ORIG_KEEPALIVE_TIME|MEKO_ORIG_KEEPALIVE_INTVL|MEKO_ORIG_KEEPALIVE_PROBES|\
+                MEKO_ORIG_SOMAXCONN|MEKO_ORIG_TCP_MAX_SYN_BACKLOG|MEKO_ORIG_NETDEV_MAX_BACKLOG|\
+                MEKO_ORIG_TCP_FASTOPEN|MEKO_ORIG_FILE_MAX|\
+                MEKO_ORIG_DEFAULT_QDISC|MEKO_ORIG_TCP_CONGESTION|NFT_IOS_LIMIT_ENABLED|NFT_OTHER_LIMIT_ENABLED)
+                    printf -v "$_key" '%s' "$_val"
+                    ;;
+                EXTRA_RULES_*_PORT)
+                    local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_PORT}"
+                    EXTRA_RULES_PORT[$_idx]="$_val"
+                    ;;
+                EXTRA_RULES_*_IP)
+                    local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_IP}"
+                    EXTRA_RULES_IP[$_idx]="$_val"
+                    ;;
+                EXTRA_RULES_*_RATE)
+                    local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_RATE}"
+                    EXTRA_RULES_RATE[$_idx]="$_val"
+                    ;;
+                EXTRA_RULES_*_BURST)
+                    local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_BURST}"
+                    EXTRA_RULES_BURST[$_idx]="$_val"
+                    ;;
+            esac
+        fi
+    done < "$SETTINGS_FILE"
+    [[ "$EXTRA_RULES_COUNT" =~ ^[0-9]+$ ]] || EXTRA_RULES_COUNT=0
+    case "$NFT_MODE" in
+        classic|smart) ;;
+        *) NFT_MODE="classic" ;;
+    esac
+    case "$NFT_OTHER_ACTION" in
+        reject|drop|icmp-host-unreachable) ;;
+        *) NFT_OTHER_ACTION="icmp-host-unreachable" ;;
+    esac
+    case "$NFT_IOS_DETECT" in
+        fingerprint|ttl) ;;
+        *) NFT_IOS_DETECT="fingerprint" ;;
+    esac
+}
 
 # ── Zapret2 настройки по умолчанию ─────────────────────────────
 ZAPRET2_DIR="/opt/zapret2"
@@ -199,7 +339,9 @@ zapret2_download_bundle() {
 # ── Запись конфига Zapret2 ──────────────────────────────────
 zapret2_write_conf() {
     local _port
-    _port=$(cat "$PORT_FILE" 2>/dev/null | head -1)
+    if [ -f "$PORT_FILE" ]; then
+        _port=$(cat "$PORT_FILE" 2>/dev/null | head -1 | xargs)
+    fi
     [ -z "$_port" ] && _port="443"
     mkdir -p "$ZAPRET2_ETC_DIR"
     local _debug_line=""
@@ -288,7 +430,9 @@ LUAEOF
 zapret2_write_service() {
     local _nft_script="/usr/local/sbin/mtpr-zapret2-start.sh"
     local _port
-    _port=$(cat "$PORT_FILE" 2>/dev/null | head -1)
+    if [ -f "$PORT_FILE" ]; then
+        _port=$(cat "$PORT_FILE" 2>/dev/null | head -1 | xargs)
+    fi
     [ -z "$_port" ] && _port="443"
 
     cat > "$_nft_script" << NFTSTART
@@ -301,19 +445,19 @@ PORT="${_port}"
 QNUM="${ZAPRET2_QNUM}"
 
 # Удаляем старую таблицу если есть
-/usr/sbin/nft delete table ip "\$TABLE" 2>/dev/null || true
+nft delete table ip "\$TABLE" 2>/dev/null || true
 
 # Применяем NFT правила
-/usr/sbin/nft add table ip "\$TABLE"
+nft add table ip "\$TABLE"
 
-/usr/sbin/nft "add chain ip \$TABLE predefrag { type filter hook output priority -401; policy accept; }"
-/usr/sbin/nft "add rule ip \$TABLE predefrag meta mark and \$FWMARK != 0x00000000 notrack"
+nft "add chain ip \$TABLE predefrag { type filter hook output priority -401; policy accept; }"
+nft "add rule ip \$TABLE predefrag meta mark and \$FWMARK != 0x00000000 notrack"
 
-/usr/sbin/nft "add chain ip \$TABLE postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
-/usr/sbin/nft "add rule ip \$TABLE postrouting meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT queue flags bypass to \$QNUM"
+nft "add chain ip \$TABLE postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
+nft "add rule ip \$TABLE postrouting meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT queue flags bypass to \$QNUM"
 
-/usr/sbin/nft "add chain ip \$TABLE prerouting { type filter hook prerouting priority mangle; policy accept; }"
-/usr/sbin/nft "add rule ip \$TABLE prerouting meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT queue flags bypass to \$QNUM"
+nft "add chain ip \$TABLE prerouting { type filter hook prerouting priority mangle; policy accept; }"
+nft "add rule ip \$TABLE prerouting meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT queue flags bypass to \$QNUM"
 
 echo "MTproxy-reanimation: NFT table \$TABLE applied (port=\$PORT qnum=\$QNUM)"
 
@@ -352,28 +496,30 @@ zapret2_apply_nft() {
     local _table="${ZAPRET2_NFT_TABLE}"
     local _fwmark="${ZAPRET2_FWMARK}"
     local _port
-    _port=$(cat "$PORT_FILE" 2>/dev/null | head -1)
+    if [ -f "$PORT_FILE" ]; then
+        _port=$(cat "$PORT_FILE" 2>/dev/null | head -1 | xargs)
+    fi
     [ -z "$_port" ] && _port="443"
 
-    /usr/sbin/nft delete table ip "$_table" 2>/dev/null || true
+    nft delete table ip "$_table" 2>/dev/null || true
 
-    /usr/sbin/nft add table ip "$_table"
+    nft add table ip "$_table"
 
-    /usr/sbin/nft "add chain ip $_table predefrag { type filter hook output priority -401; policy accept; }"
-    /usr/sbin/nft "add rule ip $_table predefrag meta mark and $_fwmark != 0x00000000 notrack"
+    nft "add chain ip $_table predefrag { type filter hook output priority -401; policy accept; }"
+    nft "add rule ip $_table predefrag meta mark and $_fwmark != 0x00000000 notrack"
 
-    /usr/sbin/nft "add chain ip $_table postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
-    /usr/sbin/nft "add rule ip $_table postrouting meta mark and $_fwmark == 0x00000000 tcp sport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
+    nft "add chain ip $_table postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
+    nft "add rule ip $_table postrouting meta mark and $_fwmark == 0x00000000 tcp sport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
 
-    /usr/sbin/nft "add chain ip $_table prerouting { type filter hook prerouting priority mangle; policy accept; }"
-    /usr/sbin/nft "add rule ip $_table prerouting meta mark and $_fwmark == 0x00000000 tcp dport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
+    nft "add chain ip $_table prerouting { type filter hook prerouting priority mangle; policy accept; }"
+    nft "add rule ip $_table prerouting meta mark and $_fwmark == 0x00000000 tcp dport ${_port} queue flags bypass to ${ZAPRET2_QNUM}"
 
     log_success "NFT таблица ${_table} применена (порт=${_port} qnum=${ZAPRET2_QNUM})"
 }
 
 # ── Удаление NFT правил Zapret2 ─────────────────────────────
 zapret2_remove_nft() {
-    /usr/sbin/nft delete table ip "${ZAPRET2_NFT_TABLE}" 2>/dev/null || true
+    nft delete table ip "${ZAPRET2_NFT_TABLE}" 2>/dev/null || true
     log_success "NFT таблица ${ZAPRET2_NFT_TABLE} удалена"
 }
 
@@ -389,8 +535,8 @@ zapret2_start() {
 
     if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null; then
         ZAPRET2_SERVICE_ENABLED="true"
+        save_settings
         log_success "zapret2 запущен и добавлен в автозапуск"
-        return 0
     else
         log_error "zapret2 не запустился"
         journalctl -u "$ZAPRET2_SERVICE" -n 10 --no-pager 2>/dev/null || true
@@ -402,20 +548,14 @@ zapret2_start() {
 zapret2_stop() {
     systemctl stop "$ZAPRET2_SERVICE" 2>/dev/null || true
     systemctl disable "$ZAPRET2_SERVICE" 2>/dev/null || true
-    zapret2_remove_nft
+    nft delete table ip "${ZAPRET2_NFT_TABLE}" 2>/dev/null || true
     log_success "zapret2 остановлен"
 }
 
 # ── Установка Zapret2 (главная функция) ─────────────────────
 zapret2_install() {
     echo ""
-    echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON${NC}"
-    echo ""
-    echo -e "  ${DIM}Серверный обход для MTProto прокси.${NC}"
-    echo -e "  ${DIM}Метод: disorder + badsum + TCP window control.${NC}"
-    echo -e "  ${DIM}Работает на сервере — клиент ничего не ставит.${NC}"
-    echo ""
-    echo -e "  ${BOLD}Текущие параметры:${NC}"
+    echo -e "    ${BOLD}Текущие параметры:${NC}"
     echo -e "    out-range:   ${ZAPRET2_OUT_RANGE}  ${DIM}(сколько исходящих пакетов обрабатывать)${NC}"
     echo -e "    split len:   ${ZAPRET2_SPLIT_LEN}  ${DIM}(размер частей при разрезке ClientHello)${NC}"
     echo -e "    win SYN+ACK: ${ZAPRET2_WIN_SYNACK}  ${DIM}(TCP window в SYN+ACK)${NC}"
@@ -435,29 +575,22 @@ zapret2_install() {
 
     zapret2_download_bundle || return 1
 
-    # Если SYN FIX активен (проверяем через функции из rules.sh), предлагаем отключить
-    if declare -f is_syn_fix_chain_installed &>/dev/null; then
-        if is_syn_fix_chain_installed || is_nft_fix_installed; then
-            echo ""
-            echo -e "  ${YELLOW}⚠ SYN FIX активен.${NC}"
-            echo -e "  ${DIM}Zapret2 fix работает на уровне пакетов и заменяет SYN FIX.${NC}"
-            echo -e "  ${DIM}Использование обоих одновременно не рекомендуется.${NC}"
-            echo ""
-            echo -en "  ${BOLD}Отключить SYN FIX? [Y/n]:${NC} "
-            local _yn_syn; read -r _yn_syn
-            if [[ ! "$_yn_syn" =~ ^[nN]$ ]]; then
-                if declare -f remove_syn_fix &>/dev/null; then
-                    remove_syn_fix 2>/dev/null || true
-                    log_success "SYN FIX отключён"
-                else
-                    log_warn "Функция remove_syn_fix не найдена — пропускаем"
-                fi
-            else
-                log_warn "SYN FIX оставлен — возможны конфликты"
-            fi
+    # Zapret2 fix заменяет SYN limiter — отключаем его если активен
+    if [ "${NFT_SERVICE_ENABLED:-false}" = "true" ] || nft list table inet "${NFT_TABLE:-telemt_limit}" &>/dev/null 2>&1; then
+        echo ""
+        echo -e "  ${YELLOW}⚠ SYN limiter активен.${NC}"
+        echo -e "  ${DIM}Zapret2 fix работает на уровне пакетов и заменяет SYN limiter.${NC}"
+        echo -e "  ${DIM}Использование обоих одновременно не рекомендуется.${NC}"
+        echo ""
+        echo -en "  ${BOLD}Отключить SYN limiter? [Y/n]:${NC} "
+        local _yn_syn; read -r _yn_syn
+        if [[ ! "$_yn_syn" =~ ^[nN]$ ]]; then
+            remove_nft_rules 2>/dev/null || true
+            remove_service 2>/dev/null || true
+            log_success "SYN limiter отключён"
+        else
+            log_warn "SYN limiter оставлен — возможны конфликты"
         fi
-    else
-        log_info "Функции SYN FIX не загружены — пропускаем проверку"
     fi
 
     zapret2_write_conf
@@ -467,15 +600,9 @@ zapret2_install() {
 
     ZAPRET2_APPLIED="true"
     ZAPRET2_SERVICE_ENABLED="true"
+    save_settings
 
-    # СОХРАНЯЕМ В ОБЩИЙ ФАЙЛ НАСТРОЕК (как в репе Васи)
-    if declare -f save_settings &>/dev/null; then
-        save_settings
-        log_success "Статус сохранён в общий settings.conf"
-    else
-        log_warn "Функция save_settings не найдена — статус может не сохраниться"
-    fi
-
+    # контрольная проверка
     if systemctl is-enabled "$ZAPRET2_SERVICE" >/dev/null 2>&1; then
         log_success "Автозапуск ${ZAPRET2_SERVICE} включён"
     else
@@ -492,7 +619,6 @@ zapret2_install() {
     echo -e "    ${GREEN}✓${NC} Создана и запущена служба ${ZAPRET2_SERVICE}"
     echo -e "    ${GREEN}✓${NC} Применена NFT таблица ip ${ZAPRET2_NFT_TABLE}"
     echo ""
-    echo -e "  ${DIM}Параметры можно изменить в меню [Z] → Настройки.${NC}"
 }
 
 # ── Удаление Zapret2 ─────────────────────────────────────────
@@ -502,7 +628,7 @@ zapret2_remove() {
         return 0
     fi
     echo ""
-    echo -e "  ${RED}${BOLD}Удаление Zapret2 MTProto fix by CHKRON${NC}"
+    echo -e "  ${RED}${BOLD}Удаление v4 MTProto fix${NC}"
     echo ""
     echo -e "  ${DIM}Будет удалено:${NC}"
     echo -e "  ${DIM}- Служба ${ZAPRET2_SERVICE}${NC}"
@@ -526,10 +652,7 @@ zapret2_remove() {
 
     ZAPRET2_APPLIED="false"
     ZAPRET2_SERVICE_ENABLED="false"
-
-    if declare -f save_settings &>/dev/null; then
-        save_settings
-    fi
+    save_settings
 
     log_success "Zapret2 MTProto fix полностью удалён"
 }
@@ -581,12 +704,12 @@ show_zapret2_settings_menu() {
             1)
                 echo -en "  out-range [${ZAPRET2_OUT_RANGE}]: "
                 local _v; read -r _v
-                [ -n "$_v" ] && { ZAPRET2_OUT_RANGE="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; } ;;
+                [ -n "$_v" ] && { ZAPRET2_OUT_RANGE="$_v"; save_settings; zapret2_update_config; } ;;
             2)
                 echo -en "  split len [${ZAPRET2_SPLIT_LEN}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 50 ] && [ "$_v" -le 1000 ]; then
-                    ZAPRET2_SPLIT_LEN="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
+                    ZAPRET2_SPLIT_LEN="$_v"; save_settings; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 50..1000"
                 fi ;;
@@ -594,7 +717,7 @@ show_zapret2_settings_menu() {
                 echo -en "  win SYN+ACK [${ZAPRET2_WIN_SYNACK}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 10 ] && [ "$_v" -le 65535 ]; then
-                    ZAPRET2_WIN_SYNACK="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
+                    ZAPRET2_WIN_SYNACK="$_v"; save_settings; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 10..65535"
                 fi ;;
@@ -602,40 +725,40 @@ show_zapret2_settings_menu() {
                 echo -en "  win ACK [${ZAPRET2_WIN_ACK}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 1 ] && [ "$_v" -le 65535 ]; then
-                    ZAPRET2_WIN_ACK="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
+                    ZAPRET2_WIN_ACK="$_v"; save_settings; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 1..65535"
                 fi ;;
             5)
                 echo -en "  in-range [${ZAPRET2_IN_RANGE}]: "
                 local _v; read -r _v
-                [ -n "$_v" ] && { ZAPRET2_IN_RANGE="$_v"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; } ;;
+                [ -n "$_v" ] && { ZAPRET2_IN_RANGE="$_v"; save_settings; zapret2_update_config; } ;;
             6)
                 echo -en "  NFQUEUE num [${ZAPRET2_QNUM}]: "
                 local _v; read -r _v
                 if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 0 ] && [ "$_v" -le 65535 ]; then
-                    ZAPRET2_QNUM="$_v"; zapret2_remove_nft; zapret2_apply_nft; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config
+                    ZAPRET2_QNUM="$_v"; save_settings; zapret2_remove_nft; zapret2_apply_nft; zapret2_update_config
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 0..65535"
                 fi ;;
             7)
                 echo -en "  fwmark [${ZAPRET2_FWMARK}]: "
                 local _v; read -r _v
-                [ -n "$_v" ] && { ZAPRET2_FWMARK="$_v"; zapret2_remove_nft; zapret2_apply_nft; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; } ;;
+                [ -n "$_v" ] && { ZAPRET2_FWMARK="$_v"; save_settings; zapret2_remove_nft; zapret2_apply_nft; zapret2_update_config; } ;;
             8)
                 if [ "${ZAPRET2_DEBUG:-false}" = "true" ]; then
                     echo -en "  Выключить debug? [Y/n]: "
                     local _yn; read -r _yn
-                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="false"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; }
+                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="false"; save_settings; zapret2_update_config; }
                 else
                     echo -e "  ${YELLOW}Debug лог будет записываться в ${ZAPRET2_DEBUG_LOG}${NC}"
                     echo -en "  Включить debug? [Y/n]: "
                     local _yn; read -r _yn
-                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="true"; if declare -f save_settings &>/dev/null; then save_settings; fi; zapret2_update_config; }
+                    [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="true"; save_settings; zapret2_update_config; }
                 fi ;;
             0|"") return ;;
         esac
-        echo ""; read -rsn1 -p "  Нажмите любую клавишу..."
+        echo ""; read -rsn1 -p "  Нажмите любую клавишу для возврата в меню"
     done
 }
 
@@ -644,8 +767,9 @@ show_zapret2_menu() {
     while true; do
         clear
         echo ""
-        echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix by CHKRON V0.11${NC}"
-        echo -e "  ${DIM}Серверный обход: disorder + badsum + window control${NC}"
+        echo -e "  ${NC}${BOLD}Меню | ${CYAN}${BOLD}V4 fix${NC}"
+		echo -e "  ${DIM}══════════════════════════════"
+        echo -e "  ${DIM}disorder + badsum + window control${NC}"
         echo ""
         echo -e "  Статус: $(zapret2_status)"
         echo ""
@@ -659,7 +783,7 @@ show_zapret2_menu() {
             echo -e "    win ACK:       ${ZAPRET2_WIN_ACK}"
             echo -e "    NFQUEUE num:   ${ZAPRET2_QNUM}"
             echo -e "    fwmark:        ${ZAPRET2_FWMARK}"
-            echo -e "    Порт:          $(cat "$PORT_FILE" 2>/dev/null || echo "не задан")"
+            echo -e "    Порт:          ${SERVER_PORT:-не задан}"
             echo -e "    Debug:         $([ "${ZAPRET2_DEBUG:-false}" = "true" ] && echo "${YELLOW}включён${NC}" || echo "${DIM}выключен${NC}")"
             echo ""
 
@@ -680,7 +804,7 @@ show_zapret2_menu() {
             echo ""
         fi
 
-        echo -e "  ${GREEN}[1]${NC}  Установить / переустановить zapret2"
+        echo -e "  ${GREEN}[1]${NC}  Установить / Переустановить v4 zapret2 fix "
         if [ "${ZAPRET2_APPLIED:-false}" = "true" ]; then
             echo -e "  ${CYAN}[2]${NC}  Перезапустить zapret2"
             echo -e "  ${CYAN}[3]${NC}  Остановить zapret2"
@@ -735,12 +859,9 @@ show_zapret2_menu() {
             8) [ "${ZAPRET2_APPLIED:-false}" = "true" ] && zapret2_remove ;;
             0|"") return ;;
         esac
-        echo ""; read -rsn1 -p "  Нажмите любую клавишу..."
+        echo ""; read -rsn1 -p "  Нажмите любую клавишу для возврата в меню"
     done
 }
 
-# ── Загрузка настроек Zapret2 (для обратной совместимости) ──
-zapret2_load_settings() {
-    # просто заглушка.
-    return 0
-}
+# ── Загрузка настроек при старте ────────────────────────────
+load_settings
