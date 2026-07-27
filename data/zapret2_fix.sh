@@ -438,13 +438,10 @@ LUAEOF
 }
 
 # ── Создание systemd сервиса для Zapret2 (обновлённая NFT таблица) ────────────────────
+# ── Создание systemd сервиса для Zapret2 (обновлённая NFT таблица) ────────────────────
 zapret2_write_service() {
     local _nft_script="/usr/local/sbin/mtpr-zapret2-start.sh"
-    local _port
-    if [ -f "$PORT_FILE" ]; then
-        _port=$(cat "$PORT_FILE" 2>/dev/null | head -1 | xargs)
-    fi
-    [ -z "$_port" ] && _port="443"
+    local _port="${SERVER_PORT:-443}"
     local _ct_mark="0x00040000"
     local _combined_mark
     printf -v _combined_mark '0x%08x' "$(( ZAPRET2_FWMARK | _ct_mark ))"
@@ -515,14 +512,11 @@ EOF
 }
 
 # ── Применение NFT правил для Zapret2 (обновлённая таблица с ct mark) ──────────────────────
+# ── Применение NFT правил для Zapret2 (обновлённая таблица с ct mark) ──────────────────────
 zapret2_apply_nft() {
     local _table="${ZAPRET2_NFT_TABLE}"
     local _fwmark="${ZAPRET2_FWMARK}"
-    local _port
-    if [ -f "$PORT_FILE" ]; then
-        _port=$(cat "$PORT_FILE" 2>/dev/null | head -1 | xargs)
-    fi
-    [ -z "$_port" ] && _port="443"
+    local _port="${SERVER_PORT:-443}"
     local _ct_mark="0x00040000"
     local _combined_mark
     printf -v _combined_mark '0x%08x' "$(( _fwmark | _ct_mark ))"
@@ -720,9 +714,6 @@ zapret2_install() {
     echo ""
     echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix${NC}"
     echo ""
-    echo -e "  ${DIM}Серверный обход для MTProto прокси.${NC}"
-    echo -e "  ${DIM}Метод: disorder + badsum + TCP window control.${NC}"
-    echo -e "  ${DIM}Работает на сервере — клиент ничего не ставит.${NC}"
     echo ""
     echo -e "  ${BOLD}Текущие параметры:${NC}"
     echo -e "    out-range:   ${ZAPRET2_OUT_RANGE}  ${DIM}(сколько исходящих пакетов обрабатывать)${NC}"
@@ -737,6 +728,20 @@ zapret2_install() {
         local _yn; read -r _yn
         [[ "$_yn" =~ ^[nN]$ ]] && { log_info "Отменено"; return 0; }
     fi
+
+    # ── Запрос порта ──────────────────────────────────────────
+    echo ""
+    echo -en "  ${NC}${BOLD}Введите порт для Zapret2 fix ${GREEN}${BOLD}(По умолчанию Enter - 443 порт)${NC}${BOLD}:${NC} "
+    local _user_port; read -r _user_port
+    if [ -z "$_user_port" ]; then
+        _user_port="443"
+    elif ! [[ "$_user_port" =~ ^[0-9]+$ ]] || [ "$_user_port" -lt 1 ] || [ "$_user_port" -gt 65535 ]; then
+        log_error "Некорректный порт. Использую 443"
+        _user_port="443"
+    fi
+    SERVER_PORT="$_user_port"
+    save_settings
+    log_info "Порт установлен: ${SERVER_PORT}"
 
     echo -en "  ${BOLD}Скачать и установить zapret2 bundle? [Y/n]:${NC} "
     local _yn; read -r _yn
@@ -831,25 +836,31 @@ zapret2_remove() {
 }
 
 # ── Обновление конфигурации Zapret2 (пересоздаёт службу и NFT) ──
-zapret2_update_config() {
-    if [ "${ZAPRET2_APPLIED:-false}" != "true" ]; then
-        log_warn "Zapret2 не установлен"
-        return 1
+# ── Запись конфига Zapret2 ──────────────────────────────────
+zapret2_write_conf() {
+    local _port="${SERVER_PORT:-443}"
+    mkdir -p "$ZAPRET2_ETC_DIR"
+    local _debug_line=""
+    if [ "${ZAPRET2_DEBUG:-false}" = "true" ]; then
+        _debug_line="--debug=@${ZAPRET2_DEBUG_LOG}"
     fi
-    zapret2_write_conf
-    zapret2_write_lua
-    zapret2_write_service   # теперь пересоздаёт сервис и скрипт запуска
-    zapret2_apply_nft
-    systemctl daemon-reload
-    systemctl enable "$ZAPRET2_SERVICE" >/dev/null 2>&1 || true
-    systemctl restart "$ZAPRET2_SERVICE" 2>/dev/null || true
-    sleep 1
-    if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null; then
-        log_success "Конфигурация обновлена, zapret2 перезапущен"
-    else
-        log_error "zapret2 не запустился после обновления конфигурации"
-        journalctl -u "$ZAPRET2_SERVICE" -n 10 --no-pager 2>/dev/null || true
-    fi
+
+    cat > "$ZAPRET2_CONF" << EOF
+--qnum ${ZAPRET2_QNUM}
+--fwmark=${ZAPRET2_FWMARK}
+--server
+${_debug_line}
+--lua-init=@${ZAPRET2_LUA_DIR}/zapret-lib.lua
+--lua-init=@${ZAPRET2_LUA_DIR}/zapret-antidpi.lua
+--lua-init=@${ZAPRET2_LUA_DIR}/mtproto.lua
+--filter-tcp=${_port}
+--out-range=${ZAPRET2_OUT_RANGE}
+--in-range=${ZAPRET2_IN_RANGE}
+--payload-disable=all
+--lua-desync=lets_resend
+--new
+EOF
+    log_success "Конфиг записан: ${ZAPRET2_CONF} (порт=${_port})"
 }
 
 # ── Меню настроек Zapret2 (добавлены debug и сброс) ──────────
