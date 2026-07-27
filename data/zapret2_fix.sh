@@ -338,13 +338,9 @@ zapret2_download_bundle() {
     return 0
 }
 
-# ── Запись конфига Zapret2 ──────────────────────────────────
+# ── Запись конфига Zapret2 (использует SERVER_PORT) ────────
 zapret2_write_conf() {
-    local _port
-    if [ -f "$PORT_FILE" ]; then
-        _port=$(cat "$PORT_FILE" 2>/dev/null | head -1 | xargs)
-    fi
-    [ -z "$_port" ] && _port="443"
+    local _port="${SERVER_PORT:-443}"
     mkdir -p "$ZAPRET2_ETC_DIR"
     local _debug_line=""
     if [ "${ZAPRET2_DEBUG:-false}" = "true" ]; then
@@ -369,7 +365,7 @@ EOF
     log_success "Конфиг записан: ${ZAPRET2_CONF} (порт=${_port})"
 }
 
-# ── Запись Lua-скрипта для MTProto (обновлённая логика iOS bypass + ACK) ──────────
+# ── Запись Lua-скрипта для MTProto ──────────────────────────
 zapret2_write_lua() {
     mkdir -p "$ZAPRET2_LUA_DIR"
     cat > "$ZAPRET2_LUA" << LUAEOF
@@ -437,8 +433,7 @@ LUAEOF
     log_success "Lua скрипт записан: ${ZAPRET2_LUA}"
 }
 
-# ── Создание systemd сервиса для Zapret2 (обновлённая NFT таблица) ────────────────────
-# ── Создание systemd сервиса для Zapret2 (обновлённая NFT таблица) ────────────────────
+# ── Создание systemd сервиса для Zapret2 ────────────────────
 zapret2_write_service() {
     local _nft_script="/usr/local/sbin/mtpr-zapret2-start.sh"
     local _port="${SERVER_PORT:-443}"
@@ -511,8 +506,7 @@ EOF
     log_success "Служба создана: ${ZAPRET2_SERVICE}"
 }
 
-# ── Применение NFT правил для Zapret2 (обновлённая таблица с ct mark) ──────────────────────
-# ── Применение NFT правил для Zapret2 (обновлённая таблица с ct mark) ──────────────────────
+# ── Применение NFT правил для Zapret2 ──────────────────────
 zapret2_apply_nft() {
     local _table="${ZAPRET2_NFT_TABLE}"
     local _fwmark="${ZAPRET2_FWMARK}"
@@ -602,7 +596,7 @@ zapret2_stop() {
     log_success "zapret2 остановлен"
 }
 
-# ── Проверка wscale и расчёт win ACK (новая функция) ──────
+# ── Проверка wscale и расчёт win ACK ──────────────────────
 zapret2_check_wscale() {
     local _show_only="${1:-false}"
     local _target=1280
@@ -714,6 +708,9 @@ zapret2_install() {
     echo ""
     echo -e "  ${CYAN}${BOLD}Zapret2 MTProto fix${NC}"
     echo ""
+    echo -e "  ${DIM}Серверный обход для MTProto прокси.${NC}"
+    echo -e "  ${DIM}Метод: disorder + badsum + TCP window control.${NC}"
+    echo -e "  ${DIM}Работает на сервере — клиент ничего не ставит.${NC}"
     echo ""
     echo -e "  ${BOLD}Текущие параметры:${NC}"
     echo -e "    out-range:   ${ZAPRET2_OUT_RANGE}  ${DIM}(сколько исходящих пакетов обрабатывать)${NC}"
@@ -836,34 +833,28 @@ zapret2_remove() {
 }
 
 # ── Обновление конфигурации Zapret2 (пересоздаёт службу и NFT) ──
-# ── Запись конфига Zapret2 ──────────────────────────────────
-zapret2_write_conf() {
-    local _port="${SERVER_PORT:-443}"
-    mkdir -p "$ZAPRET2_ETC_DIR"
-    local _debug_line=""
-    if [ "${ZAPRET2_DEBUG:-false}" = "true" ]; then
-        _debug_line="--debug=@${ZAPRET2_DEBUG_LOG}"
+zapret2_update_config() {
+    if [ "${ZAPRET2_APPLIED:-false}" != "true" ]; then
+        log_warn "Zapret2 не установлен"
+        return 1
     fi
-
-    cat > "$ZAPRET2_CONF" << EOF
---qnum ${ZAPRET2_QNUM}
---fwmark=${ZAPRET2_FWMARK}
---server
-${_debug_line}
---lua-init=@${ZAPRET2_LUA_DIR}/zapret-lib.lua
---lua-init=@${ZAPRET2_LUA_DIR}/zapret-antidpi.lua
---lua-init=@${ZAPRET2_LUA_DIR}/mtproto.lua
---filter-tcp=${_port}
---out-range=${ZAPRET2_OUT_RANGE}
---in-range=${ZAPRET2_IN_RANGE}
---payload-disable=all
---lua-desync=lets_resend
---new
-EOF
-    log_success "Конфиг записан: ${ZAPRET2_CONF} (порт=${_port})"
+    zapret2_write_conf
+    zapret2_write_lua
+    zapret2_write_service   # теперь пересоздаёт сервис и скрипт запуска
+    zapret2_apply_nft
+    systemctl daemon-reload
+    systemctl enable "$ZAPRET2_SERVICE" >/dev/null 2>&1 || true
+    systemctl restart "$ZAPRET2_SERVICE" 2>/dev/null || true
+    sleep 1
+    if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null; then
+        log_success "Конфигурация обновлена, zapret2 перезапущен"
+    else
+        log_error "zapret2 не запустился после обновления конфигурации"
+        journalctl -u "$ZAPRET2_SERVICE" -n 10 --no-pager 2>/dev/null || true
+    fi
 }
 
-# ── Меню настроек Zapret2 (добавлены debug и сброс) ──────────
+# ── Меню настроек Zapret2 ────────────────────────────────────
 show_zapret2_settings_menu() {
     while true; do
         clear
@@ -948,12 +939,12 @@ show_zapret2_settings_menu() {
     done
 }
 
-# ── Главное меню Zapret2 (обновлённое, с диагностикой и сбросом) ──
+# ── Главное меню Zapret2 ─────────────────────────────────────
 show_zapret2_menu() {
     while true; do
         clear
         echo ""
-        echo -e "  ${NC}${BOLD}Меню v0.2 | ${CYAN}${BOLD}V4.2 Zapret2 MTProto fix${NC}"
+        echo -e "  ${NC}${BOLD}Меню v0.3 | ${CYAN}${BOLD}V4.2 Zapret2 MTProto fix${NC}"
         echo -e "  ${DIM}══════════════════════════════"
         echo -e "  ${DIM}disorder + badsum + window control${NC}"
         echo ""
