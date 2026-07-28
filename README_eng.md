@@ -1,36 +1,40 @@
 <div align="center">
 
-
-# MEKO | MTProto Installer, Launcher and fixer
+# MEKO | VPN and MTProto proxy manager - Installer, Launcher and fixer
 
 <a href="https://t.me/meko_mtprotofix">
-<img width="300" height="300" alt="Без имени-1" src="https://github.com/user-attachments/assets/8decca32-f96a-4b00-9e6c-1bf16bf94d33" />
-
+<img width="300" height="300" alt="logo" src="https://github.com/user-attachments/assets/8decca32-f96a-4b00-9e6c-1bf16bf94d33" />
 
 ---
 [![Latest Release](https://img.shields.io/github/v/release/Mekotofeuka/MTPROTO_FIX_By_MEKO?color=neon)](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Stars](https://img.shields.io/github/stars/Mekotofeuka/MTPROTO_FIX_By_MEKO?style=social)](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/stargazers) [![Forks](https://img.shields.io/github/forks/Mekotofeuka/MTPROTO_FIX_By_MEKO?style=social)](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/network/members) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/pulls)
+[![Telegram](https://telegram-badge.vercel.app/api/telegram-badge?channelId=@meko_mtprotofix)](https://t.me/meko_mtprotofix)
 
 </div>
 
 <p align="center">
-  · <a href="#Quick-Start">One‑Click Installation</a> · <a href="#How-the-fix-works">How does it work?</a> · <a href="#Possible-problems-why-might-it-not-work-for-me">Troubleshooting</a> ·
+  · <a href="#quick-start">Install in 1️⃣ click</a> · <a href="#how-the-fix-works">How it works🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">Documentation & Dictionary for dummies</a> ·
+<p align="center">
+  · <a href="#possible-issues-why-might-it-not-work">FAQ❓</a> 
+  
 </p>
 
 <div align="center">
   
-**A full‑fledged proxy toolkit**:
+**Full‑fledged Manager for VPN and proxies**:
 
-**Allows you to conveniently work with **TELEMT, MTG and MTPROTO.ZIG** in just a few clicks**, supporting most of the necessary commands for interaction:
-Installation, update, rollback, configuration, editing configs, viewing logs, getting a connection link without typing any commands.
+Fixes Telegram MTProto proxies and **allows convenient** work with **TELEMT, MTG and MTPROTO.ZIG**, supporting most necessary commands:
+Install, update, rollback, configure, edit configs, view logs, install and work with panels, get connection link – **without typing any commands**.
+Also performs all needed functions for VPN panels/nodes.
 
-⭐️One of our fixes for the old version has already been adopted by TELEMT and Mtproto zig⭐️
-  
+⭐️ _One of our fixes [old V2 version](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md#Термины-связанные-с-фиксом) has already been adopted by TELEMT and Mtproto zig_ ⭐️
+
+_MEKO currently uses the [more accurate V3 version](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md#Термины-связанные-с-фиксом)_
 </div>
 
 ---
 
 <div align="center">
-👇 Having issues? Write in chat – we'll help 👇
+👇 Having trouble? Chat with us – we'll help 👇
 </div>
 <p align="center">
   <a href="https://t.me/meko_mtprotofix">
@@ -38,160 +42,123 @@ Installation, update, rollback, configuration, editing configs, viewing logs, ge
   </a>
 </p>
 <div align="center">
-☝️P.s. there is also a series based on the fix there ☝️
+☝️P.s. there's also a series based on the fix ☝️
 </div>
 
 
 
-**Helps to solve in one click the problem** that appeared on June 4, **when the Telegram client cannot connect to the MTProto proxy server**. The fix is made for the server side – clients do not need to install or change anything.
+**The script solves in 1 click** the problem that appeared since June 4, **when Telegram client cannot connect to MTProto proxy server**. The fix is applied server‑side – clients don't need to install or change anything on their devices.
 
-**Symptoms**: The connection may hang, take a long time to establish, or fail during the initial TCP stage, with further blocking of client access to the server for 2 minutes after the first connection attempt.
+**Symptoms of this issue**: 
+- Connection may hang, take a long time to establish, or fail the initial TCP handshake, followed by a **2‑minute** client access block after first connection.
+- "Infinite update" on iOS,
+- Media not loading – videos/photos/GIFs/voice messages/stickers.
 
- **Tested on: Telemt 3.4.18 and 3.4.23, MTProto.zig 1.9.0, Mtg 2.2.8, MTProtoProxy, JSMTProxy**
+**Tested on: Telemt 3.4.25, MTProto.zig 1.9.0, Mtg 2.2.8, Erlang mtproto proxy, MTProtoProxy, JSMTProxy**
 
-This script is used for servers running MTPROTO (telemt, mtproto zig, etc.). It fixes the problem of slow initial TCP client connections. Unlike earlier community fixes that used SYN limits, it has **several advantages**:
-- Fast connection in <3‑8 sec (original SYN limit: >10‑20 sec) even with a large number of users.
-- **One port for iOS/Android/macOS/Desktop** etc.
-- Media loads almost at the previous speed.
-- **Installs in one click**.
+This script is for servers with MTProto proxies; it fixes slow initial TCP client connections or complete failure (cannot connect to proxy). **Advantages**:
+- Fast connection even with many clients and devices on one IP (Wi‑Fi)
+- **Single port for all devices: iOS/Android/macOS/Desktop**, etc.
+- **Media** loads at full speed
+- Correctly detects and applies rules for different devices with **100% accuracy**
+- **Installs in one click** with 2 modes: "standard installation" with configurable settings, and "automatic" installation that tells you what it will do and after confirmation does everything for you.
+
 <div align="center">
-<img width="550" height="400" alt="image" src="https://github.com/user-attachments/assets/69290da8-c3b3-4961-b584-46a0450159d2" />
-<img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/3296a6c6-c097-4e5a-bd05-7c9f64154f79" />
-<img width="400" height="400" alt="image" src="https://github.com/user-attachments/assets/8f07e4ea-3a99-43a4-8232-ad7f7ece634e" />
-
-
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/be92a44d-5040-4592-8eda-644d4b182439" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/75abab6b-0419-477c-bab3-7dca9694357e" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/63b88f4b-3d63-48a2-97a4-0f1b67e96307" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/93bf6fbd-db3f-4f93-adb2-0c68c912fcfe" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/3296a6c6-c097-4e5a-bd05-7c9f64154f79" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/8f07e4ea-3a99-43a4-8232-ad7f7ece634e" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/b385ebfd-496c-4fa8-8a95-dff36c3304bd" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/f6fa1001-99c3-4ef2-bc52-e678b1c91529" />
 </div>
 
-## Quick Start:
+## Quick start:
 
-**Attention, this script is paid – price: 1 ⭐ on the repository**
+**Attention, this script is paid; price: 1 ⭐ on the repository**
 
 1. **Install/update our script**:
-```Bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash
-```
-2. **Install standard Telemt** version 3.4.22 or 3.4.18 and below, or as an **alternative** you can install "**MTPROTO.zig**"
-   > (all proxies can be installed through our script menu; you don't need to install them on the server beforehand)
-4. Apply our fix to the proxy by pressing **[1] Install SYN FIX** in the main menu.
-5. **Disable built‑in MSS and SYN** from the Telemt config by pressing **[5]** (if it was already added to the Telemt config on the server earlier).
-6. Check SNI via button **[7]** in the menu, or through the bot @Sni_checker_bot. You need to choose a domain that shows: 🟢 Marker: NO. Otherwise, iOS users will experience problems.
-7. If you are using SelfSteal, make sure OpenSSL 3.5 or higher is installed on the server; otherwise iOS users will similarly have issues. If you cannot install OpenSSL 3.5 or higher, use any popular domain instead of SelfSteal that returns "🟢 Marker: NO."
+<pre><code>curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash</code></pre>
+2. **Install standard Telemt**, or "**MTPROTO.zig**" or **MTG**
+   > (all proxies can be installed via our script menu; you don't need to install them beforehand on the server, and order doesn't matter – proxy first or fix first)
+4. Apply the fix to your proxy by pressing **[1] Install SYN FIX** in the main menu
+5. **Disable built‑in MSS and SYN** from Telemt config by pressing **[5]** (if it was previously added to the config)
+6. Check **SNI** via button **[7]** in menu, or via bot **@Sni_checker_bot** – you must select a domain that shows: 🟢 **Marker: NO**. Otherwise, iOS users will experience problems.
+7. If you use SelfSteal, ensure your server has **OpenSSL 3.5** or higher – otherwise, similar iOS issues will occur. If you can't install **OpenSSL 3.5+**, then use any popular domain that shows "🟢 **Marker: NO**" instead of SelfSteal. Alternative solutions are described in the [documentation](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md).
 8. Done.
 
 - **Additional**:
-Button **3** performs basic server optimisation for proxies – in several tests it performed better (faster, more stable, less resource‑intensive).
+Button **3** performs basic server optimisation for proxies – in tests it showed better performance: faster, more stable, less resource‑intensive.
 
-**Open the menu**:
-```Bash
-mekopr
-```
+**Open menu**:
+<pre><code>mekopr</code></pre>
 
 # How the fix works:
 
-Applies a set of rules to the server that divides devices into two types – **iOS** and **non‑iOS** – and applies a different limit to each.
-- Layer 1 – Checks whether the device is iOS or not.
-  - If yes – Keep the device on the first layer and apply rules specifically for iOS.
-  - If no – Move to the second layer and apply rules of the second layer for all other devices.
+Applies a set of rules to the server that splits devices into two types – **ios** and **non‑ios** – and applies different limits to each.
+
+- **Layer 1** – Checks if the device is iOS or not.
+  - **If yes** – keeps the device on layer 1 and applies rules specific to iOS.
+  - **If no** – moves to layer 2 and applies layer‑2 rules for all non‑iOS devices, limiting SYN to 1 packet per 1.1 sec.
 
 **More detailed description**
-- Fixes the dead connection problem for iOS/Android
-  - Problem: The mobile client is minimised, after which the socket is not closed cleanly, so the server holds a dead connection, and upon returning the client gets stuck on the dead socket.
-  - The script makes the dead connection break within a couple of minutes instead of several hours. When the client returns from the background, it immediately sees "socket dead" and reconnects without freezing.
-- Fixes the TCP handshake problem that is cut off by traffic‑shaping tools
-  - The script limits the incoming SYN frequency to 1.1/sec per IP, because traffic‑shaping tools limit TCP connections only if they exceed 1 per second.
-- iOS separately
-  - iOS has different connection patterns compared to Android and Desktop. In one limit they interfere with each other. Port separation is a solution, but a kludge. Our fix separates these clients based on the iOS fingerprint, so clients of any device can sit on one port without extra hassle.
-- 54/minute (instead of 1 sec)
-  - The iptables hashlimit module does not support milliseconds. 54/minute = 1.1 sec per connection. A margin of 100 ms is needed to eliminate the error that occurs with an immediate Reject, which leads to a 2‑minute block of connection from your device to the MTProto server.
-- REJECT instead of DROP
-  - DROP just kills the client connection without notifying it, causing timeouts (3‑5 sec) → retries with longer pauses → higher latency. REJECT with RST, on the other hand, immediately responds to the client that the connection is broken, so the client tries to reconnect without waiting, making the connection to Telegram much faster.
-- MSS is simply not needed for this build, so the script includes a function to disable it. If you leave a rule or config setting with MSS or another SYN limiting option, media and speed will still be reduced, so it is recommended to comment out/delete them from the server before applying the fix.
 
-- Symbols for understanding in the community:
-  - older versions without labels, before port‑based separation
-  - V1 fix (community and reanimation) – client separation by ports – all devices on one port with a SYN limit of 1/sec via DROP, iOS on another port
-  - V2 fix – using one port with a two‑layer rule, SYN limit with DROP replaced by Reject, removal of disadvantageous MSS, increase of delay from 1 to 1.1 sec, separation of users by their TTL + Length to determine who is iOS and who is another device, for iOS – accept, for the rest – accept once per 1.1 sec, otherwise – reject
-  - V3 fix – refinement of V2, replacing the TTL+Length detector with detection by iOS device fingerprint via u32 and also marking with mangle, otherwise the rule remains generally the same.
+- Fixes dead connection issues on **iOS/Android**
+  - Problem: mobile client goes to background, socket doesn't close cleanly, so the server holds a dead connection; when the client returns, it hangs on that dead socket.
+  - The script makes dead connections break within minutes instead of hours. The client immediately sees "socket dead" on return and reconnects without hanging.
 
+- Fixes **TCP** handshake being cut
+  - The script limits incoming SYN frequency to 1 packet per 1.1 sec per **IP**, because the technical means limit TCP connections only if they exceed 1 per second.
 
-# How to set up a proxy from Russia directly, with working MiddleProxy (useful for those using a "sponsor channel")
+- **iOS separately**
+  - iOS has different connection patterns compared to Android and Desktop. Mixing them under one limit interferes with each other. Splitting by port is a workaround but clumsy. Our fix separates these clients based on iOS fingerprint, so clients of any device can sit on the same port without extra hassle.
 
-This manual describes a way to run a proxy directly on a server that has restricted access to Telegram ME/DC servers. Works with Android/iOS/Desktop.
-1. Install MTPROTO ZIG
-```Bash
-curl -fsSL https://raw.githubusercontent.com/sleep3r/mtproto.zig/main/deploy/bootstrap.sh | sudo bash
-```
-```Bash
-sudo mtbuddy install --port 443 --domain rutube.ru --no-tcpmss --middle-proxy --yes
-```
-2. Install the MEKO script
-```Bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash
-```
-3. Skip the Telemt info, the script menu opens, press **1** and press y
-4. Connect to the proxy and use it.
+- **54/minute** (not 1 packet per sec)
+  - The **iptables** module **hashlimit** does not support milliseconds. 54/minute = 0.9 packets per second per connection (i.e., 1 packet per 1.1 sec). The extra 100 ms reserve eliminates errors caused by instant Reject, which otherwise leads to a 2‑minute block of your device connecting to the MTProto server.
 
-## Possible problems ("why might it not work for me?")
+- **REJECT** instead of **DROP**
+  - **DROP** simply terminates the client connection without notification, causing timeouts (3‑5 sec) → retries with longer pauses → higher latency. **REJECT** with RST, on the other hand, immediately gives the client a reset response, so the client retries without waiting, resulting in much faster Telegram connection.
 
-- Perhaps the port/IP/subnet has already been blocked before and you need to replace them (often a proxy that does not work on 443 works fine on 9443, for example).
-- When using the V2 fix, which identifies the device by TTL+Length, when connecting from iOS, the connection from your device to the server may pass through several load balancers, increasing the TTL beyond the specified limit – this happens quite often, causing the script to identify the device as desktop/Android instead of iPhone. In that case, you need to use the V3 fix.
-- When using any other fix or the V3 variant, which identifies iOS by its full fingerprint (byte order) or a fix identifying devices by TTL+Length (instead of limiting MSS, which cuts packets and worsens media loading), you need to make sure that the domain used for Fake TLS supports the post‑quantum hybrid key exchange algorithm that combines a classic elliptic curve. You can check this using the built‑in domain check function (works on OS with OpenSSL 3.5 or higher) or via the bot: @Sni_checker_bot by sending it the domain. If the chosen domain does not support this – with a very high probability, after an iOS connection attempt you will get blocked and the connection will fail.
-  - A list of popular domains that do and do not support this algorithm:
+- **MSS** is simply unnecessary for this build, so the script includes a function to disable it. If you keep any MSS rule or config setting limiting SYN, media and download speed will be poor – so it's recommended to comment/remove such settings before applying the fix.
 
-  ❌ rutube.ru, vk.com, github.com, habr.com, yandex.ru, steamcommunity.com, amazon.com, microsoft.com, amazonaws.com, mail.ru, dzen.ru, linkedin.com, live.com, office.com, amazon.com, azure.com, bing.com, github.com, fastly.net, netflix.com, sharepoint.com, skype.com, gandi.net, cloud.microsoft, yahoo.com, msn.com, tiktok.com, roblox.com, spotify.com, adobe.com, ntp.org, myfritz.net, qq.com, baidu.com, nginx.org, windows.com, yandex.net, tiktokv.com, mozilla.org, nic.ru, opera.com, samsung.com, sentry.io
+**If nothing is clear – go read** <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">Dictionary for dummies</a>, where all terms are explained in plain language along with complete documentation.
 
-  ✅ cloudflare.com, rutube.ru, my.aeza.ru, wb.ru, ozon.ru, steamcommunity.com, youtube.com, apple.com, openai.com, anthropic.com, meta.com, facebook.com, x.com, wikipedia.org, stackoverflow.com, rust-lang.org, crates.io, docs.rs, instagram.com, fbcdn.net, twitter.com, googletagmanager.com, whatsapp.net, doubleclick.net, googleusercontent.com, appsflyersdk.com, wordpress.org, digicert.com, youtu.be, pinterest.com, goo.gl, x.com, whatsapp.com, icloud.com, googlesyndication.com, cloudflare.net, googledomains.com, wa.me, chatgpt.com, vimeo.com, zoom.us, workers.dev, cloudflare-dns.com, wordpress.com, reddit.com,
+## Possible issues ("why might it not work?")
 
-- If you are using the SelfSteal variant instead of a popular domain, make sure that your nginx was compiled with OpenSSL 3.5 (if you built it on your server, check which version you have installed), otherwise you will experience intermittent iOS connection issues. For SelfSteal to work correctly, install nginx built with 3.5 or update OpenSSL on your server to 3.5 and rebuild nginx.
-    - Alternative 1: use Caddy.
-    - Alternative 2: use MSS, but then media will not load properly.
+- The port/IP/subnet may have been **blocked** earlier and need to be changed (e.g., a proxy not working on **443** may work fine on **9443**). In that case, no fix will help.
+- When using **v2** fix, which identifies device by **TTL + Length**, connecting from **iOS** – the connection may pass through load balancers, increasing **TTL** above the limit, so the script misidentifies the device as desktop/Android instead of iPhone, resulting in a block – in that case **you must use v3 fix**.
+- When using the fix without **MSS**, **you must ensure that the domain used for Fake TLS supports X25519 MLKEM768** – you can check this **via the built‑in domain checker** or **via bot: @Sni_checker_bot**. **If the chosen domain does not support it – after an iOS connection attempt you'll get a block and the connection will fail.**
+- **If you use SelfSteal instead of a foreign domain**, ensure that your nginx was compiled with OpenSSL 3.5 – **otherwise periodic iOS connection issues will occur**. For proper SelfSteal operation, install **nginx** built with **3.5** or upgrade **OpenSSL** on your server to **3.5** and rebuild **nginx**.
+    - Alternative 1: use **caddy**.
+    - Alternative 2: enable **MSS**, but then media will load **very slowly**.
+- If you enabled **MSS** because your domain doesn't support **X25519MLKEM768** and you can't use another one, and media load slowly – that's expected. MSS reduces packet size, directly affecting download speed.
 
 ## ⭐ Support the project
 
-**MEKO fix** – created in free time for the community.  
-Your support will help us conduct further tests ;)
+**MEKO Launcher** – created in free time for the community.
 
-**You can support the project by giving ⭐ to this repository (top right of this page)**
+**You can support the project by giving a ⭐ to this repository (top‑right corner of this page).**
 
-💰 **Cryptocurrency:**  
+If you find this project useful and wish to support development, you can send donations to the following crypto wallets:
 
-[<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/b910c839-ec45-486d-b7f0-05da8de41b74" />
-](https://t.me/send?start=IVlaFvgWdkxH)
+[<img width="150" height="150" alt="image" src="https://github.com/user-attachments/assets/b910c839-ec45-486d-b7f0-05da8de41b74" />](https://t.me/send?start=IVlaFvgWdkxH)
 
-from **0.1 USDT**
+USDT TRC20 ``` TGmBaRYmQwSyC6sRaumaMf9CbEuVAk4Eff ``` 
 
-USDT TRC20
-```Bash
-TGmBaRYmQwSyC6sRaumaMf9CbEuVAk4Eff
-```
-USDT BEP20
-```Bash
-0x2AF1581aA7b696Ca28C70B5D29756Da3ca577D65
-```
+USDT BEP20 ```0x2AF1581aA7b696Ca28C70B5D29756Da3ca577D65``` 
 
-TON(GRAM)
-```Bash
-UQDdT8vtR5DmbwzNvMUiNQnwxlbkFq4ypE2_UzIm6bQ88DbU
-```
+TON(GRAM) ``` UQDdT8vtR5DmbwzNvMUiNQnwxlbkFq4ypE2_UzIm6bQ88DbU ``` 
 
-BTC
-```Bash
-bc1qqfkknfrhhufq6dm7cczmdtjkgv56ma3gnz0utk
-```
+BTC ``` bc1qqfkknfrhhufq6dm7cczmdtjkgv56ma3gnz0utk ``` 
 
-SOL SPL
-```Bash
-Gn7w3EBkZqPjPDcbkTaxspip42TuhoGqaaEqHAxhG9V1
-```
+SOL SPL ``` Gn7w3EBkZqPjPDcbkTaxspip42TuhoGqaaEqHAxhG9V1 ``` 
 
 You can also support me by using my service:
 
-[<img width="300" height="300" alt="MEKO bot" src="https://github.com/user-attachments/assets/8db41a95-79f2-40d6-9777-50b6ffb6fa48" />](https://t.me/projectmeko_bot)
-
+[<img width="150" height="150" alt="projectmeko_bot" src="https://github.com/user-attachments/assets/8db41a95-79f2-40d6-9777-50b6ffb6fa48" />](https://t.me/projectmeko_bot)
 
 dalink.to/mekome
-
-
 
 <a href="https://www.star-history.com/?type=date&repos=Mekotofeuka%2FMTPROTO_FIX_By_MEKO">
  <picture>
@@ -201,18 +168,40 @@ dalink.to/mekome
  </picture>
 </a>
 
-
-
-
 ## Special thanks for contributions:
 [![Contributors](https://contrib.rocks/image?repo=Mekotofeuka/MTPROTO_FIX_By_MEKO)](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/graphs/contributors)
 - [@CryZFix](https://github.com/CryZFix/)
 - [@Bxhost](https://github.com/bxhost)
 - [@Liafanx](https://github.com/Liafanx)
-- https://github.com/Liafanx/MTproxy-reanimation – a similar tool, special thanks for the marker detection
+- [@Andycar](https://github.com/Andycar)
+- https://github.com/Liafanx/MTproxy-reanimation – similar tool, special thanks for marker detection
 - https://assyoucandy.github.io/telemt-server-guide/telemt-keepalive-guide.html
 - https://h1de0x.github.io/telemt-tune/
 
-## Original proxy repositories
+## Original repositories
 - Telemt https://github.com/telemt/telemt
+- MTG https://github.com/9seconds/mtg
 - Mtproto.zig https://github.com/sleep3r/mtproto.zig
+- telemt_panel https://github.com/amirotin/telemt_panel
+- 3x-ui-pro https://github.com/mozaroc/3x-ui-pro
+- remnawave-installer https://github.com/xxphantom/remnawave-installer
+
+> *This is an independent informational review.*
+>
+> *This post is not an advertisement for VPN, proxy, etc. All material is provided for informational purposes only, and only for citizens of countries where such information is legal – at least for scientific purposes. If you are not allowed to read this – close this page immediately!*
+>
+> *The author has no intention, does not urge, encourage or justify the use of VPN, proxy or any other software under any circumstances.*
+>
+> *Responsibility for any reading, usage and operation lies with the user.*
+>
+> *Disclaimer: the author is not responsible for the actions of third parties and does not encourage illegal use of VPN/proxy or other software.*
+>
+> *The author is not responsible for the accuracy, completeness or reliability of the published data. All coincidences are accidental. All information is provided "as is" and may not correspond to reality.*
+>
+> *Use in accordance with local laws.*
+>
+> *Use VPN and proxy only for lawful purposes: in particular – to ensure your online security and secure remote access, and in no case use this technology to circumvent blocks.*
+>
+> *The project is non‑commercial, free; all presented "payment" information was found randomly somewhere on the Internet, copied "as is" for demonstration of a possible example and does not belong to the author.*
+>
+> *Following the advice of the popular repository from Igareck – close this page, delete all VPN, proxy from your computer, install MAX and Yandex on all devices so that it "catches" even in the parking lot, and use only those Internet resources allowed by your ISP, you get the idea.*
