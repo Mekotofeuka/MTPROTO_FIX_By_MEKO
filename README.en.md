@@ -12,10 +12,11 @@
 </div>
 
 <p align="center">
-  · <a href="#quick-start">Install in 1️⃣ click</a> · <a href="#how-the-fix-works">How it works🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">Documentation & Dictionary for dummies</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.md">Русский</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.zh.md">中文</a> ·
+  · <a href="#quick-start">Install in 1️⃣ click</a> · <a href="#how-it-works">How it works🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Back to main page</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.md">Русский</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.zh.md">中文</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">Русский словарь</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.zh.md">中文词典</a> ·
+</p>
+
 <p align="center">
-  · <a href="#possible-issues-why-might-it-not-work">FAQ❓</a> 
-  
+  · <a href="#troubleshooting-ios-issues-read-this">FAQ❓</a> 
 </p>
 
 <div align="center">
