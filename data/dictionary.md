@@ -14,7 +14,7 @@
 </div>
 
 <p align="center">
-  · <a href="#Быстрый-старт">Установка в 1️⃣ клик</a> · <a href="#Как-работает-фикс">Как работает🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главную страницу</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README_eng.md">English</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.zh.md">中文词典</a> ·
+  · <a href="#Быстрый-старт">Установка в 1️⃣ клик</a> · <a href="#Как-работает-фикс">Как работает🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главную страницу</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.en.md">English</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.zh.md">中文词典</a> ·
 </p>
 
 <p align="center">
