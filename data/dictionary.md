@@ -14,11 +14,11 @@
 </div>
 
 <p align="center">
-  · <a href="#Быстрый-старт">Установка в 1 клик</a> · <a href="#Как-работает-фикс">Как работает то?</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главну страницу</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README_eng.md">English</a> ·
+  · <a href="#Быстрый-старт">Установка в 1️⃣ клик</a> · <a href="#Как-работает-фикс">Как работает🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">Вернуться на главную страницу</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README_eng.md">English</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.zh.md">中文词典</a> ·
 </p>
 
 <p align="center">
-  · <a href="#Возможные-проблемыпочему-у-меня-может-не-работать">Решение проблем(если не работает ios - прочитай этот пункт!)</a> 
+  · <a href="#Возможные-проблемыпочему-у-меня-может-не-работать">FAQ❓</a> 
 </p>
 
 ## Содержание
