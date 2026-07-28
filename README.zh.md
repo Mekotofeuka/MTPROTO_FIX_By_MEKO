@@ -12,7 +12,7 @@
 </div>
 
 <p align="center">
-  · <a href="#快速开始">一键安装</a> · <a href="#修复原理">工作原理🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">给小白看的文档与词典</a> ·
+  · <a href="#快速开始">一键安装</a> · <a href="#修复原理">工作原理🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">给小白看的文档与词典</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.md">Русский</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.en.md">English</a> ·
 <p align="center">
   · <a href="#可能的问题为什么可能不工作">常见问题❓</a> 
   
