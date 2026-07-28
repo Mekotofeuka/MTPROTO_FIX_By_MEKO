@@ -14,11 +14,11 @@
 </div>
 
 <p align="center">
-  · <a href="#快速开始">一键安装</a> · <a href="#工作原理">工作原理？</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">返回主页</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.md">Русский</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.en.md">English</a> ·
+  · <a href="#快速开始">一键安装</a> · <a href="#工作原理">工作原理🔧</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO">返回主页</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.md">Русский</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/README.en.md">English</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md">Русский словарь</a> · <a href="https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.en.md">English Dictionary</a> ·
 </p>
 
 <p align="center">
-  · <a href="#故障排除如果ios不工作请阅读此项">故障排除（如果 iOS 不工作，请阅读此项！）</a> 
+  · <a href="#故障排除如果ios不工作请阅读此项">常见问题❓</a> 
 </p>
 
 ## 目录
