@@ -40,14 +40,11 @@ RULES_SCRIPT="/opt/mtpr-simple/data/rules.sh"
 RULES_LOADED=0
 
 ensure_rules_loaded() {
-    # Если уже загружен — просто возвращаем успех
     [ "$RULES_LOADED" -eq 1 ] && return 0
 
-    # Проверяем наличие файла
     if [ -f "$RULES_SCRIPT" ]; then
         source "$RULES_SCRIPT"
         RULES_LOADED=1
-        # Загружаем Zapret2, если файл существует
         if [ -f /opt/mtpr-simple/data/zapret2_fix.sh ]; then
             source /opt/mtpr-simple/data/zapret2_fix.sh
             zapret2_load_settings 2>/dev/null || true
@@ -55,14 +52,12 @@ ensure_rules_loaded() {
         return 0
     fi
 
-    # Файла нет — пробуем скачать с таймаутом 5 сек
     log_warning "Файл $RULES_SCRIPT не найден, скачиваю с GitHub..."
     mkdir -p /opt/mtpr-simple/data
     if curl -fsSL --max-time 5 "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/data/rules.sh" -o "$RULES_SCRIPT"; then
         chmod +x "$RULES_SCRIPT"
         source "$RULES_SCRIPT"
         RULES_LOADED=1
-        # Скачиваем zapret2_fix.sh, если есть
         if curl -fsSL --max-time 5 "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/data/zapret2_fix.sh" -o /opt/mtpr-simple/data/zapret2_fix.sh; then
             chmod +x /opt/mtpr-simple/data/zapret2_fix.sh
             source /opt/mtpr-simple/data/zapret2_fix.sh
@@ -479,7 +474,6 @@ remove_mekopr() {
 
     log_info "Начинаем полное удаление MEKOpr..."
 
-    # Удаление правил (если удаётся загрузить rules.sh)
     if ensure_rules_loaded; then
         remove_syn_fix
     else
@@ -1063,12 +1057,10 @@ update_script() {
     echo -e "  ${BLUE}[i]${NC} Исполняемый файл: ${SCRIPT_NAME}"
     echo ""
 
-    # ── СОЗДАНИЕ ВСЕХ НЕОБХОДИМЫХ ПАПОК ЗАРАНЕЕ ────────────────
     mkdir -p "$INSTALL_DIR"
     mkdir -p "$INSTALL_DIR/proxys"
     mkdir -p "$INSTALL_DIR/data"
 
-    # ── Функция скачивания файла ─────────────────────────────────
     download_file() {
         local file="$1"
         local desc="$2"
@@ -1108,7 +1100,6 @@ update_script() {
     export -f download_file
     export BASE_URL INSTALL_DIR
 
-    # ── Чтение манифеста и исключение себя ──────────────────────
     echo -e "  ${BOLD}Чтение файлов из репозитория для загрузки и подготовка к установке...${NC}"
     echo ""
 
@@ -1120,14 +1111,10 @@ update_script() {
         file_path=$(echo "$file_path" | xargs)
         description=$(echo "$description" | xargs)
         
-        # ── УДАЛЁН БЛОК ПРОПУСКА САМОГО СЕБЯ ──
-        # Теперь ВСЕ файлы добавляются, включая main.sh
-
         FILES_TO_DOWNLOAD+=("$file_path|$description")
         
     done < "$MANIFEST_FILE"
 
-    # ── Вывод списка файлов для загрузки ────────────────────────
     echo -e "  ${BOLD}Файлы для загрузки (${#FILES_TO_DOWNLOAD[@]} шт.):${NC}"
     for entry in "${FILES_TO_DOWNLOAD[@]}"; do
         file_path=$(echo "$entry" | cut -d'|' -f1)
@@ -1136,7 +1123,6 @@ update_script() {
     done
     echo ""
 
-    # ── Загрузка файлов (параллельно, 6 потоков) ───────────────
     echo -e "  ${BOLD}Загрузка файлов...${NC}"
     echo ""
 
@@ -1145,7 +1131,6 @@ update_script() {
         download_file "$file_path" "$description"
     ' _ {}
 
-    # ── Проверка, что все файлы скачались ───────────────────────
     echo ""
     local failed=0
     for entry in "${FILES_TO_DOWNLOAD[@]}"; do
@@ -1165,7 +1150,6 @@ update_script() {
         return 1
     fi
 
-    # ── Установка прав ──────────────────────────────────────────
     echo -ne "  ${CYAN}[+]${NC} Установка прав выполнения... "
     chmod +x "$INSTALL_DIR/proxys/"*.sh 2>/dev/null || true
     chmod +x "$INSTALL_DIR"/*.py 2>/dev/null || true
@@ -1207,10 +1191,8 @@ install_node_manager() {
     echo -e "  ${BLUE}[i]${NC} Загрузка данных..."
     echo ""
 
-    # ── СОЗДАНИЕ ВСЕХ НЕОБХОДИМЫХ ПАПОК ЗАРАНЕЕ ────────────────
     mkdir -p "$INSTALL_DIR"
 
-    # ── Функция скачивания файла ─────────────────────────────────
     download_node_file() {
         local file="$1"
         local desc="$2"
@@ -1252,7 +1234,6 @@ install_node_manager() {
     export -f download_node_file
     export BASE_URL INSTALL_DIR
 
-    # ── Чтение манифеста ──────────────────────────────────────────
     echo -e "  ${BOLD}Чтение файлов из репозитория для загрузки и подготовка к установке...${NC}"
     echo ""
 
@@ -1268,7 +1249,6 @@ install_node_manager() {
 
     done < "$MANIFEST_FILE"
 
-    # ── Вывод списка файлов для загрузки ────────────────────────
     echo -e "  ${BOLD}Файлы для загрузки (${#FILES_TO_DOWNLOAD[@]} шт.):${NC}"
     for entry in "${FILES_TO_DOWNLOAD[@]}"; do
         file_path=$(echo "$entry" | cut -d'|' -f1)
@@ -1277,7 +1257,6 @@ install_node_manager() {
     done
     echo ""
 
-    # ── Загрузка файлов (параллельно, 6 потоков) ───────────────
     echo -e "  ${BOLD}Загрузка файлов...${NC}"
     echo ""
 
@@ -1286,7 +1265,6 @@ install_node_manager() {
         download_node_file "$file_path" "$description"
     ' _ {}
 
-    # ── Проверка, что все файлы скачались ───────────────────────
     echo ""
     local failed=0
     for entry in "${FILES_TO_DOWNLOAD[@]}"; do
@@ -1305,18 +1283,28 @@ install_node_manager() {
         return 1
     fi
 
-    # ── Установка прав ──────────────────────────────────────────
     echo -ne "  ${CYAN}[+]${NC} Установка прав выполнения... "
     chmod +x "$INSTALL_DIR/"*.sh 2>/dev/null || true
     chmod +x "$INSTALL_DIR/"*/*.sh 2>/dev/null || true
     echo -e "${GREEN}✓${NC}"
+
+    # ── Создание команды mekomanager ────────────────────────────
+    if [ -f "$MANAGER_SCRIPT" ]; then
+        if [ ! -L /usr/local/bin/mekomanager ] || [ "$(readlink /usr/local/bin/mekomanager)" != "$MANAGER_SCRIPT" ]; then
+            ln -sf "$MANAGER_SCRIPT" /usr/local/bin/mekomanager
+            log_success "Создана команда mekomanager -> $MANAGER_SCRIPT (написав её в консоли вы можете открывать меню Node Manager )"
+        else
+            log_info "Команда mekomanager уже существует и указывает на правильный файл."
+        fi
+    else
+        log_warning "Файл $MANAGER_SCRIPT не найден, команда mekomanager не создана."
+    fi
 
     rm -f "$MANIFEST_FILE"
 
     echo -e "  ${GREEN}[✓]${NC} Node Manager успешно установлен в $INSTALL_DIR"
     echo ""
 
-    # ── Запуск ──────────────────────────────────────────────────
     if [ -f "$MANAGER_SCRIPT" ]; then
         echo -e "  ${GRAY}Нажмите любую клавишу для запуска Node Manager...${NC}"
         read -rsn1
