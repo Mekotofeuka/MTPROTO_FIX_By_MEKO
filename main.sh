@@ -522,7 +522,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.95${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.96${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
@@ -1016,13 +1016,7 @@ main_menu() {
             ;;
         9)
             echo ""
-            NODE_MANAGER="/opt/mtpr-simple/remote_ctl/node_manager.sh"
-            if [ -f "$NODE_MANAGER" ]; then
-                exec "$NODE_MANAGER"
-            else
-                log_info "Node Manager не установлен. Запуск установки..."
-                install_node_manager
-            fi
+            install_node_manager
             ;;
         0 | q | Q)
             echo ""
