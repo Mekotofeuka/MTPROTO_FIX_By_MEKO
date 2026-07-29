@@ -1142,7 +1142,7 @@ show_zapret2_menu() {
     while true; do
         clear
         echo ""
-        echo -e "  ${NC}${BOLD}Меню v0.3 | ${CYAN}${BOLD}V4.2 Zapret2 MTProto fix${NC}"
+        echo -e "  ${NC}${BOLD}Меню v0.31 | ${CYAN}${BOLD}V4.2 Zapret2 MTProto fix${NC}"
         echo -e "  ${DIM}══════════════════════════════"
         echo -e "  ${DIM}disorder + badsum + window control${NC}"
         echo ""
