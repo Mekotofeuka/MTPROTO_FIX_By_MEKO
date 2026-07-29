@@ -121,6 +121,25 @@ get_nft_fix_status() {
     fi
 }
 
+# ── Получение статуса Zapret2 с удалённого сервера ───────────
+get_zapret2_status_remote() {
+    # Проверяем наличие zapret2_fix.sh и загружаем его, если нужно
+    local has_zapret2=$(ssh_exec "[ -f /opt/mtpr-simple/data/zapret2_fix.sh ] && echo 'yes'")
+    if [ "$has_zapret2" != "yes" ]; then
+        echo -e "${DIM}не установлен${NC}"
+        return
+    fi
+
+    # Используем ssh_exec для выполнения функции zapret2_status из zapret2_fix.sh
+    local status
+    status=$(ssh_exec "bash -c 'source /opt/mtpr-simple/data/zapret2_fix.sh 2>/dev/null && zapret2_status'")
+    if [ -n "$status" ]; then
+        echo "$status"
+    else
+        echo -e "${YELLOW}недоступно${NC}"
+    fi
+}
+
 # ── Генерация скрипта применения правил (удалённо) ──────────
 generate_apply_script() {
     local fix_type="${1:-new}"
@@ -692,8 +711,9 @@ main_menu() {
         echo -e "  ${BOLD}Меню фиксов (SYN FIX/Zapret2) для ${CYAN}${REMOTE_USER}@${REMOTE_IP}${NC}${BOLD} (порт $REMOTE_PORT)${NC}"
         echo -e "  ${DIM}═══════════════════════════════════════════════════════════${NC}"
         echo ""
-        echo -e "  Статус iptables: $(get_synfix_status)"
-        echo -e "  Статус nftables: $(get_nft_fix_status)"
+        echo -e "  ${BOLD}Статус iptables:${NC} $(get_synfix_status)"
+        echo -e "  ${BOLD}Статус nftables:${NC} $(get_nft_fix_status)"
+        echo -e "  ${BOLD}Zapret2 fix:${NC} $(get_zapret2_status_remote)"
         echo ""
 
         echo -e "  ${CYAN}[1]${NC}  ${BOLD}Установить SYN FIX${NC}"
@@ -718,6 +738,7 @@ main_menu() {
                 echo ""
                 echo -e "  Статус iptables: $(get_synfix_status)"
                 echo -e "  Статус nftables: $(get_nft_fix_status)"
+                echo -e "  Zapret2 fix: $(get_zapret2_status_remote)"
                 read -rsn1 -p "  Нажмите любую клавишу..."
                 ;;
             4)
@@ -735,7 +756,7 @@ main_menu() {
             0)
                 echo ""
                 log_info "Возврат в управление нодой..."
-                exit 0
+                return 0   # вместо exit 0, чтобы вернуть управление вызывающему скрипту
                 ;;
             *)
                 echo "  Неверный выбор"
