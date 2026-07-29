@@ -350,19 +350,20 @@ server_submenu() {
     while true; do
         clear
         echo ""
-        echo -e "  ${BOLD}Управление сервером: ${CYAN}${user}@${ip}${NC}${BOLD} (порт $port)${NC}"
-        echo -e ""
+        echo -e "  ${BOLD}Меню сервера: ${CYAN}${user}@${ip}${NC}${BOLD}:$port${NC}"
         echo -e "  ${DIM}════════════════════════════════════════════════════${NC}"
-        echo -e "  ${CYAN}[1]${NC} Проверить статус (онлайн/оффлайн)"
-        echo -e "  ${CYAN}[2]${NC} Меню работы с прокси"
-        echo -e "  ${CYAN}[3]${NC} Удалить прокси (заглушка)"
-        echo -e "  ${CYAN}[4]${NC} Выполнить произвольную команду"
+        echo -e ""
+		echo -e "  ${CYAN}[1]${NC}${BOLD} Проверить статус ноды (онлайн/оффлайн)"
+		echo -e ""
+        echo -e "  ${CYAN}[2]${NC}${BOLD} Меню работы с прокси"
+        echo -e "  ${CYAN}[4]${NC}${BOLD} Выполнить произвольную команду"
         echo -e "  ${CYAN}[5]${RED}${BOLD} Удалить сервер ${NC}(отозвать ключ и конфиг)${NC}"
         echo -e "  ${CYAN}[6]${YELLOW}${BOLD} Очистить всё на сервере ${NC}(прокси + фиксы)${NC}"
         echo -e "  ${CYAN}[7]${NC} ${BOLD}Меню фиксов (SYN FIX/Zapret2)${NC}"
-        echo -e "  ${CYAN}[0]${NC} Назад"
+		echo -e ""
+        echo -e "  ${CYAN}[0]${NC}${BOLD} Назад"
         echo ""
-        echo -en "  ${BOLD}Выберите действие:${NC} "
+        echo -en "  ${BOLD}Ввод:${NC} "
         local act
         read -r act
 
@@ -387,11 +388,6 @@ server_submenu() {
                     log_error "Скрипт $NODE_TELEMT_SCRIPT не найден."
                     read -p "Нажмите Enter для продолжения..."
                 fi
-                ;;
-            3)
-                echo ""
-                log_info "🗑 Удаление прокси (заглушка) — позже будет реализована."
-                read -p "Нажмите Enter для продолжения..."
                 ;;
             4)
                 echo ""
@@ -444,11 +440,12 @@ main_menu() {
         echo -e "  ${DIM}══════════════════════════════════════════════${NC}"
         echo -e "  ${BOLD}Подключено серверов:${NC} ${CYAN}${server_count}${NC}"
         echo ""
-        echo -e "  ${CYAN}[1]${NC} Добавить сервер"
-        echo -e "  ${CYAN}[2]${NC} Список серверов"
-        echo -e "  ${CYAN}[0]${NC} Выход"
+        echo -e "  ${CYAN}[1]${NC}${BOLD} Добавить сервер"
+        echo -e "  ${CYAN}[2]${NC}${BOLD} Список серверов"
+		echo -e ""
+        echo -e "  ${RED}${BOLD}[0]${NC}${BOLD} Выход"
         echo ""
-        echo -en "  ${BOLD}Выберите действие:${NC} "
+        echo -en "  ${BOLD}Ввод:${NC} "
         local choice
         read -r choice
 
