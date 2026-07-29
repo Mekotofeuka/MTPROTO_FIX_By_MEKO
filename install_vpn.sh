@@ -98,22 +98,21 @@ install_3xui() {
 # ── Установка Remnawave ──────
 install_remnawave() {
     echo ""
-    log_info "Установка Remnawave..."
+    log_info "Установка меню Remnawave..."
     echo ""
     log_info "Запуск установщика Remnawave (интерактивный режим)..."
     echo ""
 
-    # Скачиваем и запускаем скрипт с sudo, передавая аргумент --lang=ru
-    # Это корректно передаст stdin и позволит работать интерактивному меню
-    if curl -sL https://raw.githubusercontent.com/xxphantom/remnawave-installer/main/install.sh | sudo bash -s -- --lang=ru; then
+    # Используем bash -c с подстановкой команды вместо пайпа
+    if sudo bash -c "$(curl -sL https://raw.githubusercontent.com/xxphantom/remnawave-installer/main/install.sh)" @ --lang=ru; then
         log_success "Remnawave установлен"
     else
-        log_error "Ошибка установки Remnawave"
+        log_error "Ошибка установки меню Remnawave"
         return 1
     fi
 
     echo ""
-    log_success "Установка Remnawave завершена!"
+    log_success "Установка меню Remnawave завершена!"
     echo ""
     echo -e "  ${GRAY}Нажмите Enter для возврата в меню...${NC}"
     read -r </dev/tty 2>/dev/null
@@ -123,7 +122,7 @@ install_remnawave() {
 # ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню VPN ${CYAN}${BOLD}v1.9 ${CYAN}${BOLD}⚙️${NC}"
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню VPN ${CYAN}${BOLD}v1.91 ${CYAN}${BOLD}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Выберите пункт для установки:${NC}"
