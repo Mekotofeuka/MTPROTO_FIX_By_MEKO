@@ -68,10 +68,26 @@ install_3xui() {
     echo ""
     log_info "Установка 3x-ui..."
     echo ""
-    log_info "Запуск установки 3x-ui (это может занять несколько минут)..."
-    echo ""
+
+    # ── Проверка и ожидание освобождения apt ──────────────
+    log_info "Проверка блокировки менеджера пакетов apt..."
+    local wait_seconds=0
+    local max_wait=120  # максимум 2 минуты
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+        if [ $wait_seconds -ge $max_wait ]; then
+            log_error "Блокировка apt не снята за $max_wait секунд."
+            log_error "Попробуйте остановить unattended-upgrades вручную: sudo systemctl stop unattended-upgrades"
+            return 1
+        fi
+        log_warning "Обнаружена блокировка apt (возможно, unattended-upgrades). Ждём 5 секунд..."
+        sleep 5
+        wait_seconds=$((wait_seconds + 5))
+    done
+    log_success "Блокировка apt снята, продолжаем установку."
 
     # 1. Установка 3x-ui
+    log_info "Запуск установки 3x-ui (это может занять несколько минут)..."
+    echo ""
     if sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-latest.sh) -install yes -auto_domain y"; then
         log_success "3x-ui установлен"
     else
@@ -79,12 +95,24 @@ install_3xui() {
         return 1
     fi
 
-    # 2. Применение патча
+    # 2. Применение патча (тоже с проверкой блокировки)
     log_info "Применение патча 3x-ui..."
+    # Снова проверяем, т.к. блокировка могла появиться заново
+    wait_seconds=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+        if [ $wait_seconds -ge $max_wait ]; then
+            log_warning "Блокировка apt не снята, патч может не примениться."
+            break
+        fi
+        log_warning "Снова блокировка apt, ждём 5 секунд..."
+        sleep 5
+        wait_seconds=$((wait_seconds + 5))
+    done
+
     if bash <(curl -fsSL https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-patch.sh); then
         log_success "Патч применён"
     else
-        log_warning "Патч не применился (возможно, он не требуется)"
+        log_warning "Патч не применился (возможно, он не требуется или apt всё ещё занят)"
     fi
 
     echo ""
@@ -111,7 +139,7 @@ install_remnawave() {
 # ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню VPN ${CYAN}${BOLD}v1.92 ${CYAN}${BOLD}⚙️${NC}"
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню VPN ${CYAN}${BOLD}v1.93 ${CYAN}${BOLD}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Выберите пункт для установки:${NC}"
