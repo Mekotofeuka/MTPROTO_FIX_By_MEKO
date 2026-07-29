@@ -359,6 +359,7 @@ server_submenu() {
         echo -e "  ${CYAN}[4]${NC} Выполнить произвольную команду"
         echo -e "  ${CYAN}[5]${RED}${BOLD} Удалить сервер ${NC}(отозвать ключ и конфиг)${NC}"
         echo -e "  ${CYAN}[6]${YELLOW}${BOLD} Очистить всё на сервере ${NC}(прокси + фиксы)${NC}"
+        echo -e "  ${CYAN}[7]${NC} ${BOLD}Меню фиксов (SYN FIX/Zapret2)${NC}"
         echo -e "  ${CYAN}[0]${NC} Назад"
         echo ""
         echo -en "  ${BOLD}Выберите действие:${NC} "
@@ -381,7 +382,6 @@ server_submenu() {
                 echo ""
                 local NODE_TELEMT_SCRIPT="$SCRIPT_DIR/telemt1_node.sh"
                 if [ -f "$NODE_TELEMT_SCRIPT" ]; then
-                    # Передаём IP, пользователя и порт в скрипт
                     exec "$NODE_TELEMT_SCRIPT" "$ip" "$user" "$port"
                 else
                     log_error "Скрипт $NODE_TELEMT_SCRIPT не найден."
@@ -412,6 +412,16 @@ server_submenu() {
                 ;;
             6)
                 clean_all_on_server "$ip" "$user" "$port"
+                ;;
+            7)
+                echo ""
+                local NODE_RULES_SCRIPT="$SCRIPT_DIR/rules1_node.sh"
+                if [ -f "$NODE_RULES_SCRIPT" ]; then
+                    exec "$NODE_RULES_SCRIPT" "$ip" "$user" "$port"
+                else
+                    log_error "Скрипт $NODE_RULES_SCRIPT не найден."
+                    read -p "Нажмите Enter для продолжения..."
+                fi
                 ;;
             0)
                 break
