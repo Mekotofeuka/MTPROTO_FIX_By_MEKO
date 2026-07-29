@@ -522,7 +522,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.93${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.95${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
@@ -898,6 +898,7 @@ main_menu() {
         echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить работоспособность домена/прокси на ios${YELLOW}${BOLD} (Необходим: OpenSSL 3.5+)  ${NC}"
         echo -e "  ${CYAN}[7]${NC}  ${RED}${BOLD}Удалить MEKO Manager(вместе с правилами)${NC}"
         echo -e "  ${CYAN}[8]${NC}  ${NC}${BOLD}Меню MTProto fix v4.2${NC}"
+        echo -e "  ${CYAN}[9]${NC}  ${NC}${BOLD}Меню управления нодами${NC}"
         echo -e "  ${CYAN}[0]${NC}  Выход"
         echo ""
         echo -en "  ${BOLD}Выбор:${NC} "
@@ -1011,6 +1012,16 @@ main_menu() {
                 log_error "Функция show_zapret2_menu не найдена. Проверьте наличие /opt/mtpr-simple/data/zapret2_fix.sh"
                 echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
                 read -rsn1
+            fi
+            ;;
+        9)
+            echo ""
+            NODE_MANAGER="/opt/mtpr-simple/remote_ctl/node_manager.sh"
+            if [ -f "$NODE_MANAGER" ]; then
+                exec "$NODE_MANAGER"
+            else
+                log_info "Node Manager не установлен. Запуск установки..."
+                install_node_manager
             fi
             ;;
         0 | q | Q)
@@ -1181,6 +1192,145 @@ update_script() {
         echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
         read -rsn1
         return 1
+    fi
+}
+
+# ── Установка/обновление Node Manager ──────────────────────────
+install_node_manager() {
+    local BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
+    local MANIFEST_URL="$BASE_URL/remote_ctl/manifest.txt"
+    local MANIFEST_FILE="/tmp/node_manager_manifest.txt"
+    local INSTALL_DIR="/opt/mtpr-simple/remote_ctl"
+    local MANAGER_SCRIPT="$INSTALL_DIR/node_manager.sh"
+
+    echo ""
+    echo -e "  ${GREEN}[✓]${NC} Скачиваем манифест Node Manager..."
+    if ! curl -fsSL "$MANIFEST_URL" -o "$MANIFEST_FILE"; then
+        echo -e "  ${RED}[✗]${NC} Не удалось загрузить информацию о необходимых файлах"
+        return 1
+    fi
+
+    echo -e "  ${BLUE}[i]${NC} Загрузка данных..."
+    echo ""
+
+    # ── СОЗДАНИЕ ВСЕХ НЕОБХОДИМЫХ ПАПОК ЗАРАНЕЕ ────────────────
+    mkdir -p "$INSTALL_DIR"
+
+    # ── Функция скачивания файла ─────────────────────────────────
+    download_node_file() {
+        local file="$1"
+        local desc="$2"
+        local url="$BASE_URL/remote_ctl/$file"
+        local dest="$INSTALL_DIR/$file"
+        local name=$(basename "$file")
+        local dir=$(dirname "$dest")
+        mkdir -p "$dir"
+
+        local size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
+        local size_str="?"
+        if [ -n "$size" ] && [ "$size" -gt 0 ] 2>/dev/null; then
+            if [ "$size" -gt 1048576 ]; then
+                local mb=$((size / 1048576))
+                local remainder=$(((size % 1048576) / 104857))
+                if [ "$remainder" -gt 0 ]; then
+                    size_str="${mb}.${remainder} MB"
+                else
+                    size_str="${mb} MB"
+                fi
+            elif [ "$size" -gt 1024 ]; then
+                size_str="$((size / 1024)) KB"
+            else
+                size_str="$size B"
+            fi
+        fi
+
+        echo -e "  ${CYAN}⏳${NC}${BOLD} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})"
+
+        if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
+            echo -e "  ${GREEN}${BOLD}✓${NC}${BOLD} Скачан успешно:${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
+            chmod +x "$dest" 2>/dev/null || true
+            return 0
+        else
+            echo -e "  ${RED}✗${NC} ${RED}${name}${NC} — ошибка загрузки"
+            return 1
+        fi
+    }
+    export -f download_node_file
+    export BASE_URL INSTALL_DIR
+
+    # ── Чтение манифеста ──────────────────────────────────────────
+    echo -e "  ${BOLD}Чтение файлов из репозитория для загрузки и подготовка к установке...${NC}"
+    echo ""
+
+    FILES_TO_DOWNLOAD=()
+    while IFS='|' read -r file_path description; do
+        [[ "$file_path" =~ ^[[:space:]]*#.*$ ]] && continue
+        [ -z "$file_path" ] && continue
+
+        file_path=$(echo "$file_path" | xargs)
+        description=$(echo "$description" | xargs)
+
+        FILES_TO_DOWNLOAD+=("$file_path|$description")
+
+    done < "$MANIFEST_FILE"
+
+    # ── Вывод списка файлов для загрузки ────────────────────────
+    echo -e "  ${BOLD}Файлы для загрузки (${#FILES_TO_DOWNLOAD[@]} шт.):${NC}"
+    for entry in "${FILES_TO_DOWNLOAD[@]}"; do
+        file_path=$(echo "$entry" | cut -d'|' -f1)
+        desc=$(echo "$entry" | cut -d'|' -f2)
+        echo -e "    ${DIM}• ${file_path}${NC} (${desc})"
+    done
+    echo ""
+
+    # ── Загрузка файлов (параллельно, 6 потоков) ───────────────
+    echo -e "  ${BOLD}Загрузка файлов...${NC}"
+    echo ""
+
+    printf "%s\n" "${FILES_TO_DOWNLOAD[@]}" | xargs -P 6 -I {} bash -c '
+        IFS="|" read -r file_path description <<< "$1"
+        download_node_file "$file_path" "$description"
+    ' _ {}
+
+    # ── Проверка, что все файлы скачались ───────────────────────
+    echo ""
+    local failed=0
+    for entry in "${FILES_TO_DOWNLOAD[@]}"; do
+        IFS='|' read -r file_path description <<< "$entry"
+        if [ ! -f "$INSTALL_DIR/$file_path" ]; then
+            echo -e "  ${RED}[✗]${NC} Файл не найден: $file_path"
+            failed=1
+        fi
+    done
+
+    if [ $failed -eq 1 ]; then
+        echo -e "  ${RED}[✗]${NC} Установка не удалась: некоторые файлы не загружены"
+        echo -e "  ${YELLOW}Проверьте подключение к интернету и доступность репозитория.${NC}"
+        echo -e "  ${YELLOW}Попробуйте установить позже.${NC}"
+        rm -f "$MANIFEST_FILE"
+        return 1
+    fi
+
+    # ── Установка прав ──────────────────────────────────────────
+    echo -ne "  ${CYAN}[+]${NC} Установка прав выполнения... "
+    chmod +x "$INSTALL_DIR/"*.sh 2>/dev/null || true
+    chmod +x "$INSTALL_DIR/"*/*.sh 2>/dev/null || true
+    echo -e "${GREEN}✓${NC}"
+
+    rm -f "$MANIFEST_FILE"
+
+    echo -e "  ${GREEN}[✓]${NC} Node Manager успешно установлен в $INSTALL_DIR"
+    echo ""
+
+    # ── Запуск ──────────────────────────────────────────────────
+    if [ -f "$MANAGER_SCRIPT" ]; then
+        echo -e "  ${GRAY}Нажмите любую клавишу для запуска Node Manager...${NC}"
+        read -rsn1
+        exec "$MANAGER_SCRIPT"
+    else
+        log_error "Не удалось найти $MANAGER_SCRIPT после установки."
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+        read -rsn1
     fi
 }
 
