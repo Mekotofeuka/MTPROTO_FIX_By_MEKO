@@ -1306,7 +1306,9 @@ install_node_manager() {
     echo ""
 
     if [ -f "$MANAGER_SCRIPT" ]; then
-        echo -e "  ${GRAY}Нажмите любую клавишу для запуска Node Manager...${NC}"
+	    echo -e "${NC}${BOLD}Для открытия Node Manager не через меню используйте команду: ${GREEN}${BOLD} mekomanager"
+	    echo -e ""
+        echo -e "  ${GRAY}Нажмите любую клавишу для запуска Node Manager${NC}"
         read -rsn1
         exec "$MANAGER_SCRIPT"
     else
