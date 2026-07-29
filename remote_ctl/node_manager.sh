@@ -36,7 +36,6 @@ check_root() {
 check_root
 
 # ── Конфигурация ─────────────────────────────────────────────
-# Исправлено: теперь всегда определяет реальный путь к скрипту, даже через симлинк
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 SERVERS_DIR="$SCRIPT_DIR/servers"
 mkdir -p "$SERVERS_DIR"
@@ -92,11 +91,11 @@ check_ssh_key() {
     local user="$1"
     local ip="$2"
     local port="${3:-22}"
-    ssh -o BatchMode=yes -o ConnectTimeout=5 -o Port="$port" "$user@$ip" "exit" &>/dev/null
+    ssh -o BatchMode=yes -o ConnectTimeout=5 -o ConnectionAttempts=2 -o Port="$port" "$user@$ip" "exit" &>/dev/null
     return $?
 }
 
-# ── Парсинг ввода (user@ip, ssh user@ip, ip) ──────────────
+# ── Парсинг ввода (user@ip, ssh user@ip, ip) с валидацией ──
 parse_input() {
     local raw="$1"
     raw=$(trim "$raw")
@@ -122,13 +121,27 @@ parse_input() {
         return 1
     fi
 
-    if [[ ! "$ip" =~ ^[a-zA-Z0-9.-]+$ ]]; then
-        echo "❌ Некорректный адрес: $ip" >&2
+    # ── Валидация IP или домена ──────────────────────────────
+    # Проверка на IPv4 (4 октета)
+    if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        # Дополнительная проверка октетов
+        IFS='.' read -r o1 o2 o3 o4 <<< "$ip"
+        if [[ $o1 -le 255 && $o2 -le 255 && $o3 -le 255 && $o4 -le 255 ]]; then
+            # Валидный IP
+            echo "$user" "$ip"
+            return 0
+        else
+            echo "❌ Некорректный IP-адрес (октеты > 255): $ip" >&2
+            return 1
+        fi
+    # Проверка на домен (содержит точку и хотя бы одну букву после точки)
+    elif [[ "$ip" =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        echo "$user" "$ip"
+        return 0
+    else
+        echo "❌ Некорректный IP или домен: $ip (допустимы только IPv4 или домены вида example.com)" >&2
         return 1
     fi
-
-    echo "$user" "$ip"
-    return 0
 }
 
 # ── Добавление сервера ──────────────────────────────────────
@@ -136,7 +149,7 @@ add_server() {
     clear
     echo ""
     echo -e "  ${BOLD}Добавление нового сервера${NC}"
-    echo -e "  ${DIM}════════════════════════════{NC}"
+    echo -e "  ${DIM}═════════════════════════════════════${NC}"
     echo ""
     echo -en "  ${BOLD}Введите IP-адрес или строку типа ${CYAN}'root@1.2.3.4'${NC} или ${CYAN}'ssh root@127.0.0.1'${NC}: "
     local input
@@ -146,6 +159,20 @@ add_server() {
     parsed=($(parse_input "$input")) || { read -p "Нажмите Enter для возврата..." ; return 1; }
     local user="${parsed[0]}"
     local ip="${parsed[1]}"
+
+    # Проверяем доступность хоста (с таймаутом)
+    log_info "Проверка доступности $ip (порт ${port:-22})..."
+    if ! check_ssh_key "$user" "$ip" "${port:-22}"; then
+        log_warning "Хост $ip не отвечает по SSH (таймаут 5 сек)."
+        echo -en "  ${BOLD}Добавить сервер всё равно? [y/N]:${NC} "
+        local force
+        read -r force
+        if [[ ! "$force" =~ ^[yY]$ ]]; then
+            log_info "Отмена"
+            read -p "Нажмите Enter для продолжения..."
+            return 0
+        fi
+    fi
 
     if [[ -f "$SERVERS_DIR/$ip.conf" ]]; then
         echo ""
@@ -213,7 +240,8 @@ remove_server() {
     log_info "Отзыв SSH-ключа на сервере..."
     local pub_key=$(cat ~/.ssh/id_rsa.pub)
     local escaped_key=$(echo "$pub_key" | sed 's/[\/&]/\\&/g')
-    ssh -p "$port" "$user@$ip" "sed -i '/$escaped_key/d' ~/.ssh/authorized_keys" 2>/dev/null || true
+    # Используем таймаут и игнорируем ошибки
+    ssh -o ConnectTimeout=5 -o ConnectionAttempts=2 -p "$port" "$user@$ip" "sed -i '/$escaped_key/d' ~/.ssh/authorized_keys" 2>/dev/null || true
     if [[ $? -eq 0 ]]; then
         log_success "Ключ удалён из ~/.ssh/authorized_keys на сервере."
     else
@@ -250,26 +278,29 @@ clean_all_on_server() {
 
     log_info "Начинаем очистку сервера $ip..."
 
+    # Все SSH-команды с таймаутом и подавлением ошибок
+    local SSH_OPTS="-o ConnectTimeout=5 -o ConnectionAttempts=2 -p $port"
+
     # 1. Удаление Telemt (стандартный)
     log_info "Удаление Telemt (стандартный)..."
-    ssh -p "$port" "$user@$ip" "curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- purge" 2>/dev/null || true
+    ssh $SSH_OPTS "$user@$ip" "curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- purge" 2>/dev/null || true
 
     # 2. Удаление Telemt Docker
     log_info "Удаление Telemt (Docker)..."
-    ssh -p "$port" "$user@$ip" "bash -c 'cd /root/telemt 2>/dev/null && docker compose down -v 2>/dev/null; cd /root && rm -rf /root/telemt 2>/dev/null; docker rmi ghcr.io/telemt/telemt:* 2>/dev/null || true'" 2>/dev/null || true
+    ssh $SSH_OPTS "$user@$ip" "bash -c 'cd /root/telemt 2>/dev/null && docker compose down -v 2>/dev/null; cd /root && rm -rf /root/telemt 2>/dev/null; docker rmi ghcr.io/telemt/telemt:* 2>/dev/null || true'" 2>/dev/null || true
 
     # 3. Удаление MTProtoZig
     log_info "Удаление MTProtoZig..."
-    ssh -p "$port" "$user@$ip" "sudo mtbuddy uninstall --yes" 2>/dev/null || true
-    ssh -p "$port" "$user@$ip" "systemctl stop mtproto-proxy 2>/dev/null; systemctl disable mtproto-proxy 2>/dev/null; rm -f /etc/systemd/system/mtproto-proxy.service; pkill -f mtbuddy 2>/dev/null || true" 2>/dev/null || true
+    ssh $SSH_OPTS "$user@$ip" "sudo mtbuddy uninstall --yes" 2>/dev/null || true
+    ssh $SSH_OPTS "$user@$ip" "systemctl stop mtproto-proxy 2>/dev/null; systemctl disable mtproto-proxy 2>/dev/null; rm -f /etc/systemd/system/mtproto-proxy.service; pkill -f mtbuddy 2>/dev/null || true" 2>/dev/null || true
 
     # 4. Удаление MTG
     log_info "Удаление MTG..."
-    ssh -p "$port" "$user@$ip" "systemctl stop mtg.service 2>/dev/null; systemctl disable mtg.service 2>/dev/null; rm -f /etc/systemd/system/mtg.service 2>/dev/null; rm -f /usr/local/bin/mtg 2>/dev/null; rm -f /etc/mtg.toml 2>/dev/null; rm -f /opt/mtpr-simple/mtg_config_path 2>/dev/null" 2>/dev/null || true
+    ssh $SSH_OPTS "$user@$ip" "systemctl stop mtg.service 2>/dev/null; systemctl disable mtg.service 2>/dev/null; rm -f /etc/systemd/system/mtg.service 2>/dev/null; rm -f /usr/local/bin/mtg 2>/dev/null; rm -f /etc/mtg.toml 2>/dev/null; rm -f /opt/mtpr-simple/mtg_config_path 2>/dev/null" 2>/dev/null || true
 
     # 5. Удаление MEKO FIX (SYN FIX)
     log_info "Удаление MEKO FIX (SYN FIX)..."
-    ssh -p "$port" "$user@$ip" "bash -c '
+    ssh $SSH_OPTS "$user@$ip" "bash -c '
         iptables -D INPUT -j MTPR_SYNFIX 2>/dev/null
         iptables -F MTPR_SYNFIX 2>/dev/null
         iptables -X MTPR_SYNFIX 2>/dev/null
@@ -287,11 +318,11 @@ clean_all_on_server() {
 
     # 6. Удаление 3xUI
     log_info "Удаление 3xUI..."
-    ssh -p "$port" "$user@$ip" "bash -c 'echo y | x-ui uninstall 2>/dev/null; systemctl stop x-ui 2>/dev/null; systemctl disable x-ui 2>/dev/null; rm -rf /etc/3x-ui /usr/local/x-ui 2>/dev/null'" 2>/dev/null || true
+    ssh $SSH_OPTS "$user@$ip" "bash -c 'echo y | x-ui uninstall 2>/dev/null; systemctl stop x-ui 2>/dev/null; systemctl disable x-ui 2>/dev/null; rm -rf /etc/3x-ui /usr/local/x-ui 2>/dev/null'" 2>/dev/null || true
 
     # 7. Очистка остатков MEKO
     log_info "Удаление каталогов MEKO..."
-    ssh -p "$port" "$user@$ip" "rm -rf /opt/mtpr-simple /opt/telemt /etc/telemt /etc/telemt.toml /opt/mtproto-proxy 2>/dev/null || true" 2>/dev/null || true
+    ssh $SSH_OPTS "$user@$ip" "rm -rf /opt/mtpr-simple /opt/telemt /etc/telemt /etc/telemt.toml /opt/mtproto-proxy 2>/dev/null || true" 2>/dev/null || true
 
     log_success "Очистка сервера $ip завершена."
     read -p "Нажмите Enter для продолжения..."
@@ -354,14 +385,14 @@ server_submenu() {
         echo -e "  ${BOLD}Меню сервера: ${CYAN}${user}@${ip}${NC}${BOLD}:$port${NC}"
         echo -e "  ${DIM}════════════════════════════════════════════════════${NC}"
         echo -e ""
-		echo -e "  ${CYAN}[1]${NC}${BOLD} Проверить статус ноды (онлайн/оффлайн)"
-		echo -e ""
+        echo -e "  ${CYAN}[1]${NC}${BOLD} Проверить статус ноды (онлайн/оффлайн)"
+        echo -e ""
         echo -e "  ${CYAN}[2]${NC}${BOLD} Меню работы с прокси"
         echo -e "  ${CYAN}[4]${NC}${BOLD} Выполнить произвольную команду"
         echo -e "  ${CYAN}[5]${RED}${BOLD} Удалить сервер ${NC}(отозвать ключ и конфиг)${NC}"
         echo -e "  ${CYAN}[6]${YELLOW}${BOLD} Очистить всё на сервере ${NC}(прокси + фиксы)${NC}"
         echo -e "  ${CYAN}[7]${NC} ${BOLD}Меню фиксов (SYN FIX/Zapret2)${NC}"
-		echo -e ""
+        echo -e ""
         echo -e "  ${CYAN}[0]${NC}${BOLD} Назад"
         echo ""
         echo -en "  ${BOLD}Ввод:${NC} "
@@ -374,7 +405,7 @@ server_submenu() {
                 log_info "Проверка доступа..."
                 if check_ssh_key "$user" "$ip" "$port"; then
                     log_success "Сервер доступен (SSH-ключ работает)."
-                    ssh -p "$port" "$user@$ip" "uptime" 2>/dev/null || log_warning "Не удалось выполнить команду."
+                    ssh -o ConnectTimeout=5 -p "$port" "$user@$ip" "uptime" 2>/dev/null || log_warning "Не удалось выполнить команду."
                 else
                     log_error "Сервер недоступен или ключ не работает."
                 fi
@@ -397,7 +428,7 @@ server_submenu() {
                 read -r cmd
                 if [[ -n "$cmd" ]]; then
                     echo ""
-                    ssh -p "$port" "$user@$ip" "$cmd"
+                    ssh -o ConnectTimeout=5 -p "$port" "$user@$ip" "$cmd"
                 else
                     log_warning "Команда не введена."
                 fi
@@ -443,7 +474,7 @@ main_menu() {
         echo ""
         echo -e "  ${CYAN}[1]${NC}${BOLD} Добавить сервер"
         echo -e "  ${CYAN}[2]${NC}${BOLD} Список серверов"
-		echo -e ""
+        echo -e ""
         echo -e "  ${RED}${BOLD}[0]${NC}${BOLD} Выход"
         echo ""
         echo -en "  ${BOLD}Ввод:${NC} "
