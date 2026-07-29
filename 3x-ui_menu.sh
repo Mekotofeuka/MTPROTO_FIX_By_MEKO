@@ -124,7 +124,7 @@ run_xui_cmd() {
 while true; do
     clear 2>/dev/null || printf '\033[2J\033[H'
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню 3x-ui ${CYAN}${BOLD}v1.95 ${CYAN}${BOLD}⚙️${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню 3x-ui ${CYAN}${BOLD}v1.96 ${CYAN}${BOLD}⚙️${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -206,9 +206,14 @@ while true; do
                 read -r confirm </dev/tty 2>/dev/null
                 if [[ "$confirm" =~ ^[yY]$ ]]; then
                     log_info "Запуск удаления..."
-                    x-ui uninstall
+                    # Автоматически подтверждаем второй запрос
+                    echo "y" | x-ui uninstall
                     echo ""
-                    log_success "Панель не удалена. Впишите y на вопрос об удалении"
+                    if [ $? -eq 0 ]; then
+                        log_success "Панель удалена."
+                    else
+                        log_error "Ошибка при удалении панели."
+                    fi
                 else
                     log_info "Удаление отменено."
                 fi
