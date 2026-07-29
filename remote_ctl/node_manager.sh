@@ -136,9 +136,9 @@ add_server() {
     clear
     echo ""
     echo -e "  ${BOLD}Добавление нового сервера${NC}"
-    echo -e "  ${DIM}═════════════════════════════════════${NC}"
+    echo -e "  ${DIM}════════════════════════════{NC}"
     echo ""
-    echo -en "  ${BOLD}Введите IP или строку типа ${CYAN}'root@1.2.3.4'${NC} (или ${CYAN}'ssh root@1.2.3.4'${NC}): "
+    echo -en "  ${BOLD}Введите IP-адрес или строку типа ${CYAN}'root@1.2.3.4'${NC} или ${CYAN}'ssh root@127.0.0.1'${NC}: "
     local input
     read -r input
 
@@ -159,7 +159,7 @@ add_server() {
         fi
     fi
 
-    echo -en "  ${BOLD}Порт SSH (по умолчанию ${GREEN}22${NC}${BOLD}):${NC} "
+    echo -en "  ${BOLD}Введите порт для SSH подключения (по умолчанию ${GREEN}Enter - 22${NC}${BOLD}):${NC} "
     local port
     read -r port
     port=${port:-22}
@@ -303,8 +303,8 @@ list_servers() {
     local servers=($(get_servers))
     if [[ ${#servers[@]} -eq 0 ]]; then
         echo ""
-        log_warning "Нет сохранённых серверов."
-        read -p "Нажмите Enter для продолжения..."
+        log_warning "Нет сохранённых серверов. Добавьте их с помощью пункта [1]"
+        read -p "  Нажмите Enter чтобы вернуться в меню"
         return 0
     fi
 
