@@ -63,64 +63,26 @@ ensure_file() {
     return 0
 }
 
-# ── Установка 3x-ui (без подтверждения) ──────────────────────
-install_3xui() {
-    echo ""
-    log_info "Установка 3x-ui..."
-    echo ""
-
-    # ── Проверка и ожидание освобождения apt ──────────────
-    log_info "Проверка блокировки менеджера пакетов apt..."
-    local wait_seconds=0
-    local max_wait=120  # максимум 2 минуты
-    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-        if [ $wait_seconds -ge $max_wait ]; then
-            log_error "Блокировка apt не снята за $max_wait секунд."
-            log_error "Попробуйте остановить unattended-upgrades вручную: sudo systemctl stop unattended-upgrades"
-            return 1
+# ── Открытие меню 3x-ui ──────────────────────────────────────
+open_3xui_menu() {
+    local menu_file="$INSTALL_DIR/3x-ui_menu.sh"
+    
+    # Скачиваем, если отсутствует
+    if [ ! -f "$menu_file" ]; then
+        log_info "Меню 3x-ui не найдено, скачиваю..."
+        if download_file "3x-ui_menu.sh" "$menu_file"; then
+            chmod +x "$menu_file"
+            log_success "Меню 3x-ui загружено"
+        else
+            log_error "Не удалось загрузить меню 3x-ui"
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+            read -rsn1 </dev/tty 2>/dev/null
+            return
         fi
-        log_warning "Обнаружена блокировка apt (возможно, unattended-upgrades). Ждём 5 секунд..."
-        sleep 5
-        wait_seconds=$((wait_seconds + 5))
-    done
-    log_success "Блокировка apt снята, продолжаем установку."
-
-    # 1. Установка 3x-ui
-    log_info "Запуск установки 3x-ui (это может занять несколько минут)..."
-    echo ""
-    if sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-latest.sh) -install yes -auto_domain y"; then
-        log_success "3x-ui установлен"
-    else
-        log_error "Ошибка установки 3x-ui"
-        return 1
     fi
-
-    # 2. Применение патча (тоже с проверкой блокировки)
-    log_info "Применение патча 3x-ui..."
-    # Снова проверяем, т.к. блокировка могла появиться заново
-    wait_seconds=0
-    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-        if [ $wait_seconds -ge $max_wait ]; then
-            log_warning "Блокировка apt не снята, патч может не примениться."
-            break
-        fi
-        log_warning "Снова блокировка apt, ждём 5 секунд..."
-        sleep 5
-        wait_seconds=$((wait_seconds + 5))
-    done
-
-    if bash <(curl -fsSL https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-patch.sh); then
-        log_success "Патч применён"
-    else
-        log_warning "Патч не применился (возможно, он не требуется или apt всё ещё занят)"
-    fi
-
-    echo ""
-    log_success "Установка 3x-ui завершена!"
-    echo ""
-    echo -e "  ${GRAY}Нажмите Enter для возврата в меню...${NC}"
-    read -r </dev/tty 2>/dev/null
-    return 0
+    
+    # Запускаем подменю (без exec, чтобы вернуться после выхода)
+    bash "$menu_file"
 }
 
 # ── Установка Remnawave ──────
@@ -133,21 +95,19 @@ install_remnawave() {
 
     # Заменяем текущий процесс на выполнение команды с терминальным вводом
     exec sudo bash -c "$(curl -sL https://raw.githubusercontent.com/xxphantom/remnawave-installer/main/install.sh)" @ --lang=ru </dev/tty
-
 }
 
 # ── Очистка экрана и шапка ────────────────────────────────────
 clear 2>/dev/null || printf '\033[2J\033[H'
 echo ""
-echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню VPN ${CYAN}${BOLD}v1.93 ${CYAN}${BOLD}⚙️${NC}"
+echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню VPN ${CYAN}${BOLD}v1.95 ${CYAN}${BOLD}⚙️${NC}"
 echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  ${BOLD}Выберите пункт для установки:${NC}"
 echo ""
-echo -e "  ${GREEN}[1]${NC}  ${BOLD}Установка 3x-ui${NC}"
-echo -e "       ${DIM}Установит:${NC}"
-echo -e "       ${DIM}панель 3x-ui и все необходимые файлы${NC}"
-echo -e "       ${DIM}3 ноды и фикс xray ядра${NC}"
+echo -e "  ${GREEN}[1]${NC}  ${BOLD}Меню 3x-ui${NC}"
+echo -e "       ${DIM}Откроет меню панели 3x-ui:${NC}"
+echo -e "       ${DIM}установка, статус, удаление, настройки и т.д.${NC}"
 echo ""
 echo -e "  ${CYAN}[2]${NC}  ${BOLD}Установка Remnawave${NC}"
 echo -e "       ${DIM}Откроет меню установки Remnawave для выбора:${NC}"
@@ -155,7 +115,7 @@ echo -e "       ${DIM}Установить панель (full caddy / simple coo
 echo ""
 echo -e "  ${RED}${BOLD}[0]${NC}  ${RED}${BOLD}Выход${NC}"
 echo ""
-echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Enter${NC}${BOLD} - установить 3x-ui):${NC} "
+echo -en "  ${NC}${BOLD}Ввод (${GREEN}${BOLD}Enter${NC}${BOLD} - меню 3x-ui):${NC} "
 
 # ── Читаем ввод с терминала ──────────────────────────────────
 if ! read -r choice </dev/tty 2>/dev/null; then
@@ -172,10 +132,12 @@ case "$choice" in
         ;;
     2)
         install_remnawave
-        exec "$0"
+        # После exec сюда не вернёмся, но для безопасности:
+        exit 0
         ;;
     *)
-        install_3xui
+        open_3xui_menu
+        # После возврата из подменю перезапускаем install_vpn.sh, чтобы обновить экран
         exec "$0"
         ;;
 esac
