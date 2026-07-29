@@ -1,2 +1,3 @@
 node_manager.sh|Главное меню нод менеджера
 telemt1_node.sh|Работа с телемт
+rules1_node.sh|Работа с правилами
