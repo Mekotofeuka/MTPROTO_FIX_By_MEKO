@@ -36,7 +36,8 @@ check_root() {
 check_root
 
 # ── Конфигурация ─────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Исправлено: теперь всегда определяет реальный путь к скрипту, даже через симлинк
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 SERVERS_DIR="$SCRIPT_DIR/servers"
 mkdir -p "$SERVERS_DIR"
 
