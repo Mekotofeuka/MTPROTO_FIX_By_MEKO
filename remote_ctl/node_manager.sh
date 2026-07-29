@@ -351,10 +351,10 @@ server_submenu() {
         clear
         echo ""
         echo -e "  ${BOLD}Управление сервером: ${CYAN}${user}@${ip}${NC}${BOLD} (порт $port)${NC}"
-		echo -e ""
+        echo -e ""
         echo -e "  ${DIM}════════════════════════════════════════════════════${NC}"
         echo -e "  ${CYAN}[1]${NC} Проверить статус (онлайн/оффлайн)"
-        echo -e "  ${CYAN}[2]${NC} Установить прокси (заглушка)"
+        echo -e "  ${CYAN}[2]${NC} Меню работы с прокси"
         echo -e "  ${CYAN}[3]${NC} Удалить прокси (заглушка)"
         echo -e "  ${CYAN}[4]${NC} Выполнить произвольную команду"
         echo -e "  ${CYAN}[5]${RED}${BOLD} Удалить сервер ${NC}(отозвать ключ и конфиг)${NC}"
@@ -379,8 +379,14 @@ server_submenu() {
                 ;;
             2)
                 echo ""
-                log_info "🛠 Установка прокси (заглушка) — позже будет реализована."
-                read -p "Нажмите Enter для продолжения..."
+                local NODE_TELEMT_SCRIPT="$SCRIPT_DIR/telemt1_node.sh"
+                if [ -f "$NODE_TELEMT_SCRIPT" ]; then
+                    # Передаём IP, пользователя и порт в скрипт
+                    exec "$NODE_TELEMT_SCRIPT" "$ip" "$user" "$port"
+                else
+                    log_error "Скрипт $NODE_TELEMT_SCRIPT не найден."
+                    read -p "Нажмите Enter для продолжения..."
+                fi
                 ;;
             3)
                 echo ""
