@@ -794,8 +794,6 @@ show_header() {
     if [ "$telemt_installed" = false ] && [ "$mtprotozig_installed" = false ] && [ "$mtg_installed" = false ]; then
         echo -e "  ${NC}${BOLD}Прокси: ${GRAY} не установлены${NC}"
     fi
-
-    echo ""
 }
 
 # ── Функция проверки статуса базовой оптимизации ──────────
@@ -894,7 +892,6 @@ main_menu() {
         echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить домен для прокси${YELLOW}${BOLD} (Требуется: OpenSSL 3.5+)  ${NC}"
         echo -e "  ${CYAN}[7]${NC}  ${NC}${BOLD}Меню управления нодами${NC}"
         echo -e "  ${RED}${BOLD}[8]${NC}  ${RED}${BOLD}Удалить${NC}${BOLD} MEKO Manager с сервера${NC}"
-		echo -e ""
         echo -e "  ${RED}${BOLD}[0]${NC}${BOLD}  Выход"
         echo ""
         echo -en "  ${BOLD}Выбор:${NC} "
