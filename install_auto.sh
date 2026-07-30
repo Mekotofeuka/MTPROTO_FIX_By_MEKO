@@ -162,7 +162,7 @@ auto_install_mode() {
     if [[ ! "$confirm" =~ ^[yY]$ ]]; then
         log_info "Установка отменена"
         sleep 1
-        return
+        return   # ← возврат в главное меню, а не exit
     fi
     
     echo ""
@@ -365,45 +365,48 @@ semi_auto_install_mode() {
 
 # ── Главное меню выбора режима ──────────────────────────────
 show_mode_menu() {
-    clear
-    echo ""
-    echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.30${NC}"
-    echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "  ${BOLD}Выберите режим установки:${NC}"
-    echo ""
-    echo -e "  ${CYAN}[1]${NC}  ${BOLD}Автоустановка${NC}  ${NC}"
-    echo -e "  ${DIM}Выведет параметры с которыми будет установлен прокси и фикс"
-    echo -e "  ${DIM}Запросит подтверждение и выполнит установку"
-    echo -e ""
-    echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${NC}"
-    echo -e "  ${DIM}Спросит порт, версию фикса, версию телемт и выполнит установку "
-    echo -e ""
-    echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
-    echo ""
-    echo -en "  ${BOLD}Выбор (по умолчанию ${GREEN}${BOLD}1 или Enter${NC}${BOLD}):${NC} "
-    local mode_choice
-    mode_choice=$(read_input)
-    [ -z "$mode_choice" ] && mode_choice="1"
-    
-    case "$mode_choice" in
-        1)
-            auto_install_mode
-            ;;
-        2)
-            semi_auto_install_mode
-            ;;
-        0)
-            echo ""
-            log_info "Выход..."
-            exit 0
-            ;;
-        *)
-            log_warning "Неверный выбор, попробуйте снова"
-            sleep 1
-            show_mode_menu
-            ;;
-    esac
+    while true; do
+        clear
+        echo ""
+        echo -e "  ${NC}${BOLD}⚙️ УСТАНОВКА${CYAN}${BOLD} MEKOPR ${NC}${BOLD}(РЕЖИМ: ${CYAN}${BOLD}Auto${NC}${BOLD}) v0.30${NC}"
+        echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
+        echo ""
+        echo -e "  ${BOLD}Выберите режим установки:${NC}"
+        echo ""
+        echo -e "  ${CYAN}[1]${NC}  ${BOLD}Автоустановка${NC}  ${NC}"
+        echo -e "  ${DIM}Выведет параметры с которыми будет установлен фикс и/или прокси"
+        echo -e "  ${DIM}Запросит подтверждение и выполнит установку"
+        echo -e ""
+        echo -e "  ${CYAN}[2]${NC}  ${BOLD}Полуавтоматическая установка${NC}  ${NC}"
+        echo -e "  ${DIM}Спросит порт, версию фикса, прокси(если нужно) и выполнит установку "
+        echo -e ""
+        echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
+        echo ""
+        echo -en "  ${BOLD}Ввод (по умолчанию ${GREEN}${BOLD}1 или Enter${NC}${BOLD}):${NC} "
+        local mode_choice
+        mode_choice=$(read_input)
+        [ -z "$mode_choice" ] && mode_choice="1"
+        
+        case "$mode_choice" in
+            1)
+                auto_install_mode
+                # После возврата из auto_install_mode (не exit) цикл продолжается
+                ;;
+            2)
+                semi_auto_install_mode
+                # После возврата из semi_auto_install_mode (не exit) цикл продолжается
+                ;;
+            0)
+                echo ""
+                log_info "Выход..."
+                exit 0
+                ;;
+            *)
+                log_warning "Неверный ввод, попробуйте снова"
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 # ── Точка входа ──────────────────────────────────────────────
