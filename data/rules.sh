@@ -294,7 +294,7 @@ install_syn_fix() {
         if [ -r /dev/tty ]; then
             clear
             echo -e ""
-            echo -e "  ${BOLD}Меню установки MTPRoto FIX V1.2"
+            echo -e "  ${BOLD}Меню установки MTPRoto FIX V1.21"
             echo -e "  ${DIM}═══════════════════════════════════════════════════════════════"
             echo -e "  ${DIM}Для работы прокси на ios необходим корректно работающий домен"
             echo -e "  ${DIM}Подробнее в data/dictionary.md в репозитории. (обязательно к прочтению)"
@@ -305,8 +305,8 @@ install_syn_fix() {
             echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
             read -r ports_input </dev/tty
         else
-            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX (например: 443 (Enter - 443) "
-            echo -e "  ${NC}${BOLD}Либо введите порты через запятую (например: 443,8443) "
+            echo -e "  ${NC}${BOLD}Введите порт для SYN FIX ${DIM}(Например: 443)"
+            echo -e "  ${NC}${BOLD}Либо введите порты через запятую ${DIM}(Например: 443,8443) "
             echo -e ""
             echo -en "  ${NC}${BOLD}Ввод ${GREEN}${BOLD}(По умолчанию Enter - 443)${NC}${BOLD}:${NC}"
             read -r ports_input
@@ -315,6 +315,7 @@ install_syn_fix() {
             ports_input="443"
         fi
 
+        clear
         echo ""
         echo -e "  ${BOLD}Выберите вариант правил ниже"
         echo -e "  ${DIM}══════════════════════════════════════════════"
