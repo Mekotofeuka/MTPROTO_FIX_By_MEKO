@@ -1071,7 +1071,7 @@ show_zapret2_settings_menu() {
         echo -e "  ${DIM}[7]${NC} fwmark      [${ZAPRET2_FWMARK}]"
         echo -e "  ${DIM}[8]${NC} Debug лог   [$([ "${ZAPRET2_DEBUG:-false}" = "true" ] && echo "включён" || echo "выключен")]"
         echo ""
-        echo -e "  ${DIM}[0]${NC} Назад"
+        echo -e "  ${DIM}[0]${NC} вернуться"
         echo ""
         echo -en "  Выбор: "
         local _choice; read -r _choice
