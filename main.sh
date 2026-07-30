@@ -656,7 +656,7 @@ show_header() {
     elif [ "$iptables_status" = "has_chain_only" ]; then
         echo -e "  ${BOLD}SYN FIX iptables:${NC} ${YELLOW}Цепочка есть, сервис не запущен${NC}"
     elif [ "$iptables_status" = "inactive" ]; then
-        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}${BOLD}Не установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX iptables:${NC} ${GRAY}${BOLD}Не установлен${NC}"
     else
         echo -e "  ${BOLD}SYN FIX iptables:${NC} ${RED}${BOLD}Недоступно${NC}"
     fi
@@ -666,7 +666,7 @@ show_header() {
     elif [ "$nft_status" = "has_table_only" ]; then
         echo -e "  ${BOLD}SYN FIX nftables:${NC} ${YELLOW}Таблица есть, сервис не запущен${NC}"
     elif [ "$nft_status" = "inactive" ]; then
-        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}${BOLD}Не установлен${NC}"
+        echo -e "  ${BOLD}SYN FIX nftables:${NC} ${GRAY}${BOLD}Не установлен${NC}"
     else
         echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}${BOLD}Недоступно${NC}"
     fi
@@ -792,7 +792,7 @@ show_header() {
 
     # ── ПРОВЕРКА: ЕСТЬ ЛИ ХОТЯ БЫ ОДИН ПРОКСИ ──────────────
     if [ "$telemt_installed" = false ] && [ "$mtprotozig_installed" = false ] && [ "$mtg_installed" = false ]; then
-        echo -e "  ${RED}${BOLD}Прокси не установлены${NC}"
+        echo -e "  ${NC}${BOLD}Прокси: ${GRAY} не установлены${NC}"
     fi
 
     echo ""
@@ -869,7 +869,7 @@ main_menu() {
             local iptables_status=$(get_synfix_status)
             local nft_status=$(get_nft_fix_status)
             if [ "$iptables_status" = "inactive" ] && [ "$nft_status" = "inactive" ]; then
-                local item1="${GREEN}${BOLD}Меню установки MTProto FIXа${NC}"
+                local item1="${NC}${BOLD}Меню установки ${CYAN}${BOLD}MTProto FIXа${NC}"
             else
                 local item1="${RED}${BOLD}Удалить Mtproto FIX${NC}"
             fi
@@ -880,13 +880,14 @@ main_menu() {
         if is_optimization_applied; then
             local item2_text="${GRAY}${BOLD}Выполнить базовую оптимизацию (уже применена)${NC}"
         else
-            local item2_text="${GREEN}${BOLD}Выполнить базовую оптимизацию${NC}"
+            local item2_text="${NC}${BOLD}Базовая оптимизация сервера${NC}"
         fi
 
         echo -e "  ${DIM}══════════════════════════════"
         echo -e "  ${GREEN}${BOLD}[1]${NC}  $item1"
         echo -e "  ${CYAN}[2]${NC}  $item2_text"
         echo -e "  ${CYAN}[3]${NC}  ${NC}${BOLD}Меню прокси и настройки конфигов${NC}"
+		echo -e ""
         echo -e "  ${CYAN}[4]${NC}  ${CYAN}${BOLD}Обновить${NC}${BOLD} скрипт${NC}"
 		echo -e ""
         echo -e "  ${CYAN}[5]${NC}  ${NC}${BOLD}Проверить доступ к популярным сайтам с сервера${NC}"
