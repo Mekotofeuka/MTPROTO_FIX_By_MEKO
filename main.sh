@@ -867,7 +867,7 @@ main_menu() {
             local iptables_status=$(get_synfix_status)
             local nft_status=$(get_nft_fix_status)
             if [ "$iptables_status" = "inactive" ] && [ "$nft_status" = "inactive" ]; then
-                local item1="${NC}${BOLD}Меню установки ${CYAN}${BOLD}MTProto FIXа${NC}"
+                local item1="${NC}${BOLD}Меню установки ${CYAN}${BOLD}MTProto FIX${NC}"
             else
                 local item1="${RED}${BOLD}Удалить Mtproto FIX${NC}"
             fi
@@ -882,15 +882,15 @@ main_menu() {
         fi
 
         echo -e "  ${DIM}══════════════════════════════"
-        echo -e "  ${GREEN}${BOLD}[1]${NC}  $item1"
+        echo -e "  ${CYAN}${BOLD}[1]${NC}  $item1"
         echo -e "  ${CYAN}[2]${NC}  $item2_text"
+		echo -e ""
         echo -e "  ${CYAN}[3]${NC}  ${NC}${BOLD}Меню прокси и настройки конфигов${NC}"
+        echo -e "  ${CYAN}[4]${NC}  ${NC}${BOLD}Меню управления нодами${NC}"
+        echo -e "  ${CYAN}[5]${NC}  ${CYAN}${BOLD}Обновить${NC}${BOLD} скрипт${NC}"
 		echo -e ""
-        echo -e "  ${CYAN}[4]${NC}  ${CYAN}${BOLD}Обновить${NC}${BOLD} скрипт${NC}"
-		echo -e ""
-        echo -e "  ${CYAN}[5]${NC}  ${NC}${BOLD}Проверить доступ к популярным сайтам с сервера${NC}"
-        echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить домен для прокси${YELLOW}${BOLD} (Требуется: OpenSSL 3.5+)  ${NC}"
-        echo -e "  ${CYAN}[7]${NC}  ${NC}${BOLD}Меню управления нодами${NC}"
+        echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить доступ к популярным сайтам с сервера${NC}"
+        echo -e "  ${CYAN}[7]${NC}  ${NC}${BOLD}Проверить домен для прокси${YELLOW}${BOLD} (Требуется: OpenSSL 3.5+)  ${NC}"
         echo -e "  ${RED}${BOLD}[8]${NC}  ${RED}${BOLD}Удалить${NC}${BOLD} MEKO Manager с сервера${NC}"
         echo -e "  ${RED}${BOLD}[0]${NC}${BOLD}  Выход"
         echo ""
@@ -957,12 +957,16 @@ main_menu() {
             ;;
         4)
             echo ""
-            update_script
+            install_node_manager
             ;;
         5)
-            check_censor
+            echo ""
+            update_script
             ;;
         6)
+            check_censor
+            ;;
+        7)
             echo ""
             OPENSSL_VERSION=$(openssl version 2>/dev/null | awk '{print $2}')
             REQUIRED_VERSION="3.5"
@@ -994,10 +998,7 @@ main_menu() {
                 read -rsn1
             fi
             ;;
-        7)
-            echo ""
-            install_node_manager
-            ;;
+
         8)
             remove_mekopr
             ;;
