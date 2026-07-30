@@ -869,9 +869,9 @@ main_menu() {
             local iptables_status=$(get_synfix_status)
             local nft_status=$(get_nft_fix_status)
             if [ "$iptables_status" = "inactive" ] && [ "$nft_status" = "inactive" ]; then
-                local item1="${GREEN}${BOLD}Меню установки MTProto FIX${NC}"
+                local item1="${GREEN}${BOLD}Меню установки MTProto FIXа${NC}"
             else
-                local item1="${RED}${BOLD}Удалить SYN FIX${NC}"
+                local item1="${RED}${BOLD}Удалить Mtproto FIX${NC}"
             fi
         else
             local item1="${YELLOW}${BOLD}Установить/Удалить SYN FIX (недоступно)${NC}"
@@ -884,16 +884,17 @@ main_menu() {
         fi
 
         echo -e "  ${DIM}══════════════════════════════"
-        echo -e "  ${CYAN}[1]${NC}  $item1"
+        echo -e "  ${GREEN}${BOLD}[1]${NC}  $item1"
         echo -e "  ${CYAN}[2]${NC}  $item2_text"
-        echo -e "  ${CYAN}[3]${NC}  ${NC}${BOLD}Меню прокси и конфигов${NC}"
-        echo -e "  ${CYAN}[4]${NC}  ${NC}${BOLD}Обновить скрипт${NC}"
-        echo -e "  ${CYAN}[5]${NC}  ${NC}${BOLD}Проверить доступ к сайтам с сервера(тг,ютуб,инст, и тд.)${NC}"
-        echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить работоспособность домена/прокси на ios${YELLOW}${BOLD} (Необходим: OpenSSL 3.5+)  ${NC}"
-        echo -e "  ${CYAN}[7]${NC}  ${RED}${BOLD}Удалить MEKO Manager(вместе с правилами)${NC}"
-        echo -e "  ${CYAN}[8]${NC}  ${NC}${BOLD}Меню MTProto fix v4.2${NC}"
-        echo -e "  ${CYAN}[9]${NC}  ${NC}${BOLD}Меню управления нодами${NC}"
-        echo -e "  ${CYAN}[0]${NC}  Выход"
+        echo -e "  ${CYAN}[3]${NC}  ${NC}${BOLD}Меню прокси и настройки конфигов${NC}"
+        echo -e "  ${CYAN}[4]${NC}  ${CYAN}${BOLD}Обновить${NC}${BOLD} скрипт${NC}"
+		echo -e ""
+        echo -e "  ${CYAN}[5]${NC}  ${NC}${BOLD}Проверить доступ к популярным сайтам с сервера${NC}"
+        echo -e "  ${CYAN}[6]${NC}  ${NC}${BOLD}Проверить домен для прокси${YELLOW}${BOLD} (Требуется: OpenSSL 3.5+)  ${NC}"
+        echo -e "  ${CYAN}[7]${NC}  ${NC}${BOLD}Меню управления нодами${NC}"
+        echo -e "  ${RED}${BOLD}[8]${NC}  ${RED}${BOLD}Удалить${NC}${BOLD} MEKO Manager с сервера${NC}"
+		echo -e ""
+        echo -e "  ${RED}${BOLD}[0]${NC}${BOLD}  Выход"
         echo ""
         echo -en "  ${BOLD}Выбор:${NC} "
         local choice
@@ -996,21 +997,11 @@ main_menu() {
             fi
             ;;
         7)
-            remove_mekopr
-            ;;
-        8)
-            echo ""
-            if declare -f show_zapret2_menu &>/dev/null; then
-                show_zapret2_menu
-            else
-                log_error "Функция show_zapret2_menu не найдена. Проверьте наличие /opt/mtpr-simple/data/zapret2_fix.sh"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                read -rsn1
-            fi
-            ;;
-        9)
             echo ""
             install_node_manager
+            ;;
+        8)
+            remove_mekopr
             ;;
         0 | q | Q)
             echo ""
