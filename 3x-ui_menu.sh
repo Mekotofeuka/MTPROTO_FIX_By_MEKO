@@ -30,7 +30,57 @@ is_3xui_installed() {
     command -v x-ui >/dev/null 2>&1
 }
 
-# ── Установка 3x-ui (с ожиданием освобождения apt) ──────────
+# ── Проверка занятости порта ────────────────────────────────
+is_port_occupied() {
+    local port="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -tlnp 2>/dev/null | grep -q ":${port} "
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -tlnp 2>/dev/null | grep -q ":${port} "
+    elif command -v lsof >/dev/null 2>&1; then
+        lsof -i :${port} >/dev/null 2>&1
+    else
+        # Не можем проверить, считаем свободным
+        return 1
+    fi
+}
+
+# ── Загрузка и модификация установочного скрипта с другим портом ──
+install_3xui_with_port() {
+    local new_port="$1"
+    local temp_script="/tmp/x-ui-latest-modified.sh"
+
+    log_info "Скачивание установочного скрипта..."
+    curl -fsSL https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-latest.sh -o "$temp_script"
+    if [ $? -ne 0 ]; then
+        log_error "Не удалось скачать установочный скрипт"
+        return 1
+    fi
+
+    # Заменяем порт 443 на новый во всех listen, proxy_pass и других местах
+    log_info "Замена порта 443 на $new_port в установочном скрипте..."
+    sed -i "s/ listen 443;/ listen $new_port;/g" "$temp_script"
+    sed -i "s/ listen \[::\]:443;/ listen \[::\]:$new_port;/g" "$temp_script"
+    sed -i "s/:443\"/:$new_port\"/g" "$temp_script"
+    sed -i "s/:443'/:$new_port'/g" "$temp_script"
+    sed -i "s/:443 /:$new_port /g" "$temp_script"
+    sed -i "s/ port=443/ port=$new_port/g" "$temp_script"
+    sed -i "s/ 443 / $new_port /g" "$temp_script"
+    # Также заменяем в конфигах nginx (в heredoc)
+    sed -i "s/ listen 443;/ listen $new_port;/g" "$temp_script"
+    sed -i "s/ listen \[::\]:443;/ listen \[::\]:$new_port;/g" "$temp_script"
+    # proxy_pass в stream
+    sed -i "s/ proxy_pass 127.0.0.1:443;/ proxy_pass 127.0.0.1:$new_port;/g" "$temp_script"
+    sed -i "s/ proxy_pass \[::1\]:443;/ proxy_pass \[::1\]:$new_port;/g" "$temp_script"
+
+    log_info "Запуск модифицированного установщика с портом $new_port..."
+    bash "$temp_script"
+    local result=$?
+    rm -f "$temp_script"
+    return $result
+}
+
+# ── Установка 3x-ui (с проверкой порта 443) ──────────────────
 install_3xui() {
     echo ""
     log_info "Установка 3x-ui..."
@@ -54,40 +104,87 @@ install_3xui() {
     done
     log_success "Блокировка apt снята, продолжаем установку."
 
-    log_info "Запуск установки 3x-ui (это может занять несколько минут)..."
-    echo ""
-    if sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-latest.sh) -install yes -auto_domain y"; then
-        log_success "3x-ui установлен"
-    else
-        log_error "Ошибка установки 3x-ui"
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        read -rsn1 </dev/tty 2>/dev/null
-        return 1
-    fi
-
-    # Применение патча
-    log_info "Применение патча 3x-ui..."
-    wait_seconds=0
-    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-        if [ $wait_seconds -ge $max_wait ]; then
-            log_warning "Блокировка apt не снята, патч может не примениться."
-            break
+    # Проверяем, занят ли порт 443
+    local use_port=443
+    if is_port_occupied 443; then
+        echo ""
+        log_warning "Порт 443 занят!"
+        echo -e "  ${YELLOW}Возможно, его использует Telemt или другой сервис.${NC}"
+        echo -e "  ${YELLOW}3x-ui по умолчанию требует порт 443 для входящих TLS-соединений.${NC}"
+        echo -e "  ${YELLOW}Вы можете выбрать другой порт, чтобы избежать конфликта.${NC}"
+        echo ""
+        echo -e "  ${BOLD}Хотите установить 3x-ui на другой порт вместо 443?${NC}"
+        echo -e "  ${GREEN}Enter${NC} — использовать порт ${CYAN}8443${NC} (рекомендуется)"
+        echo -e "  ${GREEN}Введите число${NC} — указать свой порт (от 1024 до 65535)"
+        echo -e "  ${RED}N/n${NC} — отменить установку"
+        echo ""
+        echo -en "  ${BOLD}Ваш выбор:${NC} "
+        local port_choice
+        read -r port_choice </dev/tty 2>/dev/null
+        if [[ -z "$port_choice" ]]; then
+            use_port=8443
+        elif [[ "$port_choice" =~ ^[nN]$ ]]; then
+            log_info "Установка отменена."
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+            read -rsn1 </dev/tty 2>/dev/null
+            return 1
+        elif [[ "$port_choice" =~ ^[0-9]+$ ]] && [ "$port_choice" -ge 1024 ] && [ "$port_choice" -le 65535 ]; then
+            use_port="$port_choice"
+        else
+            log_warning "Неверный ввод, используем порт 8443"
+            use_port=8443
         fi
-        log_warning "Снова блокировка apt, ждём 5 секунд..."
-        sleep 5
-        wait_seconds=$((wait_seconds + 5))
-    done
-
-    if bash <(curl -fsSL https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-patch.sh); then
-        log_success "Патч применён"
+        log_info "Будет использован порт: ${use_port}"
+        echo ""
+        # Запускаем установку с заменой порта
+        install_3xui_with_port "$use_port"
+        local result=$?
+        if [ $result -eq 0 ]; then
+            log_success "3x-ui установлен на порт ${use_port}"
+        else
+            log_error "Ошибка установки 3x-ui"
+        fi
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+        read -rsn1 </dev/tty 2>/dev/null
+        return $result
     else
-        log_warning "Патч не применился (возможно, он не требуется или apt всё ещё занят)"
-    fi
+        # Порт свободен, используем стандартную установку
+        log_info "Порт 443 свободен, выполняем стандартную установку..."
+        log_info "Запуск установки 3x-ui (это может занять несколько минут)..."
+        echo ""
+        if sudo su -c "bash <(wget -qO- https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-latest.sh) -install yes -auto_domain y"; then
+            log_success "3x-ui установлен"
+        else
+            log_error "Ошибка установки 3x-ui"
+            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+            read -rsn1 </dev/tty 2>/dev/null
+            return 1
+        fi
 
-    echo ""
-    log_success "Установка 3x-ui завершена!"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    read -rsn1 </dev/tty 2>/dev/null
+        # Применение патча (если нужно)
+        log_info "Применение патча 3x-ui..."
+        wait_seconds=0
+        while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            if [ $wait_seconds -ge $max_wait ]; then
+                log_warning "Блокировка apt не снята, патч может не примениться."
+                break
+            fi
+            log_warning "Снова блокировка apt, ждём 5 секунд..."
+            sleep 5
+            wait_seconds=$((wait_seconds + 5))
+        done
+
+        if bash <(curl -fsSL https://raw.githubusercontent.com/mozaroc/3x-ui-pro/main/x-ui-patch.sh); then
+            log_success "Патч применён"
+        else
+            log_warning "Патч не применился (возможно, он не требуется или apt всё ещё занят)"
+        fi
+
+        echo ""
+        log_success "Установка 3x-ui завершена!"
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
+        read -rsn1 </dev/tty 2>/dev/null
+    fi
 }
 
 # ── Выполнение команды x-ui с проверкой установки ────────────
@@ -124,7 +221,7 @@ run_xui_cmd() {
 while true; do
     clear 2>/dev/null || printf '\033[2J\033[H'
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню 3x-ui ${CYAN}${BOLD}v1.96 ${CYAN}${BOLD}⚙️${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ ${NC}${BOLD}Meko Manager ${CYAN}${BOLD}| ${NC}${BOLD}Меню 3x-ui ${CYAN}${BOLD}v1.97 ${CYAN}${BOLD}⚙️${NC}"
     echo -e "  ${BOLD}${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
 
