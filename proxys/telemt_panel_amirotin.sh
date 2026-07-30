@@ -122,6 +122,42 @@ get_public_ip() {
     echo "$_ip"
 }
 
+# ── Функция проверки и исправления sudo для совместимости с панелью ──
+fix_sudo_for_panel() {
+    # Проверяем, доступна ли альтернатива sudo.ws
+    if update-alternatives --list sudo 2>/dev/null | grep -q "/usr/bin/sudo.ws"; then
+        # Альтернатива есть, проверяем активна ли она
+        current=$(update-alternatives --display sudo 2>/dev/null | grep "link currently points to" | awk '{print $5}')
+        if [ "$current" != "/usr/bin/sudo.ws" ]; then
+            echo -e "  ${YELLOW}[!] Обнаружена альтернатива sudo.ws, но она не активна.${NC}"
+            echo -en "  ${BOLD}Активировать sudo.ws для совместимости с панелью? [Y/n]:${NC} "
+            local confirm
+            read -r confirm
+            if [[ ! "$confirm" =~ ^[nN]$ ]]; then
+                sudo update-alternatives --set sudo /usr/bin/sudo.ws
+                echo -e "  ${GREEN}[✓] Альтернатива sudo.ws активирована.${NC}"
+            else
+                echo -e "  ${GRAY}Исправление пропущено. Возможны ошибки при установке панели.${NC}"
+            fi
+        else
+            echo -e "  ${GREEN}[✓] Альтернатива sudo.ws уже активна.${NC}"
+        fi
+    else
+        echo -e "  ${YELLOW}[!] Альтернатива sudo.ws не установлена.${NC}"
+        echo -e "  ${DIM}На некоторых системах это может вызвать ошибку при установке панели.${NC}"
+        echo -e "  ${DIM}Рекомендуется установить пакет sudo.ws (если доступен) или выполнить вручную:${NC}"
+        echo -e "  ${CYAN}sudo update-alternatives --set sudo /usr/bin/sudo.ws${NC}"
+        echo -en "  ${BOLD}Продолжить установку без исправления? [y/N]:${NC} "
+        local confirm
+        read -r confirm
+        if [[ "$confirm" =~ ^[nN]$ ]]; then
+            echo -e "  ${GRAY}Установка отменена.${NC}"
+            return 1
+        fi
+    fi
+    return 0
+}
+
 # ── Функция вывода информации о Telemt перед установкой ─────
 show_telemt_info() {
     echo ""
@@ -166,7 +202,7 @@ show_telemt_info() {
             
             if [ -n "$generated_password" ]; then
                 echo -e "  ${BOLD}Сгенерированный пароль для учетки:${NC} ${GREEN}${BOLD}${generated_password}${NC}"
-				echo -e "  ${DIM}(Вы можете либо придумать свой пароль во время установки панели, либо использовать пароль выше.)"
+                echo -e "  ${DIM}(Вы можете либо придумать свой пароль во время установки панели, либо использовать пароль выше.)"
             fi
         fi
     else
@@ -201,6 +237,17 @@ install_panel() {
             read -rsn1
             return 1
         fi
+    fi
+    
+    # ── Исправление sudo перед установкой ──────────────────────
+    echo ""
+    echo -e "  ${BLUE}[i]${NC} Проверка совместимости sudo..."
+    if ! fix_sudo_for_panel; then
+        echo -e "  ${GRAY}Установка отменена${NC}"
+        echo ""
+        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
+        read -rsn1
+        return 1
     fi
     
     # Показываем информацию о Telemt
