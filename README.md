@@ -1,7 +1,7 @@
 <div align="center">
 
 
-# MEKO | VPN and MTProto proxy manager - Installer, Launcher and fixer
+# MEKO | VPN and MTProto proxy manager - Fixer, Installer and Launcher  
 
 
 <a href="https://t.me/meko_mtprotofix">
@@ -22,7 +22,7 @@
 
 <div align="center">
   
-**Полноценный Менеджер для работы с VPN и прокси**:
+**Менеджер для работы с VPN и прокси**:
 
 Чинит telegram Mtproto прокси и **Позволяет удобно** работать с **TELEMT, MTG и MTPROTO.ZIG**, поддерживая большинство необходимых команд для взаимодействия:
 Установка, обновление, откат, настройка, изменение конфигов, просмотр логов, установка и работа с панелями, получение ссылки на подключение - **без ввода каких-либо команд**.
