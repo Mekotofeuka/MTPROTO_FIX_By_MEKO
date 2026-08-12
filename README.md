@@ -67,10 +67,10 @@ _MEKO использует на данный момент [более точну
 - Корректно определяет и выставляет правила для разных устройств со **100% вероятностью**
 - **Ставится в один клик** и имеет 2 режима: "стандартная установка" с выбором необходимых настроек и "автоматическая" установка, которая скажет что именно выполнит и после подтверждения всё сделает за вас
 <div align="center">
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/be92a44d-5040-4592-8eda-644d4b182439" />
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/75abab6b-0419-477c-bab3-7dca9694357e" />
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/63b88f4b-3d63-48a2-97a4-0f1b67e96307" />
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/93bf6fbd-db3f-4f93-adb2-0c68c912fcfe" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/14be6f2e-3040-448c-8815-f57e540c7d79" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/1e33aaf1-019a-431f-96a2-a9c7b1479fed" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/a5e9e623-4025-4795-8e8d-65e0abc20f8d" />
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/4dd0b010-8d24-4206-ba4c-ab8cda468ff8" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/3296a6c6-c097-4e5a-bd05-7c9f64154f79" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/8f07e4ea-3a99-43a4-8232-ad7f7ece634e" />
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/b385ebfd-496c-4fa8-8a95-dff36c3304bd" />
