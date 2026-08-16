@@ -126,7 +126,7 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 | `-mtg`                        | —                          | Установить MTG                       |
 | `-fix`                        | —                          | Установить MTProto FIX               |
 | `-no-fix`                     | —                          | Не устанавливать фикс                |
-| `-fix-type {v2\|v3\|v4\|(nft}`| `v3`                       | Тип устанавливаемого фикса(NFT = v3 через NFTables)           |
+| `-fix-type {v2\|v3\|v4\|nft}`| `v3`                       | Тип устанавливаемого фикса(NFT = v3 через NFTables)           |
 | `-fix-port <порт>`            | значение `-port` или `443` | Порт, к которому применяется фикс    |
 | `-port <порт>`                | `443`                      | Порт прокси                          |
 | `-domain <домен>`             | `mydomain.ru`              | Домен для TLS-маскировки прокси      |
