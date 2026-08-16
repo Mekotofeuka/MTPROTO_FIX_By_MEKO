@@ -69,7 +69,7 @@ ask_param() {
     local default="$2"
     local input
     if [ -r /dev/tty ]; then
-        echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: "
+        echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: " >&2
         read -r input </dev/tty
         echo "${input:-$default}"
     else
@@ -342,10 +342,10 @@ done
 # ══════════════════════════════════════════════════════════════
 
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
-    echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА${NC}"
-    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
-    echo ""
+    echo "" >&2
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА${NC}" >&2
+    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}" >&2
+    echo "" >&2
 
     # ── 1. Запрос недостающих параметров ──────────────────────
 
@@ -379,15 +379,15 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         fi
         # Тип фикса (если не указан, спрашиваем)
         if [ -z "$FIX_TYPE" ]; then
-            echo ""
-            echo -e "  ${BOLD}Выберите тип фикса:${NC}"
-            echo -e "    v2   - старый iptables (TTL+Length)"
-            echo -e "    v3   - новый iptables (u32) - ${GREEN}рекомендуется${NC}"
-            echo -e "    v4   - zapret2 (disorder + badsum + window control)"
-            echo -e "    nft  - nftables (для Docker)"
-            echo ""
+            echo "" >&2
+            echo -e "  ${BOLD}Выберите тип фикса:${NC}" >&2
+            echo -e "    v2   - старый iptables (TTL+Length)" >&2
+            echo -e "    v3   - новый iptables (u32) - ${GREEN}рекомендуется${NC}" >&2
+            echo -e "    v4   - zapret2 (disorder + badsum + window control)" >&2
+            echo -e "    nft  - nftables (для Docker)" >&2
+            echo "" >&2
             while true; do
-                echo -en "  ${BOLD}Введите (v2/v3/v4/nft, Enter - v3):${NC} "
+                echo -en "  ${BOLD}Введите (v2/v3/v4/nft, Enter - v3):${NC} " >&2
                 if [ -r /dev/tty ]; then
                     read -r answer </dev/tty
                 else
@@ -396,7 +396,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
                 answer="${answer:-v3}"
                 case "$answer" in
                     v2|v3|v4|nft) FIX_TYPE="$answer"; break ;;
-                    *) echo -e "  ${RED}Неверный ввод. Допустимо: v2, v3, v4, nft${NC}" ;;
+                    *) echo -e "  ${RED}Неверный ввод. Допустимо: v2, v3, v4, nft${NC}" >&2 ;;
                 esac
             done
         fi
@@ -434,7 +434,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
 
     # Telemt
     if [[ -n "$FLAG_TELEMT" ]]; then
-        echo ""
+        echo "" >&2
         log_info "Установка Telemt версии $TELEMT_VERSION на домен $DOMAIN, порт $PROXY_PORT..."
         curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- "$TELEMT_VERSION" -l 2 -d "$DOMAIN" -p "$PROXY_PORT"
         log_success "Telemt установлен"
@@ -442,7 +442,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
 
     # Zig
     if [[ -n "$FLAG_ZIG" ]]; then
-        echo ""
+        echo "" >&2
         log_info "Установка Mtproto.zig на домен $DOMAIN, порт $PROXY_PORT..."
         curl -fsSL https://raw.githubusercontent.com/sleep3r/mtproto.zig/main/deploy/bootstrap.sh | sudo bash
         sudo mtbuddy install --port "$PROXY_PORT" --domain "$DOMAIN" --middle-proxy --no-tcpmss --no-masking --no-nfqws --no-dpi --yes
@@ -457,7 +457,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
     # ── 4. Установка фикса ──────────────────────────────────
 
     if [[ -n "$FLAG_FIX" && -z "$FLAG_NO_FIX" ]]; then
-        echo ""
+        echo "" >&2
         log_info "Установка фикса типа $FIX_TYPE на порт $FIX_PORT..."
 
         # Вызываем install_syn_fix с переданными параметрами
@@ -466,9 +466,9 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         log_success "Фикс установлен"
     fi
 
-    echo ""
+    echo "" >&2
     log_success "Автоматическая установка завершена!"
-    echo ""
+    echo "" >&2
     exit 0
 fi
 
