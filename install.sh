@@ -70,7 +70,11 @@ ask_param() {
     local input
     if [ -r /dev/tty ]; then
         echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: " >&2
-        read -r input </dev/tty
+        if ! read -t 60 -r input </dev/tty 2>/dev/null; then
+            echo "" >&2
+            log_warning "Таймаут ввода (60 сек), используем значение по умолчанию: $default"
+            input=""
+        fi
         echo "${input:-$default}"
     else
         echo "$default"
@@ -395,9 +399,13 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             while true; do
                 echo -en "  ${BOLD}Введите (v2/v3/v4/nft, Enter - v3):${NC} " >&2
                 if [ -r /dev/tty ]; then
-                    read -r answer </dev/tty
+                    if ! read -t 60 -r answer </dev/tty 2>/dev/null; then
+                        echo "" >&2
+                        log_warning "Таймаут ввода (60 сек), используем v3"
+                        answer="v3"
+                    fi
                 else
-                    read -r answer
+                    answer=""
                 fi
                 answer="${answer:-v3}"
                 case "$answer" in
