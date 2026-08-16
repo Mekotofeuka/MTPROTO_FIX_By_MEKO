@@ -104,21 +104,21 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 mekopr
 ```
 
-### Автоматическая установка
+## Автоматическая установка
 
 `install.sh` поддерживает установку прокси и фикса с передачей параметров напрямую из командной строки.
 
 Установка только фикса на порт `443`:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -fix -fix-port 443
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -fix -fix-port 443 -fix-type v3
 ```
 
-Установка Telemt и фикса на порт `443` с доменом `ozon.ru`:
+Установка Telemt 3.4.25 и фикса v3 на порт `443` с доменом `ozon.ru`:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25
 ```
 
-Параметры для автоматической установки
+###Параметры для автоматической установки
 | Флаг                          | Значение по умолчанию      | Описание                             |
 | ----------------------------- | -------------------------- | ------------------------------------ |
 | `-telemt`                     | —                          | Установить Telemt                    |
