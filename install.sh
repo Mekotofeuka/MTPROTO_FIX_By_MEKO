@@ -80,7 +80,7 @@ ask_param() {
 # ── Функция получения последней версии Telemt ──────────────
 get_latest_telemt_version() {
     local version=""
-    version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases/latest" 2>/dev/null | awk -F'"' '/"tag_name"/ {print $4}')
+    version=$(timeout 10 curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases/latest" 2>/dev/null | awk -F'"' '/"tag_name"/ {print $4}')
     if [ -z "$version" ]; then
         version="3.4.24"
     fi
@@ -349,7 +349,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
     log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 
     echo "" >&2
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.1${NC}" >&2
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.2${NC}" >&2
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}" >&2
     echo "" >&2
 
