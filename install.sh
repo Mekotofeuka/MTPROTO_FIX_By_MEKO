@@ -405,7 +405,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             echo -e "${DIM}  Работает с помощью zapret2 на уровне TCP-пакетов:" >&2
             echo -e "${DIM}  disorder + badsum + window control" >&2
             echo "" >&2
-            echo -e "  ${GREEN}[nft]${NC}  ${BOLD}nft фикс (v3)${NC} — совместим с Docker" >&2
+            echo -e "  ${GREEN}[nft]${NC}  ${BOLD}v3 фикс nftables${NC} — совместим с Docker" >&2
             echo -e "${DIM}  Разделение по байтам из пакета, как в v3 iptables" >&2
             echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита" >&2
             echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек." >&2
