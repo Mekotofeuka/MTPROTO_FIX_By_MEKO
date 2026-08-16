@@ -69,12 +69,8 @@ ask_param() {
     local default="$2"
     local input
     if [ -r /dev/tty ]; then
-        echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: " >&2
-        if ! read -t 60 -r input </dev/tty 2>/dev/null; then
-            echo "" >&2
-            log_warning "Таймаут ввода (60 сек), используем значение по умолчанию: $default"
-            input=""
-        fi
+        echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: "
+        read -r input </dev/tty
         echo "${input:-$default}"
     else
         echo "$default"
@@ -346,16 +342,12 @@ done
 # ══════════════════════════════════════════════════════════════
 
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
-    # Переопределяем функции логирования для автоустановки (вывод в stderr)
-    log_info() { echo -e "  ${BLUE}[i]${NC} $1" >&2; }
-    log_success() { echo -e "  ${GREEN}[✓]${NC} $1" >&2; }
-    log_warning() { echo -e "  ${YELLOW}[!]${NC} $1" >&2; }
-    log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 
-    echo "" >&2
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.2${NC}" >&2
-    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}" >&2
-    echo "" >&2
+
+    echo "" 
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.2${NC}" 
+    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}" 
+    echo "" 
 
     # ── 1. Запрос недостающих параметров ──────────────────────
 
@@ -389,28 +381,24 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         fi
         # Тип фикса (если не указан, спрашиваем)
         if [ -z "$FIX_TYPE" ]; then
-            echo "" >&2
-            echo -e "  ${BOLD}Выберите тип фикса:${NC}" >&2
-            echo -e "    v2   - старый iptables (TTL+Length)" >&2
-            echo -e "    v3   - новый iptables (u32) - ${GREEN}рекомендуется${NC}" >&2
-            echo -e "    v4   - zapret2 (disorder + badsum + window control)" >&2
-            echo -e "    nft  - nftables (для Docker)" >&2
-            echo "" >&2
+            echo ""
+            echo -e "  ${BOLD}Выберите тип фикса:${NC}"
+            echo -e "    v2   - старый iptables (TTL+Length)"
+            echo -e "    v3   - новый iptables (u32) - ${GREEN}рекомендуется${NC}"
+            echo -e "    v4   - zapret2 (disorder + badsum + window control)"
+            echo -e "    nft  - nftables (для Docker)"
+            echo ""
             while true; do
-                echo -en "  ${BOLD}Введите (v2/v3/v4/nft, Enter - v3):${NC} " >&2
+                echo -en "  ${BOLD}Введите (v2/v3/v4/nft, Enter - v3):${NC} "
                 if [ -r /dev/tty ]; then
-                    if ! read -t 60 -r answer </dev/tty 2>/dev/null; then
-                        echo "" >&2
-                        log_warning "Таймаут ввода (60 сек), используем v3"
-                        answer="v3"
-                    fi
+                    read -r answer </dev/tty
                 else
-                    answer=""
+                    read -r answer
                 fi
                 answer="${answer:-v3}"
                 case "$answer" in
                     v2|v3|v4|nft) FIX_TYPE="$answer"; break ;;
-                    *) echo -e "  ${RED}Неверный ввод. Допустимо: v2, v3, v4, nft${NC}" >&2 ;;
+                    *) echo -e "  ${RED}Неверный ввод. Допустимо: v2, v3, v4, nft${NC}" ;;
                 esac
             done
         fi
