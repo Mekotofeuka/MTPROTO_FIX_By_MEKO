@@ -751,7 +751,7 @@ zapret2_stop() {
 
 # ── Проверка wscale и расчёт win ACK ──────────────────────
 zapret2_check_wscale() {
-    local _show_only="${1:-false}"
+    local _mode="${1:-ask}"   # ask, show, auto
     local _target=1280
     local _max_allowed=1399
 
@@ -825,32 +825,49 @@ zapret2_check_wscale() {
         echo -e "  ${YELLOW}⚠ Реальное окно (${_real_win} байт) — очень маленькое, возможны проблемы${NC}"
     fi
 
-    if [ "$_impossible" != "true" ] && [ "$_show_only" != "true" ]; then
+    # ── Логика применения изменений ──────────────────────────
+    if [ "$_impossible" != "true" ]; then
         if [ "$_current_real" -ge 1400 ] && [ "$_win_ack_rec" != "$_current_win_ack" ]; then
-            echo ""
-            echo -e "  ${BOLD}Необходимо изменить win ACK: ${_current_win_ack} → ${_win_ack_rec}${NC}"
-            echo -e "  ${DIM}(реальное окно: ${_current_real} → ${_real_win} байт)${NC}"
-            echo -en "  Применить? [Y/n]: "
-            local _yn; read -r _yn
-            if [[ ! "$_yn" =~ ^[nN]$ ]]; then
+            if [ "$_mode" = "auto" ]; then
+                echo ""
+                log_info "Автоматически применяем win ACK: ${_current_win_ack} → ${_win_ack_rec}"
                 ZAPRET2_WIN_ACK="$_win_ack_rec"
                 save_settings
-                log_success "win ACK установлен: ${_win_ack_rec} (реальное окно: ${_real_win} байт)"
                 zapret2_update_config
-            else
-                log_info "Значение не изменено"
+            elif [ "$_mode" = "ask" ]; then
+                echo ""
+                echo -e "  ${BOLD}Необходимо изменить win ACK: ${_current_win_ack} → ${_win_ack_rec}${NC}"
+                echo -e "  ${DIM}(реальное окно: ${_current_real} → ${_real_win} байт)${NC}"
+                echo -en "  Применить? [Y/n]: "
+                local _yn; read -r _yn
+                if [[ ! "$_yn" =~ ^[nN]$ ]]; then
+                    ZAPRET2_WIN_ACK="$_win_ack_rec"
+                    save_settings
+                    log_success "win ACK установлен: ${_win_ack_rec} (реальное окно: ${_real_win} байт)"
+                    zapret2_update_config
+                else
+                    log_info "Значение не изменено"
+                fi
             fi
         elif [ "$_win_ack_rec" != "$_current_win_ack" ] && [ "$_current_real" -lt 1400 ]; then
-            echo ""
-            echo -e "  ${DIM}Текущее значение работает, но можно оптимизировать:${NC}"
-            echo -e "  ${DIM}win ACK ${_current_win_ack} (${_current_real} байт) → ${_win_ack_rec} (${_real_win} байт)${NC}"
-            echo -en "  Оптимизировать? [y/N]: "
-            local _yn; read -r _yn
-            if [[ "$_yn" =~ ^[yY]$ ]]; then
+            if [ "$_mode" = "auto" ]; then
+                echo ""
+                log_info "Автоматически оптимизируем win ACK: ${_current_win_ack} → ${_win_ack_rec}"
                 ZAPRET2_WIN_ACK="$_win_ack_rec"
                 save_settings
-                log_success "win ACK установлен: ${_win_ack_rec} (реальное окно: ${_real_win} байт)"
                 zapret2_update_config
+            elif [ "$_mode" = "ask" ]; then
+                echo ""
+                echo -e "  ${DIM}Текущее значение работает, но можно оптимизировать:${NC}"
+                echo -e "  ${DIM}win ACK ${_current_win_ack} (${_current_real} байт) → ${_win_ack_rec} (${_real_win} байт)${NC}"
+                echo -en "  Оптимизировать? [y/N]: "
+                local _yn; read -r _yn
+                if [[ "$_yn" =~ ^[yY]$ ]]; then
+                    ZAPRET2_WIN_ACK="$_win_ack_rec"
+                    save_settings
+                    log_success "win ACK установлен: ${_win_ack_rec} (реальное окно: ${_real_win} байт)"
+                    zapret2_update_config
+                fi
             fi
         fi
     fi
@@ -1415,11 +1432,11 @@ zapret2_install_auto() {
     ZAPRET2_SERVICE_ENABLED="true"
     save_settings
 
-    zapret2_check_wscale "true"
+    # Проверка и автоматическая корректировка wscale
+    zapret2_check_wscale "auto"
 
     log_success "Zapret2 успешно установлен на порт $port"
 }
-
 
 # ── Загрузка настроек при старте ────────────────────────────
 load_settings
