@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh – Главный установщик MEKOPR
+# install.sh – Главный установщик MEKOPR с поддержкой аргументов
 
 set -e
 
@@ -63,6 +63,26 @@ ensure_file() {
     return 0
 }
 
+# ── Функция запроса параметра с дефолтом ────────────────────
+ask_param() {
+    local prompt="$1"
+    local default="$2"
+    local input
+    echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: "
+    read -r input
+    echo "${input:-$default}"
+}
+
+# ── Функция получения последней версии Telemt ──────────────
+get_latest_telemt_version() {
+    local version=""
+    version=$(curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases/latest" 2>/dev/null | awk -F'"' '/"tag_name"/ {print $4}')
+    if [ -z "$version" ]; then
+        version="3.4.24"
+    fi
+    echo "$version"
+}
+
 # ── СТАРОЕ МЕНЮ (ПРОКСИ) ──────────────────────────────────────
 show_proxy_menu() {
     clear 2>/dev/null || printf '\033[2J\033[H'
@@ -78,7 +98,7 @@ show_proxy_menu() {
     echo ""
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Автоматическая установка${NC}  ${CYAN}(для новичков)${NC}"
     echo -e "       ${DIM}Откроет меню автоматической и полуавтоматической установки прокси${NC}"
-	echo -e ""
+    echo -e ""
     echo -e "       ${DIM}Полуавтоматический вариант попросит ввести кастомные параметры"
     echo -e "       ${DIM}Автоматический вариант установит универсальные параметры сам"
     echo ""
@@ -205,5 +225,227 @@ show_main_menu() {
     done
 }
 
-# ── ЗАПУСК ────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════
+#  ПАРСИНГ АРГУМЕНТОВ КОМАНДНОЙ СТРОКИ
+# ══════════════════════════════════════════════════════════════
+
+FLAG_TELEMT=""
+FLAG_ZIG=""
+FLAG_MTG=""
+FLAG_FIX=""
+FLAG_NO_FIX=""
+FIX_TYPE=""              # v2, v3, v4
+FIX_PORT=""              # порт для фикса
+PROXY_PORT=""            # порт прокси
+DOMAIN=""
+TELEMT_VERSION=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -telemt)
+            FLAG_TELEMT="true"
+            shift
+            ;;
+        -zig)
+            FLAG_ZIG="true"
+            shift
+            ;;
+        -mtg)
+            FLAG_MTG="true"
+            shift
+            ;;
+        -fix)
+            FLAG_FIX="true"
+            shift
+            ;;
+        -no-fix)
+            FLAG_NO_FIX="true"
+            shift
+            ;;
+        -fix-type)
+            case "$2" in
+                v2|v3|v4) FIX_TYPE="$2" ;;
+                *) echo -e "${RED}[✗]${NC} Неверный тип фикса: $2 (доступны: v2, v3, v4)"; exit 1 ;;
+            esac
+            shift 2
+            ;;
+        -fix-port)
+            if [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -ge 1 ] && [ "$2" -le 65535 ]; then
+                FIX_PORT="$2"
+                shift 2
+            else
+                echo -e "${RED}[✗]${NC} Неверный порт: $2"; exit 1
+            fi
+            ;;
+        -port)
+            if [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -ge 1 ] && [ "$2" -le 65535 ]; then
+                PROXY_PORT="$2"
+                shift 2
+            else
+                echo -e "${RED}[✗]${NC} Неверный порт: $2"; exit 1
+            fi
+            ;;
+        -domain)
+            DOMAIN="$2"
+            shift 2
+            ;;
+        -version)
+            TELEMT_VERSION="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo ""
+            echo -e "  ${BOLD}Использование:${NC}"
+            echo -e "    curl ... | sudo bash -s -- [опции]"
+            echo ""
+            echo -e "  ${BOLD}Опции:${NC}"
+            echo -e "    -telemt                установить Telemt"
+            echo -e "    -zig                   установить Mtproto.zig"
+            echo -e "    -mtg                   установить MTG (пока не реализовано)"
+            echo -e "    -fix                   установить фикс"
+            echo -e "    -fix-type {v2|v3|v4}   тип фикса (по умолчанию v3)"
+            echo -e "    -fix-port <порт>       порт для фикса (если не указан, берётся из -port или спросится)"
+            echo -e "    -port <порт>           порт для прокси (и для фикса, если не задан -fix-port)"
+            echo -e "    -domain <домен>        SNI домен для прокси (по умолчанию ozon.ru)"
+            echo -e "    -version <версия>      версия Telemt (по умолчанию последняя)"
+            echo -e "    -no-fix                отключить установку фикса"
+            echo -e "    -h, --help             показать эту справку"
+            echo ""
+            echo -e "  ${BOLD}Примеры:${NC}"
+            echo -e "    # Только фикс V3 на порт 8443"
+            echo -e "    curl ... | sudo bash -s -- -fix -fix-port 8443"
+            echo ""
+            echo -e "    # Telemt + V3 фикс на порт 9443, домен my.domain"
+            echo -e "    curl ... | sudo bash -s -- -telemt -domain my.domain -port 9443 -fix"
+            echo ""
+            echo -e "    # Telemt без фикса"
+            echo -e "    curl ... | sudo bash -s -- -telemt -no-fix"
+            echo ""
+            echo -e "    # V4 фикс (zapret2) на порт 443"
+            echo -e "    curl ... | sudo bash -s -- -fix -fix-type v4"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}[✗]${NC} Неизвестный аргумент: $1"
+            echo -e "  Используйте -h для справки"
+            exit 1
+            ;;
+    esac
+done
+
+# ══════════════════════════════════════════════════════════════
+#  АВТОМАТИЧЕСКАЯ УСТАНОВКА (если передан хотя бы один флаг)
+# ══════════════════════════════════════════════════════════════
+
+if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
+    echo ""
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА${NC}"
+    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
+    echo ""
+
+    # ── 1. Запрос недостающих параметров ──────────────────────
+
+    # Домен (если ставится прокси)
+    if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" ]]; then
+        if [ -z "$DOMAIN" ]; then
+            DOMAIN=$(ask_param "Введите SNI домен" "ozon.ru")
+        fi
+        if [ -z "$PROXY_PORT" ]; then
+            PROXY_PORT=$(ask_param "Введите порт для прокси" "443")
+        fi
+        # Версия Telemt
+        if [[ -n "$FLAG_TELEMT" && -z "$TELEMT_VERSION" ]]; then
+            TELEMT_VERSION=$(ask_param "Введите версию Telemt (или Enter для последней)" "последняя")
+            if [ "$TELEMT_VERSION" = "последняя" ] || [ -z "$TELEMT_VERSION" ]; then
+                TELEMT_VERSION=$(get_latest_telemt_version)
+                log_info "Установлена последняя версия: $TELEMT_VERSION"
+            fi
+        fi
+    fi
+
+    # Порт фикса
+    if [[ -n "$FLAG_FIX" && -z "$FLAG_NO_FIX" ]]; then
+        if [ -z "$FIX_PORT" ]; then
+            if [ -n "$PROXY_PORT" ]; then
+                FIX_PORT="$PROXY_PORT"
+                log_info "Порт фикса взят из порта прокси: $FIX_PORT"
+            else
+                FIX_PORT=$(ask_param "Введите порт для фикса" "443")
+            fi
+        fi
+        # Тип фикса (если не указан, спрашиваем)
+        if [ -z "$FIX_TYPE" ]; then
+            echo ""
+            echo -e "  ${BOLD}Выберите тип фикса:${NC}"
+            echo -e "    v2  - старый iptables (TTL+Length)"
+            echo -e "    v3  - новый iptables (u32) - ${GREEN}рекомендуется${NC}"
+            echo -e "    v4  - zapret2 (disorder + badsum + window control)"
+            echo ""
+            while true; do
+                echo -en "  ${BOLD}Введите (v2/v3/v4, Enter - v3):${NC} "
+                read -r answer
+                answer="${answer:-v3}"
+                case "$answer" in
+                    v2|v3|v4) FIX_TYPE="$answer"; break ;;
+                    *) echo -e "  ${RED}Неверный ввод. Допустимо: v2, v3, v4${NC}" ;;
+                esac
+            done
+        fi
+    fi
+
+    # ── 2. Подготовка окружения ──────────────────────────────
+
+    # Скачиваем rules.sh (и zapret2_fix.sh, если нужно, но это будет сделано в rules.sh)
+    mkdir -p "$INSTALL_DIR/data"
+    if [ ! -f "$INSTALL_DIR/data/rules.sh" ]; then
+        download_file "data/rules.sh" "$INSTALL_DIR/data/rules.sh"
+    fi
+
+    # Подключаем rules.sh (для install_syn_fix)
+    source "$INSTALL_DIR/data/rules.sh"
+
+    # ── 3. Установка прокси ──────────────────────────────────
+
+    # Telemt
+    if [[ -n "$FLAG_TELEMT" ]]; then
+        echo ""
+        log_info "Установка Telemt версии $TELEMT_VERSION на домен $DOMAIN, порт $PROXY_PORT..."
+        curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- "$TELEMT_VERSION" -l 2 -d "$DOMAIN" -p "$PROXY_PORT"
+        log_success "Telemt установлен"
+    fi
+
+    # Zig
+    if [[ -n "$FLAG_ZIG" ]]; then
+        echo ""
+        log_info "Установка Mtproto.zig на домен $DOMAIN, порт $PROXY_PORT..."
+        curl -fsSL https://raw.githubusercontent.com/sleep3r/mtproto.zig/main/deploy/bootstrap.sh | sudo bash
+        sudo mtbuddy install --port "$PROXY_PORT" --domain "$DOMAIN" --middle-proxy --no-tcpmss --no-masking --no-nfqws --no-dpi --yes
+        log_success "Mtproto.zig установлен"
+    fi
+
+    # MTG (пока заглушка)
+    if [[ -n "$FLAG_MTG" ]]; then
+        log_warning "Установка MTG пока не реализована в автоматическом режиме."
+    fi
+
+    # ── 4. Установка фикса ──────────────────────────────────
+
+    if [[ -n "$FLAG_FIX" && -z "$FLAG_NO_FIX" ]]; then
+        echo ""
+        log_info "Установка фикса типа $FIX_TYPE на порт $FIX_PORT..."
+
+        # Вызываем install_syn_fix с переданными параметрами
+        # Функция install_syn_fix будет обрабатывать -type v2/v3/v4
+        install_syn_fix -auto_install -port "$FIX_PORT" -type "$FIX_TYPE"
+
+        log_success "Фикс установлен"
+    fi
+
+    echo ""
+    log_success "Автоматическая установка завершена!"
+    echo ""
+    exit 0
+fi
+
+# ── ЕСЛИ АРГУМЕНТОВ НЕТ — ПОКАЗЫВАЕМ ИНТЕРАКТИВНОЕ МЕНЮ ──────
 show_main_menu
