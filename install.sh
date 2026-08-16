@@ -349,7 +349,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
     log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 
     echo "" >&2
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА${NC}" >&2
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.1${NC}" >&2
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}" >&2
     echo "" >&2
 
