@@ -234,7 +234,7 @@ FLAG_ZIG=""
 FLAG_MTG=""
 FLAG_FIX=""
 FLAG_NO_FIX=""
-FIX_TYPE=""              # v2, v3, v4
+FIX_TYPE=""              # v2, v3, v4, nft
 FIX_PORT=""              # порт для фикса
 PROXY_PORT=""            # порт прокси
 DOMAIN=""
@@ -264,8 +264,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         -fix-type)
             case "$2" in
-                v2|v3|v4) FIX_TYPE="$2" ;;
-                *) echo -e "${RED}[✗]${NC} Неверный тип фикса: $2 (доступны: v2, v3, v4)"; exit 1 ;;
+                v2|v3|v4|nft) FIX_TYPE="$2" ;;
+                *) echo -e "${RED}[✗]${NC} Неверный тип фикса: $2 (доступны: v2, v3, v4, nft)"; exit 1 ;;
             esac
             shift 2
             ;;
@@ -303,7 +303,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -zig                   установить Mtproto.zig"
             echo -e "    -mtg                   установить MTG (пока не реализовано)"
             echo -e "    -fix                   установить фикс"
-            echo -e "    -fix-type {v2|v3|v4}   тип фикса (по умолчанию v3)"
+            echo -e "    -fix-type {v2|v3|v4|nft}   тип фикса (по умолчанию v3)"
             echo -e "    -fix-port <порт>       порт для фикса (если не указан, берётся из -port или спросится)"
             echo -e "    -port <порт>           порт для прокси (и для фикса, если не задан -fix-port)"
             echo -e "    -domain <домен>        SNI домен для прокси (по умолчанию ozon.ru)"
@@ -377,17 +377,18 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         if [ -z "$FIX_TYPE" ]; then
             echo ""
             echo -e "  ${BOLD}Выберите тип фикса:${NC}"
-            echo -e "    v2  - старый iptables (TTL+Length)"
-            echo -e "    v3  - новый iptables (u32) - ${GREEN}рекомендуется${NC}"
-            echo -e "    v4  - zapret2 (disorder + badsum + window control)"
+            echo -e "    v2   - старый iptables (TTL+Length)"
+            echo -e "    v3   - новый iptables (u32) - ${GREEN}рекомендуется${NC}"
+            echo -e "    v4   - zapret2 (disorder + badsum + window control)"
+            echo -e "    nft  - nftables (для Docker)"
             echo ""
             while true; do
-                echo -en "  ${BOLD}Введите (v2/v3/v4, Enter - v3):${NC} "
+                echo -en "  ${BOLD}Введите (v2/v3/v4/nft, Enter - v3):${NC} "
                 read -r answer
                 answer="${answer:-v3}"
                 case "$answer" in
-                    v2|v3|v4) FIX_TYPE="$answer"; break ;;
-                    *) echo -e "  ${RED}Неверный ввод. Допустимо: v2, v3, v4${NC}" ;;
+                    v2|v3|v4|nft) FIX_TYPE="$answer"; break ;;
+                    *) echo -e "  ${RED}Неверный ввод. Допустимо: v2, v3, v4, nft${NC}" ;;
                 esac
             done
         fi
@@ -420,6 +421,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             exit 1
         fi
     fi
+
     # ── 3. Установка прокси ──────────────────────────────────
 
     # Telemt
@@ -451,7 +453,6 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         log_info "Установка фикса типа $FIX_TYPE на порт $FIX_PORT..."
 
         # Вызываем install_syn_fix с переданными параметрами
-        # Функция install_syn_fix будет обрабатывать -type v2/v3/v4
         install_syn_fix -auto_install -port "$FIX_PORT" -type "$FIX_TYPE"
 
         log_success "Фикс установлен"
