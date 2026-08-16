@@ -68,9 +68,9 @@ ask_param() {
     local prompt="$1"
     local default="$2"
     local input
-    if [ -r /dev/tty ]; then
+    if [ -t 0 ] && [ -r /dev/tty ]; then
         echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: "
-        read -r input </dev/tty
+        read -r input
         echo "${input:-$default}"
     else
         echo "$default"
