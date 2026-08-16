@@ -104,6 +104,43 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 mekopr
 ```
 
+# Автоматическая установка
+
+`install.sh` поддерживает установку прокси и фикса с передачей параметров напрямую из командной строки.
+
+Установка только фикса на порт `443`:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -fix -fix-port 443
+```
+
+Установка Telemt и фикса на порт `443` с доменом `ozon.ru`:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix
+```
+
+Параметры для автоматической установки
+| Флаг                          | Значение по умолчанию      | Описание                             |
+| ----------------------------- | -------------------------- | ------------------------------------ |
+| `-telemt`                     | —                          | Установить Telemt                    |
+| `-zig`                        | —                          | Установить MTProto.zig               |
+| `-mtg`                        | —                          | Установить MTG                       |
+| `-fix`                        | —                          | Установить MTProto FIX               |
+| `-no-fix`                     | —                          | Не устанавливать фикс                |
+| `-fix-type {v2\|v3\|v4\|(nft}`| `v3`                       | Тип устанавливаемого фикса(NFT = v3 через NFTables)           |
+| `-fix-port <порт>`            | значение `-port` или `443` | Порт, к которому применяется фикс    |
+| `-port <порт>`                | `443`                      | Порт прокси                          |
+| `-domain <домен>`             | `mydomain.ru`              | Домен для TLS-маскировки прокси      |
+| `-version <версия>`           | последняя                  | Версия Telemt                        |
+| `-h`, `--help`                | —                          | Показать список доступных аргументов |
+
+> Если версия Telemt и тип фикса не указаны, они будут запрошены во время установки.
+> Если параметры командной строки не используются, установщик откроет стандартное меню установки.
+> Если передать все необходимые параметры, установка выполняется без дополнительных вопросов:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25
+```
+
+
 # Как работает фикс V3:
 
 Применяет к серверу набор правил, который разделяет устройства на 2 вида - **ios** и **не ios** и применяет к каждому свой лимит
