@@ -63,20 +63,6 @@ ensure_file() {
     return 0
 }
 
-# ── Функция запроса параметра с дефолтом ────────────────────
-ask_param() {
-    local prompt="$1"
-    local default="$2"
-    local input
-    if [ -r /dev/tty ]; then
-        echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: " >&2
-        read -r input </dev/tty
-        echo "${input:-$default}"
-    else
-        echo "$default"
-    fi
-}
-
 # ── Функция получения последней версии Telemt ──────────────
 get_latest_telemt_version() {
     local version=""
@@ -343,26 +329,42 @@ done
 
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
 
-
-    echo "" 
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.3${NC}" 
-    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}" 
-    echo "" 
+    echo ""
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.4${NC}"
+    echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
+    echo ""
 
     # ── 1. Запрос недостающих параметров ──────────────────────
 
     # Домен (если ставится прокси)
     if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" ]]; then
         if [ -z "$DOMAIN" ]; then
-            DOMAIN=$(ask_param "Введите SNI домен" "ozon.ru")
+            echo -en "  ${BOLD}Введите SNI домен${NC} ${DIM}(по умолчанию: ozon.ru)${NC}: " >&2
+            if [ -r /dev/tty ]; then
+                read -r DOMAIN </dev/tty
+            else
+                DOMAIN=""
+            fi
+            [ -z "$DOMAIN" ] && DOMAIN="ozon.ru"
         fi
         if [ -z "$PROXY_PORT" ]; then
-            PROXY_PORT=$(ask_param "Введите порт для прокси" "443")
+            echo -en "  ${BOLD}Введите порт для прокси${NC} ${DIM}(по умолчанию: 443)${NC}: " >&2
+            if [ -r /dev/tty ]; then
+                read -r PROXY_PORT </dev/tty
+            else
+                PROXY_PORT=""
+            fi
+            [ -z "$PROXY_PORT" ] && PROXY_PORT="443"
         fi
         # Версия Telemt
         if [[ -n "$FLAG_TELEMT" && -z "$TELEMT_VERSION" ]]; then
-            TELEMT_VERSION=$(ask_param "Введите версию Telemt (или Enter для последней)" "последняя")
-            if [ "$TELEMT_VERSION" = "последняя" ] || [ -z "$TELEMT_VERSION" ]; then
+            echo -en "  ${BOLD}Введите версию Telemt (или Enter для последней)${NC} ${DIM}(по умолчанию: последняя)${NC}: " >&2
+            if [ -r /dev/tty ]; then
+                read -r TELEMT_VERSION </dev/tty
+            else
+                TELEMT_VERSION=""
+            fi
+            if [ -z "$TELEMT_VERSION" ] || [ "$TELEMT_VERSION" = "последняя" ]; then
                 TELEMT_VERSION=$(get_latest_telemt_version)
                 log_info "Установлена последняя версия: $TELEMT_VERSION"
             fi
@@ -376,7 +378,13 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
                 FIX_PORT="$PROXY_PORT"
                 log_info "Порт фикса взят из порта прокси: $FIX_PORT"
             else
-                FIX_PORT=$(ask_param "Введите порт для фикса" "443")
+                echo -en "  ${BOLD}Введите порт для фикса${NC} ${DIM}(по умолчанию: 443)${NC}: " >&2
+                if [ -r /dev/tty ]; then
+                    read -r FIX_PORT </dev/tty
+                else
+                    FIX_PORT=""
+                fi
+                [ -z "$FIX_PORT" ] && FIX_PORT="443"
             fi
         fi
         # Тип фикса (если не указан, спрашиваем)
