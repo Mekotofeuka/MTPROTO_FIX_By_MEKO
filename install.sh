@@ -69,7 +69,11 @@ ask_param() {
     local default="$2"
     local input
     echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: "
-    read -r input
+    if [ -r /dev/tty ]; then
+        read -r input </dev/tty
+    else
+        read -r input
+    fi
     echo "${input:-$default}"
 }
 
@@ -384,7 +388,11 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             echo ""
             while true; do
                 echo -en "  ${BOLD}Введите (v2/v3/v4/nft, Enter - v3):${NC} "
-                read -r answer
+                if [ -r /dev/tty ]; then
+                    read -r answer </dev/tty
+                else
+                    read -r answer
+                fi
                 answer="${answer:-v3}"
                 case "$answer" in
                     v2|v3|v4|nft) FIX_TYPE="$answer"; break ;;
