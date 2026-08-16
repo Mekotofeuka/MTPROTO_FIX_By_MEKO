@@ -412,7 +412,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек." >&2
             echo "" >&2
             while true; do
-                echo -en "  ${BOLD}Ввод (v2/v3/v4/nft, Enter - v3):${NC} " >&2
+                echo -en "  ${NC}${BOLD}Ввод${GREEN}${BOLD} (v2/v3/v4/nft, Enter - v3)${NC}:${NC} " >&2
                 if [ -r /dev/tty ]; then
                     read -r answer </dev/tty
                 else
