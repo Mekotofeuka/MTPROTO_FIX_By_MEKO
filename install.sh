@@ -395,15 +395,31 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
 
     # ── 2. Подготовка окружения ──────────────────────────────
 
-    # Скачиваем rules.sh (и zapret2_fix.sh, если нужно, но это будет сделано в rules.sh)
+    # Всегда скачиваем свежий rules.sh
     mkdir -p "$INSTALL_DIR/data"
-    if [ ! -f "$INSTALL_DIR/data/rules.sh" ]; then
-        download_file "data/rules.sh" "$INSTALL_DIR/data/rules.sh"
+    log_info "Загрузка свежего rules.sh..."
+    curl -fsSL "$BASE_URL/data/rules.sh" -o "$INSTALL_DIR/data/rules.sh"
+    chmod +x "$INSTALL_DIR/data/rules.sh"
+
+    # Если тип фикса v4, скачиваем zapret2_fix.sh
+    if [[ "$FIX_TYPE" == "v4" ]]; then
+        log_info "Загрузка свежего zapret2_fix.sh..."
+        curl -fsSL "$BASE_URL/data/zapret2_fix.sh" -o "$INSTALL_DIR/data/zapret2_fix.sh"
+        chmod +x "$INSTALL_DIR/data/zapret2_fix.sh"
     fi
 
-    # Подключаем rules.sh (для install_syn_fix)
+    # Подключаем rules.sh
     source "$INSTALL_DIR/data/rules.sh"
 
+    # Если тип v4, подключаем zapret2_fix.sh
+    if [[ "$FIX_TYPE" == "v4" ]]; then
+        if [ -f "$INSTALL_DIR/data/zapret2_fix.sh" ]; then
+            source "$INSTALL_DIR/data/zapret2_fix.sh"
+        else
+            log_error "zapret2_fix.sh не загружен"
+            exit 1
+        fi
+    fi
     # ── 3. Установка прокси ──────────────────────────────────
 
     # Telemt
