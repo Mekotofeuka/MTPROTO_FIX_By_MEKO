@@ -264,19 +264,68 @@ SERVICE_UNIT_EOF
     fi
 }
 
-# ── УСТАНОВКА SYN FIX ──────────────────────────────────────
+# ── УСТАНОВКА SYN FIX (с поддержкой аргументов) ────────────
 install_syn_fix() {
     local ports_input
     local fix_choice
     local auto_install=false
     local forced_ports=""
-    local FIX_TYPE="new"
+    local FIX_TYPE="new"   # new=v3, old=v2, docker_smart=nft, zapret2
 
-    if [[ "$1" == "-auto_install" ]]; then
-        auto_install=true
-        forced_ports="$2"
-        FIX_TYPE="new"
+    # ── Парсинг аргументов ──────────────────────────────────
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -auto_install)
+                auto_install=true
+                shift
+                ;;
+            -port)
+                forced_ports="$2"
+                shift 2
+                ;;
+            -type)
+                case "$2" in
+                    v2|old)   FIX_TYPE="old" ;;
+                    v3|new)   FIX_TYPE="new" ;;
+                    nft)      FIX_TYPE="docker_smart" ;;
+                    v4|zapret2) FIX_TYPE="zapret2" ;;
+                    *) log_warning "Неизвестный тип фикса: $2, используем v3"; FIX_TYPE="new" ;;
+                esac
+                shift 2
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    # ── Если auto_install и тип zapret2 – вызываем отдельную функцию ──
+    if [ "$auto_install" = true ] && [ "$FIX_TYPE" = "zapret2" ]; then
+        if [ -z "$forced_ports" ]; then
+            forced_ports="443"
+        fi
+        log_info "Установка Zapret2 (v4) на порт $forced_ports..."
+        # Вызываем функцию, которая будет реализована в zapret2_fix.sh
+        if declare -f zapret2_install_auto &>/dev/null; then
+            zapret2_install_auto "$forced_ports"
+            return $?
+        else
+            log_error "Функция zapret2_install_auto не найдена. Сначала обновите zapret2_fix.sh"
+            return 1
+        fi
     fi
+
+    # ── Если auto_install и тип nft – вызываем установку nftables ──
+    if [ "$auto_install" = true ] && [ "$FIX_TYPE" = "docker_smart" ]; then
+        if [ -z "$forced_ports" ]; then
+            forced_ports="443"
+        fi
+        # Установка nftables в автоматическом режиме
+        install_nft_auto "$forced_ports"
+        return $?
+    fi
+
+    # ── Далее интерактивный режим или auto_install для v2/v3 ──
 
     ssh_port=$(get_ssh_port)
 
@@ -290,7 +339,6 @@ install_syn_fix() {
         fi
     else
         echo ""
-        # Используем /dev/tty для ввода
         if [ -r /dev/tty ]; then
             clear
             echo -e ""
@@ -323,10 +371,10 @@ install_syn_fix() {
         echo -e "  ${GREEN}[1]${NC}  ${BOLD}V3 фикс iptables${NC} (Разделение устройств с помощью u32 по байтам из пакета) — ${GREEN}${BOLD}рекомендуется${NC}"
         echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита"
         echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек."
-		echo -e ""
+        echo -e ""
         echo -e "  ${CYAN}[2]${NC}  ${BOLD}V4 фикс zapret2 ${NC} — быстрый (на этапе тестирования)${NC}"
         echo -e "${DIM}  Работает с помощью zapret2 на уровне TCP-пакетов: ${NC}"
-		echo -e "${DIM}  disorder + badsum + window control"
+        echo -e "${DIM}  disorder + badsum + window control"
         echo ""
         echo -e "  ${YELLOW}[3]${NC}  ${BOLD}v2 фикс iptables${NC} (Разделение устройств определяя их TTL+Length)"
         echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"
@@ -361,14 +409,14 @@ install_syn_fix() {
             log_info "Выбран v3 nftables"
         elif [ "$fix_choice" = "5" ]; then
             FIX_TYPE="docker_classic"
-            log_info "Выбран v3 nftables"
+            log_info "Выбран v2 nftables"
         else
             log_warning "Неверный выбор, используем первый вариант"
             FIX_TYPE="new"
         fi
     fi
 
-    # ── Если выбран Zapret2 fix ────────────────────────────────
+    # ── Если выбран Zapret2 fix в интерактивном режиме ────────
     if [ "$FIX_TYPE" = "zapret2" ]; then
         if [ -f "/opt/mtpr-simple/data/zapret2_fix.sh" ]; then
             source /opt/mtpr-simple/data/zapret2_fix.sh
@@ -384,7 +432,7 @@ install_syn_fix() {
         return 0
     fi
 
-    # Парсим порты
+    # ── Парсим порты ──────────────────────────────────────────
     IFS=',' read -ra PORTS_ARRAY <<< "$ports_input"
     local valid_ports=()
     for p in "${PORTS_ARRAY[@]}"; do
@@ -398,13 +446,9 @@ install_syn_fix() {
 
     if [ ${#valid_ports[@]} -eq 0 ]; then
         log_error "Нет корректных портов для установки"
-        echo ""
-        if [ -r /dev/tty ]; then
+        if [ "$auto_install" = false ] && [ -r /dev/tty ]; then
             echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
             read -rsn1 </dev/tty
-        else
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-            read -rsn1
         fi
         return 1
     fi
@@ -415,7 +459,6 @@ install_syn_fix() {
 
     # ── nftables режимы ──────────────────────────────────────
     if [ "$FIX_TYPE" = "docker_smart" ] || [ "$FIX_TYPE" = "docker_classic" ]; then
-
         # Проверяем nftables
         if ! command -v nft &>/dev/null; then
             log_warning "nftables не установлен, устанавливаю..."
@@ -426,14 +469,10 @@ install_syn_fix() {
             elif command -v dnf &>/dev/null; then
                 dnf install -y -q nftables
             else
-                echo ""
                 log_error "Не удалось установить nftables автоматически"
-                if [ -r /dev/tty ]; then
+                if [ "$auto_install" = false ] && [ -r /dev/tty ]; then
                     echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
                     read -rsn1 </dev/tty
-                else
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1
                 fi
                 return 1
             fi
@@ -468,11 +507,9 @@ install_syn_fix() {
 
         log_info "Установка nftables режима..."
 
-        # ── Генерируем скрипт как в реаниматоре ──────────────
         local NFT_SCRIPT="/opt/mtpr-simple/mtpr-synfix-nft.sh"
         local NFT_TABLE="mtpr_synfix"
 
-        # Создаём shell-обёртку (как в реаниматоре)
         cat > "$NFT_SCRIPT" << 'NFT_WRAPPER_EOF'
 #!/bin/sh
 set -eu
@@ -480,10 +517,7 @@ set -eu
 TABLE="mtpr_synfix"
 CHAIN="input"
 
-# Удаляем таблицу если существует
 nft delete table inet "$TABLE" 2>/dev/null || true
-
-# Создаём таблицу и цепочку
 nft add table inet "$TABLE"
 nft "add chain inet $TABLE $CHAIN { type filter hook input priority 0; policy accept; }"
 
@@ -491,47 +525,33 @@ NFT_WRAPPER_EOF
 
         if [ "$FIX_TYPE" = "docker_smart" ]; then
             cat >> "$NFT_SCRIPT" << 'SMART_RULES_EOF'
-# 1. iOS по TCP fingerprint → ACCEPT без лимита
 nft "add rule inet mtpr_synfix input tcp dport PORT_HERE tcp flags & (syn|ack) == syn @th,108,20 0x2ffff @th,160,16 0x204 @th,192,16 0x103 @th,224,24 0x10108 @th,320,32 0x4020000 counter accept comment \"ios_accept\""
-
-# 2. Все остальные → лимит 54/minute
 nft "add rule inet mtpr_synfix input tcp dport PORT_HERE tcp flags & (syn|ack) == syn meter mtpr_other { ip saddr timeout 60s limit rate 54/minute burst 1 packets } counter accept comment \"other_accept\""
-
-# 3. Превысившие лимит → reject с icmp-host-unreachable
 nft "add rule inet mtpr_synfix input tcp dport PORT_HERE tcp flags & (syn|ack) == syn counter reject with icmp type host-unreachable comment \"other_reject\""
 SMART_RULES_EOF
         else
             cat >> "$NFT_SCRIPT" << 'CLASSIC_RULES_EOF'
-# Classic: 1/second burst 1 для всех
 nft "add rule inet mtpr_synfix input tcp dport PORT_HERE tcp flags & (syn|ack) == syn meter mtpr_classic { ip saddr timeout 60s limit rate 1/second burst 1 packets } counter drop comment \"classic_drop\""
 CLASSIC_RULES_EOF
         fi
 
-        # Подставляем порты
         for port in "${valid_ports[@]}"; do
             sed -i "s/PORT_HERE/${port}/g" "$NFT_SCRIPT"
         done
 
         chmod +x "$NFT_SCRIPT"
 
-        # Применяем скрипт (как в реаниматоре)
         if /bin/sh "$NFT_SCRIPT"; then
-            echo ""
             log_success "NFT правила применены успешно"
         else
-            echo ""
             log_error "Ошибка применения NFT правил"
-            if [ -r /dev/tty ]; then
+            if [ "$auto_install" = false ] && [ -r /dev/tty ]; then
                 echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
                 read -rsn1 </dev/tty
-            else
-                echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                read -rsn1
             fi
             return 1
         fi
 
-        # Создаём systemd сервис (как в реаниматоре)
         cat > /etc/systemd/system/mtpr-nft-synfix.service << 'SERVICE_NFT_EOF'
 [Unit]
 Description=MTProto SYN FIX (nftables) for Telemt/Docker
@@ -552,19 +572,15 @@ SERVICE_NFT_EOF
         systemctl enable mtpr-nft-synfix.service 2>/dev/null
         systemctl restart mtpr-nft-synfix.service 2>/dev/null
 
-        echo ""
         log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str"
-        if [ -r /dev/tty ]; then
+        if [ "$auto_install" = false ] && [ -r /dev/tty ]; then
             echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
             read -rsn1 </dev/tty
-        else
-            echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-            read -rsn1
         fi
         return 0
     fi
 
-    # ── iptables режимы (1 и 2) ──────────────────────
+    # ── iptables режимы (v2 и v3) ──────────────────────────
     if [ "$auto_install" = false ]; then
         echo ""
         log_warning "Будет выполнена установка SYN FIX на порты: $ports_str"
@@ -596,149 +612,221 @@ SERVICE_NFT_EOF
     generate_service_unit
     systemctl daemon-reload
 
-    # ── Пытаемся применить правила с перехватом ошибки u32 ──
     local apply_output
     local apply_exit_code
     apply_output=$(PORT="$ports_str" /opt/mtpr-simple/apply-mtpr-synfix.sh 2>&1)
     apply_exit_code=$?
 
-    # Проверяем, была ли ошибка с u32 (только для нового варианта)
     if [ "$FIX_TYPE" = "new" ] && [ $apply_exit_code -ne 0 ] && echo "$apply_output" | grep -q "u32"; then
-        echo ""
-        echo -e "  ${YELLOW}[!]${NC} Обнаружена ошибка: модуль u32 отсутствует"
-        echo -e "  ${YELLOW}[!]${NC} Для работы нового варианта SYN FIX требуется установить модуль xt_u32"
-        echo ""
-        echo -e "  ${BOLD}Установить необходимый модуль xt_u32?${NC}"
-        echo -e "  ${GREEN}Enter/Y${NC} — установить и продолжить"
-        echo -e "  ${RED}N/n${NC} — отменить установку и вернуться в меню"
-        echo ""
-        if [ -r /dev/tty ]; then
-            echo -en "  ${BOLD}Ввод:${NC} "
-            read -r install_u32 </dev/tty
-        else
-            echo -en "  ${BOLD}Ввод:${NC} "
-            read -r install_u32
-        fi
-
-        if [[ -z "$install_u32" || "$install_u32" =~ ^[yY]$ ]]; then
+        if [ "$auto_install" = false ]; then
             echo ""
-            log_info "Установка модуля xt_u32 для AlmaLinux..."
+            echo -e "  ${YELLOW}[!]${NC} Обнаружена ошибка: модуль u32 отсутствует"
+            echo -e "  ${YELLOW}[!]${NC} Для работы нового варианта SYN FIX требуется установить модуль xt_u32"
             echo ""
-            
-            # Определяем версию AlmaLinux
-            local ALMA_VERSION=""
-            if [ -f /etc/almalinux-release ]; then
-                ALMA_VERSION=$(grep -oE '[0-9]+' /etc/almalinux-release | head -1)
-            elif [ -f /etc/os-release ]; then
-                ALMA_VERSION=$(grep -E '^VERSION_ID=' /etc/os-release | cut -d'"' -f2 | cut -d'.' -f1)
-            fi
-            
-            if [ -z "$ALMA_VERSION" ]; then
-                ALMA_VERSION="9"
-                echo -e "  ${YELLOW}[!]${NC} Не удалось определить версию AlmaLinux, используем 9"
-            fi
-            
-            echo -e "  ${BLUE}[i]${NC} Обнаружена версия AlmaLinux: ${ALMA_VERSION}"
+            echo -e "  ${BOLD}Установить необходимый модуль xt_u32?${NC}"
+            echo -e "  ${GREEN}Enter/Y${NC} — установить и продолжить"
+            echo -e "  ${RED}N/n${NC} — отменить установку и вернуться в меню"
             echo ""
-            
-            local ELREPO_URL=""
-            if [ "$ALMA_VERSION" = "10" ]; then
-                ELREPO_URL="https://www.elrepo.org/elrepo-release-10.el10.elrepo.noarch.rpm"
-            else
-                ELREPO_URL="https://www.elrepo.org/elrepo-release-9.el9.elrepo.noarch.rpm"
-            fi
-            
-            echo -e "  ${BLUE}[i]${NC} Добавление репозитория elrepo (версия ${ALMA_VERSION})..."
-            if sudo dnf install -y "$ELREPO_URL" 2>&1; then
-                echo -e "  ${GREEN}[✓]${NC} Репозиторий elrepo добавлен"
-            else
-                echo -e "  ${RED}[✗]${NC} Не удалось добавить репозиторий elrepo"
-                if [ -r /dev/tty ]; then
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1 </dev/tty
-                else
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1
-                fi
-                return 1
-            fi
-            
-            echo ""
-            echo -e "  ${BLUE}[i]${NC} Установка модуля kmod-xt_u32..."
-            if sudo dnf install -y kmod-xt_u32 2>&1; then
-                echo -e "  ${GREEN}[✓]${NC} Модуль kmod-xt_u32 успешно установлен"
-                echo ""
-                log_info "Повторная попытка применения правил..."
-                echo ""
-                
-                PORT="$ports_str" /opt/mtpr-simple/apply-mtpr-synfix.sh
-                systemctl enable mtpr-synfix.service
-                systemctl restart mtpr-synfix.service
-                
-                echo ""
-                log_success "SYN FIX успешно установлен на порты: $ports_str"
-                if [ -r /dev/tty ]; then
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1 </dev/tty
-                else
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1
-                fi
-            else
-                echo -e "  ${RED}[✗]${NC} Не удалось установить модуль kmod-xt_u32"
-                echo -e "  ${YELLOW}[!]${NC} Попробуйте выбрать старый вариант фикса (TTL+Length)"
-                if [ -r /dev/tty ]; then
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1 </dev/tty
-                else
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1
-                fi
-                return 1
-            fi
-        else
-            log_info "Установка отменена"
             if [ -r /dev/tty ]; then
-                echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-                read -rsn1 </dev/tty
+                echo -en "  ${BOLD}Ввод:${NC} "
+                read -r install_u32 </dev/tty
             else
-                echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-                read -rsn1
+                echo -en "  ${BOLD}Ввод:${NC} "
+                read -r install_u32
             fi
+
+            if [[ -z "$install_u32" || "$install_u32" =~ ^[yY]$ ]]; then
+                echo ""
+                log_info "Установка модуля xt_u32 для AlmaLinux..."
+                echo ""
+                
+                local ALMA_VERSION=""
+                if [ -f /etc/almalinux-release ]; then
+                    ALMA_VERSION=$(grep -oE '[0-9]+' /etc/almalinux-release | head -1)
+                elif [ -f /etc/os-release ]; then
+                    ALMA_VERSION=$(grep -E '^VERSION_ID=' /etc/os-release | cut -d'"' -f2 | cut -d'.' -f1)
+                fi
+                
+                if [ -z "$ALMA_VERSION" ]; then
+                    ALMA_VERSION="9"
+                    echo -e "  ${YELLOW}[!]${NC} Не удалось определить версию AlmaLinux, используем 9"
+                fi
+                
+                echo -e "  ${BLUE}[i]${NC} Обнаружена версия AlmaLinux: ${ALMA_VERSION}"
+                echo ""
+                
+                local ELREPO_URL=""
+                if [ "$ALMA_VERSION" = "10" ]; then
+                    ELREPO_URL="https://www.elrepo.org/elrepo-release-10.el10.elrepo.noarch.rpm"
+                else
+                    ELREPO_URL="https://www.elrepo.org/elrepo-release-9.el9.elrepo.noarch.rpm"
+                fi
+                
+                echo -e "  ${BLUE}[i]${NC} Добавление репозитория elrepo (версия ${ALMA_VERSION})..."
+                if sudo dnf install -y "$ELREPO_URL" 2>&1; then
+                    echo -e "  ${GREEN}[✓]${NC} Репозиторий elrepo добавлен"
+                else
+                    echo -e "  ${RED}[✗]${NC} Не удалось добавить репозиторий elrepo"
+                    if [ -r /dev/tty ]; then
+                        echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
+                        read -rsn1 </dev/tty
+                    fi
+                    return 1
+                fi
+                
+                echo ""
+                echo -e "  ${BLUE}[i]${NC} Установка модуля kmod-xt_u32..."
+                if sudo dnf install -y kmod-xt_u32 2>&1; then
+                    echo -e "  ${GREEN}[✓]${NC} Модуль kmod-xt_u32 успешно установлен"
+                    echo ""
+                    log_info "Повторная попытка применения правил..."
+                    echo ""
+                    
+                    PORT="$ports_str" /opt/mtpr-simple/apply-mtpr-synfix.sh
+                    systemctl enable mtpr-synfix.service
+                    systemctl restart mtpr-synfix.service
+                    
+                    log_success "SYN FIX успешно установлен на порты: $ports_str"
+                    if [ -r /dev/tty ]; then
+                        echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
+                        read -rsn1 </dev/tty
+                    fi
+                else
+                    echo -e "  ${RED}[✗]${NC} Не удалось установить модуль kmod-xt_u32"
+                    echo -e "  ${YELLOW}[!]${NC} Попробуйте выбрать старый вариант фикса (TTL+Length)"
+                    if [ -r /dev/tty ]; then
+                        echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
+                        read -rsn1 </dev/tty
+                    fi
+                    return 1
+                fi
+            else
+                log_info "Установка отменена"
+                if [ -r /dev/tty ]; then
+                    echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
+                    read -rsn1 </dev/tty
+                fi
+                return 1
+            fi
+        else
+            # Автоматический режим: просто выводим ошибку и выходим
+            log_error "Модуль u32 отсутствует. Для автоматической установки требуется xt_u32."
             return 1
         fi
     elif [ $apply_exit_code -ne 0 ]; then
-        echo ""
         log_error "Ошибка применения правил iptables:"
         echo "$apply_output"
-        if [ -r /dev/tty ]; then
+        if [ "$auto_install" = false ] && [ -r /dev/tty ]; then
             echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
             read -rsn1 </dev/tty
-        else
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-            read -rsn1
         fi
         return 1
     else
         systemctl enable mtpr-synfix.service
         systemctl restart mtpr-synfix.service
-        echo ""
         log_success "SYN FIX успешно установлен на порты: $ports_str"
-        if [ -r /dev/tty ]; then
+        if [ "$auto_install" = false ] && [ -r /dev/tty ]; then
             echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
             read -rsn1 </dev/tty
-        else
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-            read -rsn1
         fi
     fi
+}
+
+# ── Функция автоматической установки nftables ──────────────
+install_nft_auto() {
+    local ports_str="$1"
+    IFS=',' read -ra PORTS_ARRAY <<< "$ports_str"
+    local valid_ports=()
+    for p in "${PORTS_ARRAY[@]}"; do
+        p=$(echo "$p" | xargs)
+        if [[ "$p" =~ ^[0-9]+$ ]] && [ "$p" -ge 1 ] && [ "$p" -le 65535 ]; then
+            valid_ports+=("$p")
+        fi
+    done
+    if [ ${#valid_ports[@]} -eq 0 ]; then
+        log_error "Нет корректных портов"
+        return 1
+    fi
+
+    local ports_str_clean=$(IFS=,; echo "${valid_ports[*]}")
+    save_port "$ports_str_clean"
+
+    # Проверяем nftables
+    if ! command -v nft &>/dev/null; then
+        log_warning "nftables не установлен, устанавливаю..."
+        if command -v apt-get &>/dev/null; then
+            apt-get update -qq && apt-get install -y -qq nftables
+        elif command -v yum &>/dev/null; then
+            yum install -y -q nftables
+        elif command -v dnf &>/dev/null; then
+            dnf install -y -q nftables
+        else
+            log_error "Не удалось установить nftables автоматически"
+            return 1
+        fi
+    fi
+
+    local NFT_SCRIPT="/opt/mtpr-simple/mtpr-synfix-nft.sh"
+    cat > "$NFT_SCRIPT" << 'NFT_WRAPPER_EOF'
+#!/bin/sh
+set -eu
+
+TABLE="mtpr_synfix"
+CHAIN="input"
+
+nft delete table inet "$TABLE" 2>/dev/null || true
+nft add table inet "$TABLE"
+nft "add chain inet $TABLE $CHAIN { type filter hook input priority 0; policy accept; }"
+
+NFT_WRAPPER_EOF
+
+    cat >> "$NFT_SCRIPT" << 'SMART_RULES_EOF'
+nft "add rule inet mtpr_synfix input tcp dport PORT_HERE tcp flags & (syn|ack) == syn @th,108,20 0x2ffff @th,160,16 0x204 @th,192,16 0x103 @th,224,24 0x10108 @th,320,32 0x4020000 counter accept comment \"ios_accept\""
+nft "add rule inet mtpr_synfix input tcp dport PORT_HERE tcp flags & (syn|ack) == syn meter mtpr_other { ip saddr timeout 60s limit rate 54/minute burst 1 packets } counter accept comment \"other_accept\""
+nft "add rule inet mtpr_synfix input tcp dport PORT_HERE tcp flags & (syn|ack) == syn counter reject with icmp type host-unreachable comment \"other_reject\""
+SMART_RULES_EOF
+
+    for port in "${valid_ports[@]}"; do
+        sed -i "s/PORT_HERE/${port}/g" "$NFT_SCRIPT"
+    done
+
+    chmod +x "$NFT_SCRIPT"
+
+    if /bin/sh "$NFT_SCRIPT"; then
+        log_success "NFT правила применены успешно"
+    else
+        log_error "Ошибка применения NFT правил"
+        return 1
+    fi
+
+    cat > /etc/systemd/system/mtpr-nft-synfix.service << 'SERVICE_NFT_EOF'
+[Unit]
+Description=MTProto SYN FIX (nftables) for Telemt/Docker
+After=docker.service network.target
+Wants=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh /opt/mtpr-simple/mtpr-synfix-nft.sh
+ExecStop=/bin/sh -c '/usr/sbin/nft delete table inet mtpr_synfix 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_NFT_EOF
+
+    systemctl daemon-reload
+    systemctl enable mtpr-nft-synfix.service 2>/dev/null
+    systemctl restart mtpr-nft-synfix.service 2>/dev/null
+
+    log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str_clean"
+    return 0
 }
 
 # ── УДАЛЕНИЕ SYN FIX ─────────────────────────────────────────
 remove_syn_fix() {
     log_info "Удаление SYN FIX..."
 
-    # Удаляем iptables (если установлен вариант 1 или 2)
     systemctl stop mtpr-synfix.service 2>/dev/null || true
     systemctl disable mtpr-synfix.service 2>/dev/null || true
 
@@ -753,7 +841,6 @@ remove_syn_fix() {
         log_info "Цепочка $SYNFIX_CHAIN удалена"
     fi
 
-    # ── Удаляем правила с u32 из mangle (только для iptables-вариантов) ──
     local u32_filter="32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000"
     
     if iptables -t mangle -L PREROUTING -n 2>/dev/null | grep -q "$u32_filter"; then
@@ -767,9 +854,7 @@ remove_syn_fix() {
         log_info "Правил с нашим u32-фильтром в iptables/mangle не найдено"
     fi
 
-    # ── Удаляем nftables-таблицу (если установлен вариант 3 или 4) ──
     if command -v nft >/dev/null 2>&1; then
-        # Проверяем наличие таблицы inet mtpr_synfix (создаётся при варианте 3/4)
         if nft list table inet mtpr_synfix &>/dev/null; then
             log_info "Обнаружена таблица inet mtpr_synfix (nftables), удаляем..."
             nft delete table inet mtpr_synfix 2>/dev/null && log_info "Таблица inet mtpr_synfix удалена"
@@ -777,7 +862,6 @@ remove_syn_fix() {
             log_info "Таблицы inet mtpr_synfix не найдено"
         fi
 
-        # Также удаляем правила из ip mangle, если они там остались (для старых версий)
         handles=$(nft -a list chain ip mangle PREROUTING 2>/dev/null | grep 'xt match "u32".*meta mark set 0x400' | grep -o 'handle [0-9]*' | awk '{print $2}') || true
         if [ -n "$handles" ]; then
             log_info "Найдены правила u32 в nftables (ip mangle), удаляем..."
@@ -786,14 +870,12 @@ remove_syn_fix() {
             done
         fi
 
-        # Дополнительно удаляем таблицу inet mtpr_synfix (если она ещё есть) - дублируем для надёжности
         nft delete table inet mtpr_synfix 2>/dev/null || true
     fi
 
     rm -f "$PORT_FILE"
     rm -f /etc/systemd/system/mtpr-synfix.service
 
-    # Удаляем nftables-сервис, если он был создан
     systemctl stop mtpr-nft-synfix.service 2>/dev/null || true
     systemctl disable mtpr-nft-synfix.service 2>/dev/null || true
     rm -f /etc/systemd/system/mtpr-nft-synfix.service
