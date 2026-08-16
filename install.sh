@@ -68,13 +68,13 @@ ask_param() {
     local prompt="$1"
     local default="$2"
     local input
-    echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: "
     if [ -r /dev/tty ]; then
+        echo -en "  ${BOLD}$prompt${NC} ${DIM}(по умолчанию: $default)${NC}: "
         read -r input </dev/tty
+        echo "${input:-$default}"
     else
-        read -r input
+        echo "$default"
     fi
-    echo "${input:-$default}"
 }
 
 # ── Функция получения последней версии Telemt ──────────────
