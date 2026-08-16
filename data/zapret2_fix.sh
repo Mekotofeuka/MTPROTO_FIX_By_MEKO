@@ -1366,5 +1366,60 @@ EOF
     log_success "Watcher-скрипт создан: ${WATCHER_SCRIPT}"
 }
 
+# ── Автоматическая установка zapret2 (без вопросов) ──────────
+zapret2_install_auto() {
+    local port="${1:-443}"
+    echo ""
+    log_info "Автоустановка Zapret2 на порт $port..."
+
+    load_settings
+
+    SERVER_PORT="$port"
+    save_settings
+
+    if [ ! -x "$ZAPRET2_BIN" ]; then
+        log_info "Скачивание zapret2..."
+        zapret2_download_bundle || { log_error "Не удалось скачать zapret2"; return 1; }
+    fi
+
+    if [ "${NFT_SERVICE_ENABLED:-false}" = "true" ] || nft list table inet "${NFT_TABLE:-telemt_limit}" &>/dev/null 2>&1; then
+        log_info "Отключаем SYN limiter..."
+        remove_nft_rules 2>/dev/null || true
+        remove_service 2>/dev/null || true
+    fi
+
+    if zapret2_queue_in_use "${ZAPRET2_QNUM}"; then
+        local _new_q
+        _new_q=$(zapret2_find_free_queue 250 299)
+        [ -z "$_new_q" ] && _new_q=$(zapret2_find_free_queue 201 249)
+        if [ -n "$_new_q" ]; then
+            ZAPRET2_QNUM="$_new_q"
+            save_settings
+            log_info "Выбрана свободная очередь: $ZAPRET2_QNUM"
+        else
+            log_warning "Не найдена свободная очередь, используем $ZAPRET2_QNUM (может быть конфликт)"
+        fi
+    fi
+
+    zapret2_write_conf
+    zapret2_write_lua
+    zapret2_write_service
+
+    if ! zapret2_start; then
+        log_error "Не удалось запустить zapret2, откат..."
+        zapret2_cleanup_failed_install || true
+        return 1
+    fi
+
+    ZAPRET2_APPLIED="true"
+    ZAPRET2_SERVICE_ENABLED="true"
+    save_settings
+
+    zapret2_check_wscale "true"
+
+    log_success "Zapret2 успешно установлен на порт $port"
+}
+
+
 # ── Загрузка настроек при старте ────────────────────────────
 load_settings
