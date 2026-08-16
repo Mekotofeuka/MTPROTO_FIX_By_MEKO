@@ -366,6 +366,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             fi
             if [ -z "$TELEMT_VERSION" ] || [ "$TELEMT_VERSION" = "последняя" ]; then
                 TELEMT_VERSION=$(get_latest_telemt_version)
+				log_info "Выбран SNI: $DOMAIN"
                 log_info "Выбрана последняя версия: $TELEMT_VERSION"
             fi
         fi
