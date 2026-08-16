@@ -342,6 +342,12 @@ done
 # ══════════════════════════════════════════════════════════════
 
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
+    # Переопределяем функции логирования для автоустановки (вывод в stderr)
+    log_info() { echo -e "  ${BLUE}[i]${NC} $1" >&2; }
+    log_success() { echo -e "  ${GREEN}[✓]${NC} $1" >&2; }
+    log_warning() { echo -e "  ${YELLOW}[!]${NC} $1" >&2; }
+    log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
+
     echo "" >&2
     echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА${NC}" >&2
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}" >&2
