@@ -121,16 +121,16 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 ###Параметры для автоматической установки
 | Флаг                          | Значение по умолчанию      | Описание                             |
 | ----------------------------- | -------------------------- | ------------------------------------ |
-| `-telemt`                     | —                          | Установить Telemt                    |
-| `-zig`                        | —                          | Установить MTProto.zig               |
-| `-mtg`                        | —                          | Установить MTG                       |
-| `-fix`                        | —                          | Установить MTProto FIX               |
+| `-telemt`                     | —                          | Установить [Telemt](https://github.com/telemt/telemt)                    |
+| `-zig`                        | —                          | Установить [MTProto.zig](https://github.com/sleep3r/mtproto.zig)               |
+| `-mtg`                        | —                          | Установить [MTG](https://github.com/9seconds/mtg)                       |
+| `-fix`                        | —                          | Установить [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO)               |
 | `-no-fix`                     | —                          | Не устанавливать фикс                |
 | `-fix-type {v2\|v3\|v4\|nft}`| `v3`                       | Тип устанавливаемого фикса(NFT = v3 через NFTables)           |
 | `-fix-port <порт>`            | значение `-port` или `443` | Порт, к которому применяется фикс    |
 | `-port <порт>`                | `443`                      | Порт прокси                          |
 | `-domain <домен>`             | `mydomain.ru`              | Домен для TLS-маскировки прокси      |
-| `-version <версия>`           | последняя                  | Версия Telemt                        |
+| `-version <версия>`           | последняя                  | Версия [Telemt](https://github.com/telemt/telemt)                        |
 | `-h`, `--help`                | —                          | Показать список доступных аргументов |
 
 > Если версия Telemt и тип фикса не указаны, они будут запрошены во время установки.
