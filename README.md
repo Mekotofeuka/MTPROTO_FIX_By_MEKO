@@ -104,7 +104,7 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 mekopr
 ```
 
-## Автоматическая установка
+### Автоматическая установка
 
 `install.sh` поддерживает установку прокси и фикса с передачей параметров напрямую из командной строки.
 
