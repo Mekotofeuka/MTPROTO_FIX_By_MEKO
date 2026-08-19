@@ -131,19 +131,19 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 | `-mtg`                        | —                          | Установить [MTG](https://github.com/9seconds/mtg)                       |
 | `-fix`                        | —                          | Установить [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO)               |
 | `-no-fix`                     | —                          | Не устанавливать фикс                |
-| `-fix-type {v2\|v3\|v4\|nft}`| `v3`                       | Тип устанавливаемого фикса(NFT = v3 через NFTables)           |
+| `-fix-type {v2\|v3\|v4\|nft}`| `v3`                       | Тип устанавливаемого фикса (NFT = v3 через NFTables)           |
 | `-fix-port <порт>`            | значение `-port` или `443` | Порт, к которому применяется фикс    |
 | `-port <порт>`                | `443`                      | Порт прокси                          |
-| `-domain <домен>`             | `mydomain.ru`              | Домен для TLS-маскировки прокси      |
+| `-domain <домен>`             | `ozon.ru`                  | Домен для TLS-маскировки прокси      |
 | `-version <версия>`           | последняя                  | Версия [Telemt](https://github.com/telemt/telemt)                        |
+| `-ad_tag <тег>`               | —                          | Добавить `ad_tag` в секцию `[general]` конфига Telemt     |
+| `-user <имя> [секрет]`        | —                          | Добавить пользователя в `[access.users]`. Если **секрет** не указан – будет запрошен или сгенерирован автоматически при нажатии **Enter** |
+| `-public_host <домен>`        | —                          | Добавить/обновить `public_host` в секции `[server.links]` конфига Telemt |
 | `-h`, `--help`                | —                          | Показать список доступных аргументов |
 
 > Если версия Telemt и тип фикса не указаны, они будут запрошены во время установки.
 > Если параметры командной строки не используются, установщик откроет стандартное меню установки.
-> Если передать все необходимые параметры, установка выполняется без дополнительных вопросов:
-```bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25
-```
+> Если передать все необходимые параметры, установка выполняется без дополнительных вопросов
 
 
 # Как работает фикс V3:
