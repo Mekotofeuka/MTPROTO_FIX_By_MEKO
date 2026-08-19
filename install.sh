@@ -694,7 +694,7 @@ done
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
 
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.81${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.82${NC}"
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -868,7 +868,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         echo "" >&2
         log_info "Ссылка для подключения к прокси:"
         echo "" >&2
-        local links=$(generate_proxy_links)
+        links=$(generate_proxy_links)
         if [ -n "$links" ]; then
             echo -e "$links" >&2
         else
