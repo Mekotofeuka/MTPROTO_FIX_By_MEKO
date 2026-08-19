@@ -87,6 +87,211 @@ get_config_path() {
     return 0
 }
 
+# ── Функции для работы с TOML (из telemt1.sh) ──────────────
+_toml_get_value() {
+    local _key="$1" _file="$2"
+    [ -f "$_file" ] || return 0
+    awk -v k="$_key" '
+        /^[[:space:]]*#/ { next }
+        $1 == k && $2 == "=" { gsub(/[^0-9]/, "", $3); print $3; exit }
+    ' "$_file" 2>/dev/null
+}
+
+_is_excluded_path() {
+    local _path="$1"
+    case "$_path" in
+        *telemt-panel*|*telemt_panel*) return 0 ;;
+    esac
+    return 1
+}
+
+_looks_like_telemt_config() {
+    local _file="$1"
+    [ -f "$_file" ] || return 1
+    grep -qE '^\[access\.users\]|^\[censorship\]|^\[general\.modes\]|^tls_domain[[:space:]]*=' "$_file" 2>/dev/null
+}
+
+# ── Расширенное обнаружение Telemt ──────────────────────────
+detect_telemt_advanced() {
+    local DETECTED_CONFIG_PATH=""
+    local DETECTED_PORT=""
+    local DETECTED_IP=""
+    local DETECTED_PUBLIC_HOST=""
+    local DETECTED_CLASSIC=""
+    local DETECTED_SECURE=""
+    local DETECTED_TLS=""
+    local DETECTED_TLS_DOMAIN=""
+    local DETECTED_SECRET=""
+    
+    # 1. Локальный процесс telemt
+    if pgrep -x telemt &>/dev/null || systemctl is-active telemt.service &>/dev/null 2>&1; then
+        local _args
+        _args=$(ps -eo args 2>/dev/null | grep '[t]elemt' | grep -v 'telemt-panel' | grep -v 'telemt_panel' | head -1 | grep -oE '/[^ ]+\.toml' | head -1)
+        if [ -n "$_args" ] && [ -f "$_args" ] && ! _is_excluded_path "$_args" && _looks_like_telemt_config "$_args"; then
+            DETECTED_CONFIG_PATH="$_args"
+        fi
+    fi
+    
+    # 2. Поиск конфига в стандартных местах
+    if [ -z "$DETECTED_CONFIG_PATH" ]; then
+        local _cf
+        for _cf in /etc/telemt/telemt.toml /etc/telemt/config.toml /etc/telemt.toml /opt/telemt/config.toml /opt/telemt/telemt.toml; do
+            if [ -f "$_cf" ] && ! _is_excluded_path "$_cf" && _looks_like_telemt_config "$_cf"; then
+                DETECTED_CONFIG_PATH="$_cf"
+                break
+            fi
+        done
+    fi
+    
+    # 3. Проверяем сохранённый путь
+    if [ -z "$DETECTED_CONFIG_PATH" ] && [ -f "$CONFIG_PATH_FILE" ] && [ -s "$CONFIG_PATH_FILE" ]; then
+        local _saved_path=$(cat "$CONFIG_PATH_FILE")
+        if [ "$_saved_path" != "skip" ] && [ -f "$_saved_path" ] && _looks_like_telemt_config "$_saved_path"; then
+            DETECTED_CONFIG_PATH="$_saved_path"
+        fi
+    fi
+    
+    # 4. Получаем параметры из конфига
+    if [ -n "$DETECTED_CONFIG_PATH" ] && [ -f "$DETECTED_CONFIG_PATH" ]; then
+        DETECTED_PORT=$(_toml_get_value "port" "$DETECTED_CONFIG_PATH")
+        DETECTED_IP=$(grep -E '^ip[[:space:]]*=' "$DETECTED_CONFIG_PATH" 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+        DETECTED_PUBLIC_HOST=$(grep -E '^public_host[[:space:]]*=' "$DETECTED_CONFIG_PATH" 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+        DETECTED_TLS_DOMAIN=$(grep -E '^tls_domain[[:space:]]*=' "$DETECTED_CONFIG_PATH" 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+        
+        # Ищем секрет - сначала в секции [access.users], потом во всем файле
+        DETECTED_SECRET=$(sed -n '/^\[access\.users\]/,/^\[/p' "$DETECTED_CONFIG_PATH" 2>/dev/null | grep -E '=' | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+        if [ -z "$DETECTED_SECRET" ]; then
+            DETECTED_SECRET=$(grep -E '^[[:space:]]*[^#]*[[:space:]]*=' "$DETECTED_CONFIG_PATH" 2>/dev/null | grep -v '^#' | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+        fi
+        
+        # Проверяем режимы
+        DETECTED_CLASSIC=$(grep -E '^classic[[:space:]]*=' "$DETECTED_CONFIG_PATH" 2>/dev/null | grep -v '^#' | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+        DETECTED_SECURE=$(grep -E '^secure[[:space:]]*=' "$DETECTED_CONFIG_PATH" 2>/dev/null | grep -v '^#' | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+        DETECTED_TLS=$(grep -E '^tls[[:space:]]*=' "$DETECTED_CONFIG_PATH" 2>/dev/null | grep -v '^#' | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+    fi
+    
+    echo "$DETECTED_CONFIG_PATH:$DETECTED_PORT:$DETECTED_IP:$DETECTED_PUBLIC_HOST:$DETECTED_CLASSIC:$DETECTED_SECURE:$DETECTED_TLS:$DETECTED_TLS_DOMAIN:$DETECTED_SECRET"
+}
+
+# ── Функция получения публичного IP ──────────────────────────
+get_public_ip() {
+    local _ip=""
+    _ip=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null) ||
+    _ip=$(curl -4 -fsS --max-time 5 https://ifconfig.me 2>/dev/null) ||
+    _ip=$(curl -4 -fsS --max-time 5 https://icanhazip.com 2>/dev/null) ||
+    _ip=""
+    echo "$_ip"
+}
+
+# ── Функция генерации ссылок для подключения ────────────────
+generate_proxy_links() {
+    local config_path=$(get_config_path)
+    if [ ! -f "$config_path" ]; then
+        return 1
+    fi
+    
+    # Получаем данные из конфига через расширенное обнаружение
+    local detected_info=$(detect_telemt_advanced)
+    local IFS=':'
+    local parts=($detected_info)
+    unset IFS
+    
+    local detected_path="${parts[0]}"
+    local detected_port="${parts[1]}"
+    local detected_ip="${parts[2]}"
+    local detected_public_host="${parts[3]}"
+    local detected_classic="${parts[4]}"
+    local detected_secure="${parts[5]}"
+    local detected_tls="${parts[6]}"
+    local detected_tls_domain="${parts[7]}"
+    local detected_secret="${parts[8]}"
+    
+    # Определяем порт
+    local port=""
+    if [ -n "$detected_port" ]; then
+        port="$detected_port"
+    else
+        port=$(grep -E '^port[[:space:]]*=' "$config_path" 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
+    fi
+    if [ -z "$port" ]; then
+        port="443"
+    fi
+    
+    # Определяем сервер (IP или public_host)
+    local server=""
+    if [ -n "$detected_public_host" ]; then
+        server="$detected_public_host"
+    elif [ -n "$detected_ip" ]; then
+        server="$detected_ip"
+    else
+        server=$(get_public_ip)
+    fi
+    if [ -z "$server" ]; then
+        server=$(curl -4 -fsS --max-time 3 https://api.ipify.org 2>/dev/null)
+    fi
+    if [ -z "$server" ]; then
+        server="SERVER_IP"
+    fi
+    
+    # Если нет секрета — выходим
+    if [ -z "$detected_secret" ]; then
+        return 1
+    fi
+    
+    # Определяем какие режимы включены
+    local classic_enabled=false
+    local secure_enabled=false
+    local tls_enabled=false
+    
+    if [ "$detected_classic" = "true" ]; then
+        classic_enabled=true
+    fi
+    if [ "$detected_secure" = "true" ]; then
+        secure_enabled=true
+    fi
+    if [ "$detected_tls" = "true" ]; then
+        tls_enabled=true
+    fi
+    
+    # Если ни один режим не включен явно, но есть tls_domain — считаем что tls включен
+    if [ "$classic_enabled" = false ] && [ "$secure_enabled" = false ] && [ "$tls_enabled" = false ]; then
+        if [ -n "$detected_tls_domain" ]; then
+            tls_enabled=true
+        else
+            classic_enabled=true
+        fi
+    fi
+    
+    local links=""
+    
+    # TLS режим (ee + secret + hex(tls_domain))
+    if [ "$tls_enabled" = true ]; then
+        local hex_domain=""
+        if [ -n "$detected_tls_domain" ]; then
+            # Используем od вместо xxd для 100% совместимости
+            hex_domain=$(echo -n "$detected_tls_domain" | od -An -tx1 | tr -d ' \n' 2>/dev/null)
+        fi
+        local tls_secret="ee${detected_secret}${hex_domain}"
+        links="${links}  TLS:\n"
+        links="${links}  tg://proxy?server=${server}&port=${port}&secret=${tls_secret}\n"
+    fi
+    
+    # Secure режим (dd + secret)
+    if [ "$secure_enabled" = true ]; then
+        local secure_secret="dd${detected_secret}"
+        links="${links}  Secure (DD):\n"
+        links="${links}  tg://proxy?server=${server}&port=${port}&secret=${secure_secret}\n"
+    fi
+    
+    # Classic режим (просто secret)
+    if [ "$classic_enabled" = true ]; then
+        links="${links}  Classic:\n"
+        links="${links}  tg://proxy?server=${server}&port=${port}&secret=${detected_secret}\n"
+    fi
+    
+    echo -e "$links"
+}
+
 # ── Функция добавления ad_tag в конфиг Telemt (без перезапуска) ──
 add_ad_tag_to_config() {
     local ad_tag="$1"
@@ -163,7 +368,7 @@ add_user_to_config() {
     return 0
 }
 
-# ── Функция добавления/обновления public_host в секции [server.links] ──
+# ── Функция добавления/обновления public_host в секции [server.links] (без перезапуска) ──
 add_public_host_to_config() {
     local public_host="$1"
     local config_path=$(get_config_path)
@@ -489,7 +694,7 @@ done
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
 
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.8${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.81${NC}"
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -658,6 +863,18 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         else
             log_warning "Не удалось перезапустить telemt (возможно, он не установлен как служба)"
         fi
+        
+        # ── Вывод ссылки на прокси ────────────────────────────
+        echo "" >&2
+        log_info "Ссылка для подключения к прокси:"
+        echo "" >&2
+        local links=$(generate_proxy_links)
+        if [ -n "$links" ]; then
+            echo -e "$links" >&2
+        else
+            echo -e "  ${YELLOW}[!]${NC} Не удалось сгенерировать ссылку. Проверьте конфиг." >&2
+        fi
+        echo "" >&2
     fi
 
     # Zig
