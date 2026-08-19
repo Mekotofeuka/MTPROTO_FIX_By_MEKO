@@ -243,7 +243,7 @@ SOL SPL ``` Gn7w3EBkZqPjPDcbkTaxspip42TuhoGqaaEqHAxhG9V1 ```
 - telemt_panel https://github.com/amirotin/telemt_panel
 - 3x-ui-pro https://github.com/mozaroc/3x-ui-pro
 - remnawave-installer https://github.com/xxphantom/remnawave-installer
-
+- MTProxyL https://github.com/Liafanx/MTProxyL/
 
 > *Это независимый информационный обзор.*
 >
