@@ -118,6 +118,11 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25
 ```
 
+Установка **Telemt** `3.4.25` и **фикса v3** на порт `443` с доменом `ozon.ru` и **ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95`:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95
+```
+
 ### Параметры для автоматической установки
 | Флаг                          | Значение по умолчанию      | Описание                             |
 | ----------------------------- | -------------------------- | ------------------------------------ |
