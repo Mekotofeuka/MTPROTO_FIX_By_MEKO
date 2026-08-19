@@ -130,6 +130,64 @@ add_ad_tag_to_config() {
     return 0
 }
 
+# ── Функция генерации случайного 32-символьного hex-секрета ──
+generate_secret() {
+    # Пробуем openssl, затем od, затем fallback
+    if command -v openssl &>/dev/null; then
+        openssl rand -hex 16 2>/dev/null
+    elif command -v od &>/dev/null; then
+        head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' 2>/dev/null
+    else
+        # fallback – просто случайные цифры
+        echo "$(date +%s)$RANDOM$RANDOM" | sha256sum | head -c 32
+    fi
+}
+
+# ── Функция добавления пользователя в секцию [access.users] ──
+add_user_to_config() {
+    local user_name="$1"
+    local user_secret="$2"
+    local config_path=$(get_config_path)
+    
+    if [ -z "$user_name" ] || [ -z "$user_secret" ]; then
+        log_error "Имя пользователя и секрет обязательны"
+        return 1
+    fi
+    
+    if [ ! -f "$config_path" ]; then
+        log_error "Файл конфига не найден: $config_path"
+        return 1
+    fi
+    
+    # Проверяем, существует ли уже такой пользователь
+    if grep -q "^[[:space:]]*${user_name}[[:space:]]*=" "$config_path"; then
+        log_warning "Пользователь '$user_name' уже существует в конфиге, пропускаем"
+        return 0
+    fi
+    
+    # Добавляем в секцию [access.users]
+    if grep -q '^\[access\.users\]' "$config_path"; then
+        # Вставляем перед закрывающей скобкой или после секции
+        sed -i "/^\[access\.users\]/a ${user_name} = \"$user_secret\"" "$config_path"
+        log_info "Добавлен пользователь: $user_name = $user_secret"
+    else
+        # Если секции нет — создаём
+        echo "" >> "$config_path"
+        echo "[access.users]" >> "$config_path"
+        echo "${user_name} = \"$user_secret\"" >> "$config_path"
+        log_info "Создана секция [access.users] и добавлен пользователь: $user_name"
+    fi
+    
+    # Перезапускаем telemt
+    if systemctl restart telemt 2>/dev/null; then
+        log_success "Telemt перезапущен для применения нового пользователя"
+    else
+        log_warning "Не удалось перезапустить telemt (возможно, он не установлен как служба)"
+    fi
+    
+    return 0
+}
+
 # ── Функция получения последней версии Telemt ──────────────
 get_latest_telemt_version() {
     local version=""
@@ -297,6 +355,8 @@ PROXY_PORT=""            # порт прокси
 DOMAIN=""
 TELEMT_VERSION=""
 AD_TAG=""                # ad_tag для добавления в конфиг
+USER_NAME=""             # имя пользователя для добавления
+USER_SECRET=""           # секрет пользователя (если не задан, будет запрошен или сгенерирован)
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -355,6 +415,17 @@ while [[ $# -gt 0 ]]; do
             AD_TAG="$2"
             shift 2
             ;;
+        -user)
+            USER_NAME="$2"
+            # Проверяем, есть ли следующий аргумент и не является ли он флагом
+            if [[ -n "$3" && ! "$3" =~ ^- ]]; then
+                USER_SECRET="$3"
+                shift 3
+            else
+                USER_SECRET=""
+                shift 2
+            fi
+            ;;
         -h|--help)
             echo ""
             echo -e "  ${BOLD}Использование:${NC}"
@@ -371,6 +442,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -domain <домен>        SNI домен для прокси (по умолчанию ozon.ru)"
             echo -e "    -version <версия>      версия Telemt (по умолчанию последняя)"
             echo -e "    -ad_tag <тег>          добавить ad_tag в конфиг Telemt (в секцию [general])"
+            echo -e "    -user <имя> [секрет]   добавить пользователя в [access.users] (если секрет не указан — будет запрошен или сгенерирован)"
             echo -e "    -no-fix                отключить установку фикса"
             echo -e "    -h, --help             показать эту справку"
             echo ""
@@ -378,8 +450,8 @@ while [[ $# -gt 0 ]]; do
             echo -e "    # Только фикс V3 на порт 8443"
             echo -e "    curl ... | sudo bash -s -- -fix -fix-port 8443"
             echo ""
-            echo -e "    # Telemt + V3 фикс на порт 9443, домен my.domain, с ad_tag"
-            echo -e "    curl ... | sudo bash -s -- -telemt -domain my.domain -port 9443 -fix -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95"
+            echo -e "    # Telemt + V3 фикс на порт 9443, домен my.domain, с ad_tag и пользователем"
+            echo -e "    curl ... | sudo bash -s -- -telemt -domain my.domain -port 9443 -fix -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user vasya"
             echo ""
             echo -e "    # Telemt без фикса"
             echo -e "    curl ... | sudo bash -s -- -telemt -no-fix"
@@ -403,7 +475,7 @@ done
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
 
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.5${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.7${NC}"
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -540,6 +612,26 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         # Добавляем ad_tag, если передан
         if [ -n "$AD_TAG" ]; then
             add_ad_tag_to_config "$AD_TAG"
+        fi
+        
+        # Добавляем пользователя, если передан
+        if [ -n "$USER_NAME" ]; then
+            # Если секрет не передан — запрашиваем или генерируем
+            if [ -z "$USER_SECRET" ]; then
+                echo -en "  ${BOLD}Введите секрет для пользователя $USER_NAME (Enter - сгенерировать автоматически)${NC}: " >&2
+                if [ -r /dev/tty ]; then
+                    read -r input_secret </dev/tty
+                else
+                    input_secret=""
+                fi
+                if [ -z "$input_secret" ]; then
+                    USER_SECRET=$(generate_secret)
+                    log_info "Сгенерирован секрет: $USER_SECRET"
+                else
+                    USER_SECRET="$input_secret"
+                fi
+            fi
+            add_user_to_config "$USER_NAME" "$USER_SECRET"
         fi
     fi
 
