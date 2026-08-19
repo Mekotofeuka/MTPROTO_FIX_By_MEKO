@@ -516,7 +516,7 @@ show_header() {
     ensure_rules_loaded 2>/dev/null
 
     echo ""
-    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.97${NC}"
+    echo -e "  ${NC}${BOLD}MEKO ${CYAN}${BOLD}| ${NC}${BOLD}MTProto Manager ${CYAN}${BOLD} v1.98${NC}"
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
