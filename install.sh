@@ -63,6 +63,73 @@ ensure_file() {
     return 0
 }
 
+# ── Функция обрезки пробелов ──────────────────────────────
+trim() {
+    local var="$1"
+    var="${var#"${var%%[![:space:]]*}"}"
+    var="${var%"${var##*[![:space:]]}"}"
+    printf '%s' "$var"
+}
+
+# ── Файл для сохранения пути к конфигу ──────────────────────
+CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
+
+# ── Функция получения текущего пути к конфигу ──────────────
+get_config_path() {
+    if [ -f "$CONFIG_PATH_FILE" ] && [ -s "$CONFIG_PATH_FILE" ]; then
+        local path=$(cat "$CONFIG_PATH_FILE")
+        if [ "$path" != "skip" ]; then
+            echo "$path"
+            return 0
+        fi
+    fi
+    echo "/etc/telemt/telemt.toml"
+    return 0
+}
+
+# ── Функция добавления ad_tag в конфиг Telemt ──────────────
+add_ad_tag_to_config() {
+    local ad_tag="$1"
+    local config_path=$(get_config_path)
+    
+    if [ -z "$ad_tag" ]; then
+        return 0
+    fi
+    
+    if [ ! -f "$config_path" ]; then
+        log_error "Файл конфига не найден: $config_path"
+        return 1
+    fi
+    
+    # Проверяем, есть ли уже ad_tag в секции [general]
+    if grep -q '^ad_tag[[:space:]]*=' "$config_path"; then
+        # Если есть — заменяем
+        sed -i "s/^ad_tag[[:space:]]*=.*/ad_tag = \"$ad_tag\"/" "$config_path"
+        log_info "ad_tag обновлён: $ad_tag"
+    else
+        # Если нет — добавляем в секцию [general]
+        if grep -q '^\[general\]' "$config_path"; then
+            sed -i "/^\[general\]/a ad_tag = \"$ad_tag\"" "$config_path"
+            log_info "ad_tag добавлен в секцию [general]: $ad_tag"
+        else
+            # Если секции [general] нет — создаём
+            echo "" >> "$config_path"
+            echo "[general]" >> "$config_path"
+            echo "ad_tag = \"$ad_tag\"" >> "$config_path"
+            log_info "Создана секция [general] и добавлен ad_tag: $ad_tag"
+        fi
+    fi
+    
+    # Перезапускаем telemt
+    if systemctl restart telemt 2>/dev/null; then
+        log_success "Telemt перезапущен для применения ad_tag"
+    else
+        log_warning "Не удалось перезапустить telemt (возможно, он не установлен как служба)"
+    fi
+    
+    return 0
+}
+
 # ── Функция получения последней версии Telemt ──────────────
 get_latest_telemt_version() {
     local version=""
@@ -229,6 +296,7 @@ FIX_PORT=""              # порт для фикса
 PROXY_PORT=""            # порт прокси
 DOMAIN=""
 TELEMT_VERSION=""
+AD_TAG=""                # ad_tag для добавления в конфиг
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -283,6 +351,10 @@ while [[ $# -gt 0 ]]; do
             TELEMT_VERSION="$2"
             shift 2
             ;;
+        -ad_tag)
+            AD_TAG="$2"
+            shift 2
+            ;;
         -h|--help)
             echo ""
             echo -e "  ${BOLD}Использование:${NC}"
@@ -298,6 +370,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -port <порт>           порт для прокси (и для фикса, если не задан -fix-port)"
             echo -e "    -domain <домен>        SNI домен для прокси (по умолчанию ozon.ru)"
             echo -e "    -version <версия>      версия Telemt (по умолчанию последняя)"
+            echo -e "    -ad_tag <тег>          добавить ad_tag в конфиг Telemt (в секцию [general])"
             echo -e "    -no-fix                отключить установку фикса"
             echo -e "    -h, --help             показать эту справку"
             echo ""
@@ -305,8 +378,8 @@ while [[ $# -gt 0 ]]; do
             echo -e "    # Только фикс V3 на порт 8443"
             echo -e "    curl ... | sudo bash -s -- -fix -fix-port 8443"
             echo ""
-            echo -e "    # Telemt + V3 фикс на порт 9443, домен my.domain"
-            echo -e "    curl ... | sudo bash -s -- -telemt -domain my.domain -port 9443 -fix"
+            echo -e "    # Telemt + V3 фикс на порт 9443, домен my.domain, с ad_tag"
+            echo -e "    curl ... | sudo bash -s -- -telemt -domain my.domain -port 9443 -fix -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95"
             echo ""
             echo -e "    # Telemt без фикса"
             echo -e "    curl ... | sudo bash -s -- -telemt -no-fix"
@@ -330,7 +403,7 @@ done
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
 
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.4${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.5${NC}"
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -366,7 +439,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             fi
             if [ -z "$TELEMT_VERSION" ] || [ "$TELEMT_VERSION" = "последняя" ]; then
                 TELEMT_VERSION=$(get_latest_telemt_version)
-				log_info "Выбран SNI: $DOMAIN"
+                log_info "Выбран SNI: $DOMAIN"
                 log_info "Выбрана последняя версия: $TELEMT_VERSION"
             fi
         fi
@@ -463,6 +536,11 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         log_info "Установка Telemt версии $TELEMT_VERSION на домен $DOMAIN, порт $PROXY_PORT..."
         curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- "$TELEMT_VERSION" -l 2 -d "$DOMAIN" -p "$PROXY_PORT"
         log_success "Telemt установлен"
+        
+        # Добавляем ad_tag, если передан
+        if [ -n "$AD_TAG" ]; then
+            add_ad_tag_to_config "$AD_TAG"
+        fi
     fi
 
     # Zig
