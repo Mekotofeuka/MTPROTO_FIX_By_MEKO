@@ -87,7 +87,7 @@ get_config_path() {
     return 0
 }
 
-# ── Функция добавления ad_tag в конфиг Telemt ──────────────
+# ── Функция добавления ad_tag в конфиг Telemt (без перезапуска) ──
 add_ad_tag_to_config() {
     local ad_tag="$1"
     local config_path=$(get_config_path)
@@ -103,47 +103,34 @@ add_ad_tag_to_config() {
     
     # Проверяем, есть ли уже ad_tag в секции [general]
     if grep -q '^ad_tag[[:space:]]*=' "$config_path"; then
-        # Если есть — заменяем
         sed -i "s/^ad_tag[[:space:]]*=.*/ad_tag = \"$ad_tag\"/" "$config_path"
         log_info "ad_tag обновлён: $ad_tag"
     else
-        # Если нет — добавляем в секцию [general]
         if grep -q '^\[general\]' "$config_path"; then
             sed -i "/^\[general\]/a ad_tag = \"$ad_tag\"" "$config_path"
             log_info "ad_tag добавлен в секцию [general]: $ad_tag"
         else
-            # Если секции [general] нет — создаём
             echo "" >> "$config_path"
             echo "[general]" >> "$config_path"
             echo "ad_tag = \"$ad_tag\"" >> "$config_path"
             log_info "Создана секция [general] и добавлен ad_tag: $ad_tag"
         fi
     fi
-    
-    # Перезапускаем telemt
-    if systemctl restart telemt 2>/dev/null; then
-        log_success "Telemt перезапущен для применения ad_tag"
-    else
-        log_warning "Не удалось перезапустить telemt (возможно, он не установлен как служба)"
-    fi
-    
     return 0
 }
 
 # ── Функция генерации случайного 32-символьного hex-секрета ──
 generate_secret() {
-    # Пробуем openssl, затем od, затем fallback
     if command -v openssl &>/dev/null; then
         openssl rand -hex 16 2>/dev/null
     elif command -v od &>/dev/null; then
         head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' 2>/dev/null
     else
-        # fallback – просто случайные цифры
         echo "$(date +%s)$RANDOM$RANDOM" | sha256sum | head -c 32
     fi
 }
 
-# ── Функция добавления пользователя в секцию [access.users] ──
+# ── Функция добавления пользователя в секцию [access.users] (без перезапуска) ──
 add_user_to_config() {
     local user_name="$1"
     local user_secret="$2"
@@ -159,32 +146,54 @@ add_user_to_config() {
         return 1
     fi
     
-    # Проверяем, существует ли уже такой пользователь
     if grep -q "^[[:space:]]*${user_name}[[:space:]]*=" "$config_path"; then
         log_warning "Пользователь '$user_name' уже существует в конфиге, пропускаем"
         return 0
     fi
     
-    # Добавляем в секцию [access.users]
     if grep -q '^\[access\.users\]' "$config_path"; then
-        # Вставляем перед закрывающей скобкой или после секции
         sed -i "/^\[access\.users\]/a ${user_name} = \"$user_secret\"" "$config_path"
         log_info "Добавлен пользователь: $user_name = $user_secret"
     else
-        # Если секции нет — создаём
         echo "" >> "$config_path"
         echo "[access.users]" >> "$config_path"
         echo "${user_name} = \"$user_secret\"" >> "$config_path"
         log_info "Создана секция [access.users] и добавлен пользователь: $user_name"
     fi
+    return 0
+}
+
+# ── Функция добавления/обновления public_host в секции [server.links] ──
+add_public_host_to_config() {
+    local public_host="$1"
+    local config_path=$(get_config_path)
     
-    # Перезапускаем telemt
-    if systemctl restart telemt 2>/dev/null; then
-        log_success "Telemt перезапущен для применения нового пользователя"
-    else
-        log_warning "Не удалось перезапустить telemt (возможно, он не установлен как служба)"
+    if [ -z "$public_host" ]; then
+        return 0
     fi
     
+    if [ ! -f "$config_path" ]; then
+        log_error "Файл конфига не найден: $config_path"
+        return 1
+    fi
+    
+    # Проверяем, есть ли секция [server.links]
+    if grep -q '^\[server\.links\]' "$config_path"; then
+        # Секция есть – проверяем public_host
+        if grep -q '^public_host[[:space:]]*=' "$config_path"; then
+            sed -i "s/^public_host[[:space:]]*=.*/public_host = \"$public_host\"/" "$config_path"
+            log_info "public_host обновлён: $public_host"
+        else
+            sed -i "/^\[server\.links\]/a public_host = \"$public_host\"" "$config_path"
+            log_info "public_host добавлен в секцию [server.links]: $public_host"
+        fi
+    else
+        # Секции нет – создаём
+        echo "" >> "$config_path"
+        echo "[server.links]" >> "$config_path"
+        echo "public_host = \"$public_host\"" >> "$config_path"
+        log_info "Создана секция [server.links] и добавлен public_host: $public_host"
+    fi
     return 0
 }
 
@@ -354,9 +363,10 @@ FIX_PORT=""              # порт для фикса
 PROXY_PORT=""            # порт прокси
 DOMAIN=""
 TELEMT_VERSION=""
-AD_TAG=""                # ad_tag для добавления в конфиг
-USER_NAME=""             # имя пользователя для добавления
-USER_SECRET=""           # секрет пользователя (если не задан, будет запрошен или сгенерирован)
+AD_TAG=""
+USER_NAME=""
+USER_SECRET=""
+PUBLIC_HOST=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -417,7 +427,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -user)
             USER_NAME="$2"
-            # Проверяем, есть ли следующий аргумент и не является ли он флагом
             if [[ -n "$3" && ! "$3" =~ ^- ]]; then
                 USER_SECRET="$3"
                 shift 3
@@ -425,6 +434,10 @@ while [[ $# -gt 0 ]]; do
                 USER_SECRET=""
                 shift 2
             fi
+            ;;
+        -public_host)
+            PUBLIC_HOST="$2"
+            shift 2
             ;;
         -h|--help)
             echo ""
@@ -443,6 +456,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -version <версия>      версия Telemt (по умолчанию последняя)"
             echo -e "    -ad_tag <тег>          добавить ad_tag в конфиг Telemt (в секцию [general])"
             echo -e "    -user <имя> [секрет]   добавить пользователя в [access.users] (если секрет не указан — будет запрошен или сгенерирован)"
+            echo -e "    -public_host <домен>   добавить/обновить public_host в секции [server.links]"
             echo -e "    -no-fix                отключить установку фикса"
             echo -e "    -h, --help             показать эту справку"
             echo ""
@@ -450,8 +464,8 @@ while [[ $# -gt 0 ]]; do
             echo -e "    # Только фикс V3 на порт 8443"
             echo -e "    curl ... | sudo bash -s -- -fix -fix-port 8443"
             echo ""
-            echo -e "    # Telemt + V3 фикс на порт 9443, домен my.domain, с ad_tag и пользователем"
-            echo -e "    curl ... | sudo bash -s -- -telemt -domain my.domain -port 9443 -fix -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user vasya"
+            echo -e "    # Telemt + V3 фикс с ad_tag, пользователем и public_host"
+            echo -e "    curl ... | sudo bash -s -- -telemt -domain my.domain -port 9443 -fix -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user vasya -public_host my.domain"
             echo ""
             echo -e "    # Telemt без фикса"
             echo -e "    curl ... | sudo bash -s -- -telemt -no-fix"
@@ -475,7 +489,7 @@ done
 if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
 
     echo ""
-    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.7${NC}"
+    echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.8${NC}"
     echo -e "  ${DIM}═════════════════════════════════════════════════${NC}"
     echo ""
 
@@ -616,7 +630,6 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         
         # Добавляем пользователя, если передан
         if [ -n "$USER_NAME" ]; then
-            # Если секрет не передан — запрашиваем или генерируем
             if [ -z "$USER_SECRET" ]; then
                 echo -en "  ${BOLD}Введите секрет для пользователя $USER_NAME (Enter - сгенерировать автоматически)${NC}: " >&2
                 if [ -r /dev/tty ]; then
@@ -632,6 +645,18 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
                 fi
             fi
             add_user_to_config "$USER_NAME" "$USER_SECRET"
+        fi
+        
+        # Добавляем public_host, если передан
+        if [ -n "$PUBLIC_HOST" ]; then
+            add_public_host_to_config "$PUBLIC_HOST"
+        fi
+        
+        # Единый перезапуск telemt после всех изменений
+        if systemctl restart telemt 2>/dev/null; then
+            log_success "Telemt перезапущен для применения всех изменений"
+        else
+            log_warning "Не удалось перезапустить telemt (возможно, он не установлен как служба)"
         fi
     fi
 
