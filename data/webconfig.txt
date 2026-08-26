@@ -43,14 +43,6 @@ mode = "static_directory"
 directory = "/var/lib/telemt/public"
 index = "index.html"
 
-host = "zdez.tvoi.domen.com" # замените на свой домен
-public_addr = "12.34.56.789:443"   # замените на реальный IP
-
-[web.vhosts.decoy]
-mode = "static_directory"
-directory = "/var/lib/telemt/public"
-index = "index.html"
-
 [[web.vhosts.profiles]]
 user = "hello"
 secret_mode = "dd"
