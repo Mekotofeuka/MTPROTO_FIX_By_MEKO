@@ -412,6 +412,74 @@ get_latest_telemt_version() {
     echo "$version"
 }
 
+# ── Функция скачивания и подстановки WEB-конфига ────────────
+setup_web_config() {
+    local web_user="$1"
+    local web_secret="$2"
+    local web_host="$3"
+    local web_ip="$4"
+    local config_path=$(get_config_path)
+    
+    # Скачиваем шаблон webconfig.txt
+    local web_template="/tmp/webconfig.txt"
+    log_info "Скачивание шаблона WEB-конфига..."
+    if ! curl -fsSL "$BASE_URL/data/webconfig.txt" -o "$web_template"; then
+        log_error "Не удалось скачать шаблон webconfig.txt"
+        return 1
+    fi
+    
+    # Проверяем обязательные параметры
+    if [ -z "$web_host" ]; then
+        log_error "WEB-хост (домен) обязателен. Укажите -web-host"
+        return 1
+    fi
+    
+    if [ -z "$web_ip" ]; then
+        web_ip=$(get_public_ip)
+        if [ -z "$web_ip" ]; then
+            log_error "Не удалось определить внешний IP"
+            return 1
+        fi
+        log_info "Внешний IP определён: $web_ip"
+    fi
+    
+    # Генерируем секрет, если не передан
+    if [ -z "$web_secret" ]; then
+        web_secret=$(generate_secret)
+        log_info "Сгенерирован секрет для WEB: $web_secret"
+    fi
+    
+    # Если пользователь не указан, используем "webuser"
+    if [ -z "$web_user" ]; then
+        web_user="webuser"
+        log_info "Имя пользователя не указано, используем: $web_user"
+    fi
+    
+    # Читаем шаблон и подставляем значения
+    local web_config_content=$(cat "$web_template")
+    
+    # Заменяем плейсхолдеры
+    web_config_content="${web_config_content//\"zdez.tvoi.domen.com\"/\"$web_host\"}"
+    web_config_content="${web_config_content//\"12.34.56.789:443\"/\"$web_ip:443\"}"
+    web_config_content="${web_config_content//hello = \"e5544cb710bae52b8bcbc05375921c16\"/hello = \"$web_secret\"}"
+    
+    # Заменяем имя пользователя в access.users (если отличается от "hello")
+    if [ "$web_user" != "hello" ]; then
+        web_config_content="${web_config_content//hello = /$web_user = }"
+        # Меняем в links_show
+        web_config_content="${web_config_content//links_show = [\"hello\"]/links_show = [\"$web_user\"]}"
+        # Меняем в профиле
+        web_config_content="${web_config_content//user = \"hello\"/user = \"$web_user\"}"
+    fi
+    
+    # Сохраняем полученный конфиг
+    echo "$web_config_content" > "$config_path"
+    log_success "WEB-конфиг сохранён в $config_path"
+    
+    rm -f "$web_template"
+    return 0
+}
+
 # ── СТАРОЕ МЕНЮ (ПРОКСИ) ──────────────────────────────────────
 show_proxy_menu() {
     clear 2>/dev/null || printf '\033[2J\033[H'
@@ -563,6 +631,7 @@ FLAG_ZIG=""
 FLAG_MTG=""
 FLAG_FIX=""
 FLAG_NO_FIX=""
+FLAG_WEB=""
 FIX_TYPE=""              # v2, v3, v4, nft
 FIX_PORT=""              # порт для фикса
 PROXY_PORT=""            # порт прокси
@@ -572,6 +641,9 @@ AD_TAG=""
 USER_NAME=""
 USER_SECRET=""
 PUBLIC_HOST=""
+WEB_USER=""
+WEB_SECRET=""
+WEB_HOST=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -594,6 +666,22 @@ while [[ $# -gt 0 ]]; do
         -no-fix)
             FLAG_NO_FIX="true"
             shift
+            ;;
+        -web)
+            FLAG_WEB="true"
+            shift
+            ;;
+        -web-user)
+            WEB_USER="$2"
+            shift 2
+            ;;
+        -web-secret)
+            WEB_SECRET="$2"
+            shift 2
+            ;;
+        -web-host)
+            WEB_HOST="$2"
+            shift 2
             ;;
         -fix-type)
             case "$2" in
@@ -662,6 +750,10 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -ad_tag <тег>          добавить ad_tag в конфиг Telemt (в секцию [general])"
             echo -e "    -user <имя> [секрет]   добавить пользователя в [access.users] (если секрет не указан — будет запрошен или сгенерирован)"
             echo -e "    -public_host <домен>   добавить/обновить public_host в секции [server.links]"
+            echo -e "    -web                   установить Telemt в WEB-режиме"
+            echo -e "    -web-user <имя>        имя пользователя для WEB-режима (по умолчанию webuser)"
+            echo -e "    -web-secret <секрет>   секрет для WEB-режима (если не указан — генерируется автоматически)"
+            echo -e "    -web-host <домен>      домен для WEB-хоста (обязательно)"
             echo -e "    -no-fix                отключить установку фикса"
             echo -e "    -h, --help             показать эту справку"
             echo ""
@@ -677,6 +769,9 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo -e "    # V4 фикс (zapret2) на порт 443"
             echo -e "    curl ... | sudo bash -s -- -fix -fix-type v4"
+            echo ""
+            echo -e "    # Telemt в WEB-режиме с указанием домена"
+            echo -e "    curl ... | sudo bash -s -- -telemt -web -web-host my.domain.com -web-user myuser"
             exit 0
             ;;
         *)
@@ -691,7 +786,7 @@ done
 #  АВТОМАТИЧЕСКАЯ УСТАНОВКА (если передан хотя бы один флаг)
 # ══════════════════════════════════════════════════════════════
 
-if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]; then
+if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" || -n "$FLAG_WEB" ]]; then
 
     echo ""
     echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.82${NC}"
@@ -732,6 +827,50 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
                 TELEMT_VERSION=$(get_latest_telemt_version)
                 log_info "Выбран SNI: $DOMAIN"
                 log_info "Выбрана последняя версия: $TELEMT_VERSION"
+            fi
+        fi
+    fi
+
+    # ── Запрос WEB-параметров, если передан флаг -web ──────
+    if [[ -n "$FLAG_WEB" ]]; then
+        # WEB-хост (обязательно)
+        if [ -z "$WEB_HOST" ]; then
+            echo ""
+            echo -e "  ${BOLD}Для WEB-режима необходимо указать домен${NC}"
+            echo -en "  ${BOLD}Введите домен для WEB-хоста:${NC} "
+            if [ -r /dev/tty ]; then
+                read -r WEB_HOST </dev/tty
+            else
+                WEB_HOST=""
+            fi
+            if [ -z "$WEB_HOST" ]; then
+                log_error "Домен для WEB-режима обязателен. Укажите -web-host или введите сейчас."
+                exit 1
+            fi
+        fi
+        
+        # WEB-пользователь
+        if [ -z "$WEB_USER" ]; then
+            echo -en "  ${BOLD}Введите имя пользователя для WEB${NC} ${DIM}(по умолчанию: webuser)${NC}: "
+            if [ -r /dev/tty ]; then
+                read -r WEB_USER </dev/tty
+            else
+                WEB_USER=""
+            fi
+            [ -z "$WEB_USER" ] && WEB_USER="webuser"
+        fi
+        
+        # WEB-секрет
+        if [ -z "$WEB_SECRET" ]; then
+            echo -en "  ${BOLD}Введите секрет для WEB${NC} ${DIM}(Enter - сгенерировать автоматически)${NC}: "
+            if [ -r /dev/tty ]; then
+                read -r WEB_SECRET </dev/tty
+            else
+                WEB_SECRET=""
+            fi
+            if [ -z "$WEB_SECRET" ]; then
+                WEB_SECRET=$(generate_secret)
+                log_info "Сгенерирован секрет: $WEB_SECRET"
             fi
         fi
     fi
@@ -828,33 +967,52 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
         curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh -s -- "$TELEMT_VERSION" -l 2 -d "$DOMAIN" -p "$PROXY_PORT"
         log_success "Telemt установлен"
         
-        # Добавляем ad_tag, если передан
-        if [ -n "$AD_TAG" ]; then
-            add_ad_tag_to_config "$AD_TAG"
-        fi
-        
-        # Добавляем пользователя, если передан
-        if [ -n "$USER_NAME" ]; then
-            if [ -z "$USER_SECRET" ]; then
-                echo -en "  ${BOLD}Введите секрет для пользователя $USER_NAME (Enter - сгенерировать автоматически)${NC}: " >&2
-                if [ -r /dev/tty ]; then
-                    read -r input_secret </dev/tty
-                else
-                    input_secret=""
-                fi
-                if [ -z "$input_secret" ]; then
-                    USER_SECRET=$(generate_secret)
-                    log_info "Сгенерирован секрет: $USER_SECRET"
-                else
-                    USER_SECRET="$input_secret"
-                fi
+        # Если передан флаг -web, настраиваем WEB-конфиг
+        if [[ -n "$FLAG_WEB" ]]; then
+            log_info "Настройка WEB-режима..."
+            
+            # Получаем внешний IP
+            local web_ip=$(get_public_ip)
+            if [ -z "$web_ip" ]; then
+                log_error "Не удалось определить внешний IP"
+                exit 1
             fi
-            add_user_to_config "$USER_NAME" "$USER_SECRET"
-        fi
-        
-        # Добавляем public_host, если передан
-        if [ -n "$PUBLIC_HOST" ]; then
-            add_public_host_to_config "$PUBLIC_HOST"
+            log_info "Внешний IP: $web_ip"
+            
+            # Настраиваем WEB-конфиг
+            if setup_web_config "$WEB_USER" "$WEB_SECRET" "$WEB_HOST" "$web_ip"; then
+                log_success "WEB-конфиг успешно настроен"
+            else
+                log_error "Ошибка настройки WEB-конфига"
+                exit 1
+            fi
+        else
+            # Обычная установка: добавляем ad_tag, пользователя, public_host
+            if [ -n "$AD_TAG" ]; then
+                add_ad_tag_to_config "$AD_TAG"
+            fi
+            
+            if [ -n "$USER_NAME" ]; then
+                if [ -z "$USER_SECRET" ]; then
+                    echo -en "  ${BOLD}Введите секрет для пользователя $USER_NAME (Enter - сгенерировать автоматически)${NC}: " >&2
+                    if [ -r /dev/tty ]; then
+                        read -r input_secret </dev/tty
+                    else
+                        input_secret=""
+                    fi
+                    if [ -z "$input_secret" ]; then
+                        USER_SECRET=$(generate_secret)
+                        log_info "Сгенерирован секрет: $USER_SECRET"
+                    else
+                        USER_SECRET="$input_secret"
+                    fi
+                fi
+                add_user_to_config "$USER_NAME" "$USER_SECRET"
+            fi
+            
+            if [ -n "$PUBLIC_HOST" ]; then
+                add_public_host_to_config "$PUBLIC_HOST"
+            fi
         fi
         
         # Единый перезапуск telemt после всех изменений
@@ -873,6 +1031,18 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ]]
             echo -e "$links" >&2
         else
             echo -e "  ${YELLOW}[!]${NC} Не удалось сгенерировать ссылку. Проверьте конфиг." >&2
+        fi
+        
+        # Если WEB-режим, выводим WEB-ссылку отдельно
+        if [[ -n "$FLAG_WEB" ]]; then
+            echo "" >&2
+            log_info "WEB-ссылка для Telegram Desktop:"
+            echo "" >&2
+            echo -e "  tg://webproxy?server=${WEB_HOST}&secret=${WEB_SECRET}" >&2
+            # Если используется dd-режим, выводим с префиксом dd
+            echo -e "  ${DIM}С префиксом dd (если нужен secure-режим):${NC}" >&2
+            echo -e "  tg://webproxy?server=${WEB_HOST}&secret=dd${WEB_SECRET}" >&2
+            echo "" >&2
         fi
         echo "" >&2
     fi
