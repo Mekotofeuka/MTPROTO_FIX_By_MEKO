@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh – Главный установщик MEKOPR с поддержцией аргументов
+# install.sh – Главный установщик MEKOPR с поддержкой аргументов
 
 set -e
 
@@ -1090,7 +1090,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
             log_info "Настройка WEB-режима..."
             
             # Получаем внешний IP
-            local web_ip=$(get_public_ip)
+            web_ip=$(get_public_ip)   # Убрали local
             if [ -z "$web_ip" ]; then
                 log_error "Не удалось определить внешний IP"
                 exit 1
