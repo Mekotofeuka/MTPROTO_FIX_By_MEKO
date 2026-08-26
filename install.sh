@@ -1170,14 +1170,14 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
             echo -e "  ${YELLOW}[!]${NC} Не удалось сгенерировать ссылку. Проверьте конфиг." >&2
         fi
         
-        # ── Вывод WEB-ссылки (ИСПРАВЛЕНО) ──────────────────────
+        # ── Вывод WEB-ссылки (ИСПРАВЛЕНО: убраны local) ───────
         if [[ -n "$FLAG_WEB" ]]; then
             echo "" >&2
             log_info "WEB-ссылка для Telegram Desktop:"
             echo "" >&2
             # Определяем secret_mode из конфига для пользователя
-            local config_path=$(get_config_path)
-            local secret_mode=$(grep -A1 "user = \"$WEB_USER\"" "$config_path" | grep 'secret_mode' | head -1 | awk -F'"' '{print $2}')
+            config_path=$(get_config_path)   # убрали local
+            secret_mode=$(grep -A1 "user = \"$WEB_USER\"" "$config_path" | grep 'secret_mode' | head -1 | awk -F'"' '{print $2}')
             if [ -z "$secret_mode" ]; then
                 # Если не нашли, пробуем для "hello"
                 secret_mode=$(grep -A1 'user = "hello"' "$config_path" | grep 'secret_mode' | head -1 | awk -F'"' '{print $2}')
