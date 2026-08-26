@@ -183,7 +183,7 @@ get_public_ip() {
     echo "$_ip"
 }
 
-# ── Функция генерации ссылок для подключения ────────────────
+# ── Функция генерации ссылок для подключения (ИСПРАВЛЕНА) ────
 generate_proxy_links() {
     local config_path=$(get_config_path)
     if [ ! -f "$config_path" ]; then
@@ -206,6 +206,12 @@ generate_proxy_links() {
     local detected_tls_domain="${parts[7]}"
     local detected_secret="${parts[8]}"
     
+    # ── Попробуем получить public_addr из секции [[web.vhosts]] ──
+    local web_public_addr=""
+    if [ -f "$config_path" ]; then
+        web_public_addr=$(grep -E '^public_addr[[:space:]]*=' "$config_path" | head -1 | awk -F'"' '{print $2}' | cut -d: -f1)
+    fi
+    
     # Определяем порт
     local port=""
     if [ -n "$detected_port" ]; then
@@ -217,9 +223,11 @@ generate_proxy_links() {
         port="443"
     fi
     
-    # Определяем сервер (IP или public_host)
+    # ── Определяем сервер (IP или public_host) ──
     local server=""
-    if [ -n "$detected_public_host" ]; then
+    if [ -n "$web_public_addr" ]; then
+        server="$web_public_addr"
+    elif [ -n "$detected_public_host" ]; then
         server="$detected_public_host"
     elif [ -n "$detected_ip" ]; then
         server="$detected_ip"
@@ -1162,14 +1170,23 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
             echo -e "  ${YELLOW}[!]${NC} Не удалось сгенерировать ссылку. Проверьте конфиг." >&2
         fi
         
-        # Если WEB-режим, выводим WEB-ссылку отдельно
+        # ── Вывод WEB-ссылки (ИСПРАВЛЕНО) ──────────────────────
         if [[ -n "$FLAG_WEB" ]]; then
             echo "" >&2
             log_info "WEB-ссылка для Telegram Desktop:"
             echo "" >&2
-            echo -e "  tg://webproxy?server=${WEB_HOST}&secret=${WEB_SECRET}" >&2
-            echo -e "  ${DIM}С префиксом dd (если нужен secure-режим):${NC}" >&2
-            echo -e "  tg://webproxy?server=${WEB_HOST}&secret=dd${WEB_SECRET}" >&2
+            # Определяем secret_mode из конфига для пользователя
+            local config_path=$(get_config_path)
+            local secret_mode=$(grep -A1 "user = \"$WEB_USER\"" "$config_path" | grep 'secret_mode' | head -1 | awk -F'"' '{print $2}')
+            if [ -z "$secret_mode" ]; then
+                # Если не нашли, пробуем для "hello"
+                secret_mode=$(grep -A1 'user = "hello"' "$config_path" | grep 'secret_mode' | head -1 | awk -F'"' '{print $2}')
+            fi
+            if [ "$secret_mode" = "dd" ]; then
+                echo -e "  tg://webproxy?server=${WEB_HOST}&secret=dd${WEB_SECRET}" >&2
+            else
+                echo -e "  tg://webproxy?server=${WEB_HOST}&secret=${WEB_SECRET}" >&2
+            fi
             echo "" >&2
         fi
         echo "" >&2
