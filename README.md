@@ -118,6 +118,11 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb
 ```
 
+Установка **TELEMT** версии `3.5.3` **MTProto** на `9443` порт с **фиксом** `V3`, со **SNI** `ozon.ru` на домен `yourdomain.com`, а также поставит **NGINX** на `443` порт:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 9443 -version 3.5.3 -web -web-host yourdomain.com -web-user hello -web-secret e5544cb710bae52b8bcbc05375921c16 -nginx -fix -fix-type v3
+```
+
 
 Установка **Telemt** `3.4.25` и **фикса v3** на порт `443` с доменом `ozon.ru`, **ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95` и **юзером** `Vasya` с секретом `68...dedb`, а также **доменом** `my.domain.com`:
 ```bash
@@ -140,6 +145,11 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 | `-ad_tag <тег>`               | —                          | Добавить `ad_tag` в секцию `[general]` конфига Telemt     |
 | `-user <имя> [секрет]`        | —                          | Добавить пользователя в `[access.users]`. Если **секрет** не указан – будет запрошен или сгенерирован автоматически при нажатии **Enter** |
 | `-public_host <домен>`        | —                          | Добавить/обновить `public_host` в секции `[server.links]` конфига Telemt |
+| `-web`                        | —                          | Установить Telemt в **WEB-режиме** (требует `-web-host`)                |
+| `-web-user <имя>`             | `webuser`                  | Имя пользователя для WEB-профиля (в `[web.vhosts.profiles]`)           |
+| `-web-secret <секрет>`        | генерируется автоматически | Секрет для WEB-пользователя (16 байт hex). Если не указан – создаётся новый |
+| `-web-host <домен>`           | —                          | **Обязательный** домен для WEB-хоста (FQDN, на который будут подключаться клиенты) |
+| `-nginx`                      | —                          | Установить и настроить **Nginx + Certbot** для WEB-режима (автоматически получает SSL-сертификат). Требует `-web` и `-web-host`. |
 | `-h`, `--help`                | —                          | Показать список доступных аргументов |
 
 > Если версия Telemt и тип фикса не указаны, они будут запрошены во время установки.
