@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh – Главный установщик MEKOPR с поддержкой аргументов
+# install.sh – Главный установщик MEKOPR с поддержцией аргументов
 
 set -e
 
@@ -480,6 +480,118 @@ setup_web_config() {
     return 0
 }
 
+# ── Функция установки и настройки Nginx для WEB-режима ──────
+setup_nginx() {
+    local web_host="$1"
+    local web_ip="$2"
+    
+    if [ -z "$web_host" ]; then
+        log_error "Для установки Nginx необходим домен (WEB_HOST)"
+        return 1
+    fi
+    
+    log_info "Установка Nginx и Certbot..."
+    
+    # Определяем пакетный менеджер
+    if command -v apt-get &>/dev/null; then
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -qq
+        apt-get install -y -qq nginx certbot python3-certbot-nginx
+    elif command -v yum &>/dev/null; then
+        yum install -y -q nginx certbot python3-certbot-nginx
+    elif command -v dnf &>/dev/null; then
+        dnf install -y -q nginx certbot python3-certbot-nginx
+    else
+        log_error "Не удалось определить пакетный менеджер для установки Nginx"
+        return 1
+    fi
+    
+    # Создаём decoy
+    mkdir -p /var/lib/telemt/public
+    echo "OK" > /var/lib/telemt/public/index.html
+    log_success "Decoy создан: /var/lib/telemt/public/index.html"
+    
+    # Получаем сертификат с временным отключением IPv6 (если нужно)
+    log_info "Получение SSL-сертификата для $web_host..."
+    # Временно отключаем IPv6, чтобы certbot не пытался использовать его
+    sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
+    sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
+    
+    if ! certbot --nginx -d "$web_host" --non-interactive --agree-tos --email admin@"$web_host" 2>/dev/null; then
+        # Если не получилось, пробуем standalone
+        systemctl stop nginx
+        if certbot certonly --standalone -d "$web_host" --non-interactive --agree-tos --email admin@"$web_host" 2>/dev/null; then
+            systemctl start nginx
+        else
+            log_error "Не удалось получить SSL-сертификат"
+            sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null 2>&1
+            sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null 2>&1
+            return 1
+        fi
+    fi
+    
+    # Включаем IPv6 обратно
+    sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null 2>&1
+    sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null 2>&1
+    
+    log_success "SSL-сертификат получен"
+    
+    # Создаём конфиг Nginx
+    local nginx_config="/etc/nginx/sites-available/default"
+    log_info "Создание конфига Nginx для $web_host..."
+    
+    cat > "$nginx_config" <<EOF
+map \$http_upgrade \$telemt_connection_upgrade {
+    default upgrade;
+    ''      '';
+}
+
+upstream telemt_web {
+    server 127.0.0.1:18080;
+    keepalive 64;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $web_host;
+
+    ssl_certificate     /etc/letsencrypt/live/$web_host/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$web_host/privkey.pem;
+
+    client_max_body_size 2m;
+    access_log off;
+
+    location / {
+        proxy_pass http://telemt_web;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$remote_addr;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$telemt_connection_upgrade;
+
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 65s;
+        proxy_read_timeout 65s;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_next_upstream off;
+    }
+}
+EOF
+    
+    # Проверяем и перезагружаем Nginx
+    if nginx -t 2>/dev/null; then
+        systemctl restart nginx
+        log_success "Nginx перезагружен с новым конфигом"
+    else
+        log_error "Конфигурация Nginx невалидна"
+        return 1
+    fi
+    
+    log_success "Nginx настроен для $web_host"
+    return 0
+}
+
 # ── СТАРОЕ МЕНЮ (ПРОКСИ) ──────────────────────────────────────
 show_proxy_menu() {
     clear 2>/dev/null || printf '\033[2J\033[H'
@@ -632,6 +744,7 @@ FLAG_MTG=""
 FLAG_FIX=""
 FLAG_NO_FIX=""
 FLAG_WEB=""
+FLAG_NGINX=""
 FIX_TYPE=""              # v2, v3, v4, nft
 FIX_PORT=""              # порт для фикса
 PROXY_PORT=""            # порт прокси
@@ -682,6 +795,10 @@ while [[ $# -gt 0 ]]; do
         -web-host)
             WEB_HOST="$2"
             shift 2
+            ;;
+        -nginx)
+            FLAG_NGINX="true"
+            shift
             ;;
         -fix-type)
             case "$2" in
@@ -754,6 +871,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -web-user <имя>        имя пользователя для WEB-режима (по умолчанию webuser)"
             echo -e "    -web-secret <секрет>   секрет для WEB-режима (если не указан — генерируется автоматически)"
             echo -e "    -web-host <домен>      домен для WEB-хоста (обязательно)"
+            echo -e "    -nginx                 установить и настроить Nginx + Certbot для WEB-режима (требует -web и -web-host)"
             echo -e "    -no-fix                отключить установку фикса"
             echo -e "    -h, --help             показать эту справку"
             echo ""
@@ -770,8 +888,8 @@ while [[ $# -gt 0 ]]; do
             echo -e "    # V4 фикс (zapret2) на порт 443"
             echo -e "    curl ... | sudo bash -s -- -fix -fix-type v4"
             echo ""
-            echo -e "    # Telemt в WEB-режиме с указанием домена"
-            echo -e "    curl ... | sudo bash -s -- -telemt -web -web-host my.domain.com -web-user myuser"
+            echo -e "    # Telemt в WEB-режиме с полной автоматической установкой Nginx"
+            echo -e "    curl ... | sudo bash -s -- -telemt -web -web-host my.domain.com -web-user myuser -nginx"
             exit 0
             ;;
         *)
@@ -986,6 +1104,17 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
                 log_error "Ошибка настройки WEB-конфига"
                 exit 1
             fi
+            
+            # Если передан флаг -nginx, устанавливаем и настраиваем Nginx
+            if [[ -n "$FLAG_NGINX" ]]; then
+                log_info "Установка и настройка Nginx + Certbot..."
+                if setup_nginx "$WEB_HOST" "$web_ip"; then
+                    log_success "Nginx успешно настроен"
+                else
+                    log_error "Ошибка настройки Nginx"
+                    exit 1
+                fi
+            fi
         else
             # Обычная установка: добавляем ad_tag, пользователя, public_host
             if [ -n "$AD_TAG" ]; then
@@ -1039,7 +1168,6 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
             log_info "WEB-ссылка для Telegram Desktop:"
             echo "" >&2
             echo -e "  tg://webproxy?server=${WEB_HOST}&secret=${WEB_SECRET}" >&2
-            # Если используется dd-режим, выводим с префиксом dd
             echo -e "  ${DIM}С префиксом dd (если нужен secure-режим):${NC}" >&2
             echo -e "  tg://webproxy?server=${WEB_HOST}&secret=dd${WEB_SECRET}" >&2
             echo "" >&2
