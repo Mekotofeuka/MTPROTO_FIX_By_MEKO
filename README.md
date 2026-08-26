@@ -1,7 +1,7 @@
 <div align="center">
 
 
-# MEKO | VPN and MTProto proxy manager - Fixer, Installer and Launcher  
+# MEKO | VPN and MTProto/WEB proxy manager - Fixer, Installer and Launcher  
 
 
 <a href="https://t.me/meko_mtprotofix">
