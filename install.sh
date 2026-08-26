@@ -1173,7 +1173,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
         # ── Вывод WEB-ссылки (ИСПРАВЛЕНО: убраны local) ───────
         if [[ -n "$FLAG_WEB" ]]; then
             echo "" >&2
-            log_info "WEB-ссылка для Telegram Desktop:"
+            log_info "WEB-ссылка:"
             echo "" >&2
             # Определяем secret_mode из конфига для пользователя
             config_path=$(get_config_path)   # убрали local
