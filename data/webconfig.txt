@@ -54,6 +54,3 @@ index = "index.html"
 [[web.vhosts.profiles]]
 user = "hello"
 secret_mode = "dd"
-max_sessions = 9999
-max_streams = 9999
-max_streams_per_session = 9999
