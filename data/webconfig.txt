@@ -8,7 +8,7 @@ secure = true
 tls = true
 
 [server]
-port = 443
+port = 9443
 
 [server.api]
 enabled = true
@@ -20,6 +20,12 @@ tls_domain = "ozon.ru" # Замените на другой свой/чужой 
 
 [access.users]
 hello = "e5544cb710bae52b8bcbc05375921c16"
+
+# ========== MTProto-слушатель (TLS/Classic/Secure) ==========
+[[server.listeners]]
+ip = "0.0.0.0"
+port = 9443
+# transport не указан — по умолчанию mtproto
 
 # ========== WEB-слушатель ==========
 [[server.listeners]]
