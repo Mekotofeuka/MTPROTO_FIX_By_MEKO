@@ -1,0 +1,59 @@
+[general]
+use_middle_proxy = true
+links_show = ["hello"]
+
+[general.modes]
+classic = true
+secure = true
+tls = true
+
+[server]
+port = 443
+
+[server.api]
+enabled = true
+listen = "127.0.0.1:9091"
+whitelist = ["127.0.0.1/32"]
+
+[censorship]
+tls_domain = "ozon.ru"
+
+[access.users]
+hello = "e5544cb710bae52b8bcbc05375921c16"
+
+# ========== WEB-слушатель ==========
+[[server.listeners]]
+ip = "127.0.0.1"
+port = 18080
+transport = "web"
+proxy_protocol = false
+web_client_ip_source = "x_forwarded_for"
+web_trusted_proxy_cidrs = ["127.0.0.1/32"]
+
+[web]
+enabled = true
+carrier = "https-lanes"
+
+[[web.vhosts]]
+host = "zdez.tvoi.domen.com"  # замените на свой домен
+public_addr = "12.34.56.789:443"   # замените на реальный IP
+
+[web.vhosts.decoy]
+mode = "static_directory"
+directory = "/var/lib/telemt/public"
+index = "index.html"
+
+host = "zdez.tvoi.domen.com" # замените на свой домен
+public_addr = "12.34.56.789:443"   # замените на реальный IP
+
+[web.vhosts.decoy]
+mode = "static_directory"
+directory = "/var/lib/telemt/public"
+index = "index.html"
+
+[[web.vhosts.profiles]]
+user = "hello"
+secret_mode = "dd"
+max_sessions = 9999
+max_streams = 9999
+max_streams_per_session = 9999
