@@ -120,7 +120,7 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb
 ```
 
-Установка **TELEMT** версии `3.5.3` **MTProto** на `9443` порт с **фиксом** `V3`, со **SNI** `ozon.ru` на домен `yourdomain.com`, а также поставит **NGINX** на `443` порт:
+Установка **TELEMT** версии `3.5.3` **MTProto** на `9443` порт с **фиксом** `V3`, со **SNI** `ozon.ru` на домен `yourdomain.com`, а также поставит **NGINX** и **WEB прокси** на `443` порт:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 9443 -version 3.5.3 -web -web-host yourdomain.com -web-user hello -web-secret e5544cb710bae52b8bcbc05375921c16 -nginx -fix -fix-type v3
 ```
