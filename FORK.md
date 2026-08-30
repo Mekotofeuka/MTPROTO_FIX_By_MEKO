@@ -7,7 +7,7 @@ Upstream-проект: [Mekotofeuka/MTPROTO_FIX_By_MEKO](https://github.com/Meko
 отдельных файлах:
 
 - `install-random-port.sh` — неинтерактивная установка на случайном порту;
-- `README-AUTO-RU.md` — документация дополнения;
+- `README.md` — краткая документация дополнения;
 - `THIRD_PARTY_NOTICES.md` — сведения об исходных проектах;
 - `.github/workflows/random-port-shellcheck.yml` — проверка дополнения.
 
