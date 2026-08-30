@@ -1,0 +1,20 @@
+name: Проверка установщика
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Проверить синтаксис Bash
+        run: bash -n install-random-port.sh
+      - name: Запустить ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: ./install-random-port.sh
