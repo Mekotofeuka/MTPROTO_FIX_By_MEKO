@@ -58,7 +58,7 @@ _MEKO использует на данный момент [более точну
 - Висеть "бесконечное обновление" на ios, 
 - не работать Медиа - видео/фото/gif/кружки/стикеры.
 
- **Проверен на: Telemt 3.5.3, MTProto.zig 1.13.0, Mtg 2.2.8, Erlang mtproto proxy, MTProtoProxy python, JSMTProxy**
+ **Проверен на: Telemt 3.5.6, MTProto.zig 1.13.0, Mtg 2.2.8, Erlang mtproto proxy, MTProtoProxy python, JSMTProxy**
 
 Данный скрипт используется для серверов с MTPROTO прокси, фиксит проблему долгого первичного TCP-подключения клиентов либо его полное отсутствие(не подключается к прокси), **имеет ряд преимуществ**:
 - Быстрое подключение даже при большом количестве клиентов и устройств на одном IP(Wi-Fi)
@@ -115,20 +115,20 @@ mekopr
 curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -fix -fix-port 443 -fix-type v3
 ```
 
-Установка **Telemt** `3.4.25` и **фикса v3** на порт `443` с доменом `ozon.ru`, **ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95` и **юзером** `Vasya` с секретом `68...dedb`:
+Установка **Telemt** `3.5.6` и **фикса v3** на порт `443` с доменом `ozon.ru`, **ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95` и **юзером** `Vasya` с секретом `68...dedb`:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.5.6 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb
 ```
 
-Установка **TELEMT** версии `3.5.3` **MTProto** на `9443` порт с **фиксом** `V3`, со **SNI** `ozon.ru` на домен `yourdomain.com`, а также поставит **NGINX** и **WEB прокси** на `443` порт:
+Установка **TELEMT** версии `3.5.6` **MTProto** на `9443` порт с **фиксом** `V3`, со **SNI** `ozon.ru` на домен `yourdomain.com`, а также поставит **NGINX** и **WEB прокси** на `443` порт:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 9443 -version 3.5.3 -web -web-host yourdomain.com -web-user hello -web-secret e5544cb710bae52b8bcbc05375921c16 -nginx -fix -fix-type v3
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 9443 -version 3.5.6 -web -web-host yourdomain.com -web-user hello -web-secret e5544cb710bae52b8bcbc05375921c16 -nginx -fix -fix-type v3
 ```
 
 
-Установка **Telemt** `3.4.25` и **фикса v3** на порт `443` с доменом `ozon.ru`, **ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95` и **юзером** `Vasya` с секретом `68...dedb`, а также **доменом** `my.domain.com`:
+Установка **Telemt** `3.5.6` и **фикса v3** на порт `443` с доменом `ozon.ru`, **ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95` и **юзером** `Vasya` с секретом `68...dedb`, а также **доменом** `my.domain.com`:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.4.25 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb -public_host my.domain.com
+curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.5.6 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb -public_host my.domain.com
 ```
 
 ### Параметры для автоматической установки
