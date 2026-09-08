@@ -209,7 +209,7 @@ If you find this project useful and wish to donate here are crypto wallets :
 [<img width="150" height="150" alt="image" src="https://github.com/user-attachments/assets/b910c839-ec45-486d-b7f0-05da8de41b74" />
 ](https://t.me/send?start=IVlaFvgWdkxH)
 
-USDT TRC20 ``` TGmBaRYmQwSyC6sRaumaMf9CbEuVAk4Eff ``` 
+USDT TRC20 ``` TH8jwDmdRZmxZPSbWWnbT9EH6FFVdLVR5f ``` 
 
 USDT BEP20 ```0x2AF1581aA7b696Ca28C70B5D29756Da3ca577D65``` 
 
