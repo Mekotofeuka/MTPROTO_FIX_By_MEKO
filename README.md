@@ -211,13 +211,13 @@ If you find this project useful and wish to donate here are crypto wallets :
 
 USDT TRC20 ``` TH8jwDmdRZmxZPSbWWnbT9EH6FFVdLVR5f ``` 
 
-USDT BEP20 ```0x2AF1581aA7b696Ca28C70B5D29756Da3ca577D65``` 
+USDT BEP20 ```0xB15CDB4eDBC6264B70C72746ca579D0fB4Dc75F5``` 
 
-TON(GRAM) ``` UQDdT8vtR5DmbwzNvMUiNQnwxlbkFq4ypE2_UzIm6bQ88DbU ``` 
+TON(GRAM) ``` UQBGHDKNsBj8nJODoEK5Pi993gU940BnNW9tvXIA15lzg22h ``` 
 
-BTC ``` bc1qqfkknfrhhufq6dm7cczmdtjkgv56ma3gnz0utk ``` 
+BTC ``` bc1qsrpd79gtc0ttkcxyapg5ue4x60qfm9rd54g9sc ``` 
 
-SOL SPL ``` Gn7w3EBkZqPjPDcbkTaxspip42TuhoGqaaEqHAxhG9V1 ``` 
+SOL SPL ``` J2fdY6G4JimD2fEA685Upt4riTTJtPMfXfLBLc7H3zas ``` 
 
 Также вы можете поддержать меня, воспользовавшись моим сервисом:
 
