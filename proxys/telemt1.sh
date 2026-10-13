@@ -545,6 +545,50 @@ view_logs() {
     { read -rsn1 </dev/tty; } 2>/dev/null || true
 }
 
+# ── Занят ли TCP-порт ЧУЖИМ процессом ───────────────────────
+# 0 — занят посторонним, 1 — свободен или занят самим telemt
+_telemt_port_busy_by_other() {
+    local p="$1" line
+    [ -z "$p" ] && return 1
+    line=$(ss -ltnp 2>/dev/null | awk -v p=":$p" 'index($4, p) == length($4) - length(p) + 1 { print }')
+    [ -z "$line" ] && return 1
+    case "$line" in *telemt*) return 1 ;; esac
+    return 0
+}
+
+# ── Спросить порт (только интерактивный путь) ───────────────
+# Результат — в TELEMT_PORT_CHOSEN. rc=1 — отмена пользователем.
+ask_telemt_port() {
+    local default_port="443" reply
+    while true; do
+        echo ""
+        echo -e "  ${NC}${BOLD}Укажите порт для прокси${NC} ${GRAY}(по умолчанию: ${default_port})${NC}"
+        echo -e "  ${GRAY}Enter — оставить по умолчанию, N/n — отмена${NC}"
+        echo -en "  ${NC}${BOLD}Порт:${NC} "
+        { read -r reply </dev/tty; } 2>/dev/null || { echo; return 1; }
+
+        if [[ "$reply" =~ ^[Nn]$ ]]; then
+            echo ""
+            echo -e "  ${GRAY}Установка отменена${NC}"
+            return 1
+        fi
+        [ -z "$reply" ] && reply="$default_port"
+
+        if ! [[ "$reply" =~ ^[0-9]+$ ]] || [ "$reply" -lt 1 ] || [ "$reply" -gt 65535 ]; then
+            echo -e "  ${YELLOW}[!]${NC} Неверный порт: ${reply} (нужно 1-65535)."
+            continue
+        fi
+        if _telemt_port_busy_by_other "$reply"; then
+            echo -e "  ${RED}[✗]${NC} Порт уже занят другим процессом: ${reply}"
+            echo -e "  ${GRAY}Освободите порт или укажите другой.${NC}"
+            continue
+        fi
+
+        TELEMT_PORT_CHOSEN="$reply"
+        return 0
+    done
+}
+
 # ── Функция установки Telemt ────────────────────────────────
 install_telemt() {
     echo ""
@@ -585,6 +629,17 @@ install_telemt() {
 
     echo ""
     echo -e "  ${BLUE}[i]${NC} Установка Telemt версии ${display_version}..."
+
+    # ── ПОРТ: спрашиваем у пользователя ──────────────────────
+    # Если 443 (или любой другой порт) занят, upstream падает с
+    # «Порт уже занят другим процессом» — поэтому порт выбираем здесь.
+    if ! ask_telemt_port; then
+        echo ""
+        echo -e "  ${GRAY}${BOLD}Нажмите любую клавишу для возврата в меню...${NC}"
+        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        return 1
+    fi
+    local _port="$TELEMT_PORT_CHOSEN"
     echo ""
 
     # ── ПЕРЕХОДИМ В /tmp И УБИРАЕМ INSTALL_DIR ──
@@ -593,21 +648,16 @@ install_telemt() {
 
     # ── Флаги для upstream-установщика ────────────────────────
     # -l 2 обязателен: интерфейс русский, иначе upstream задаёт
-    # лишний вопрос про язык. Порт берём из /opt/mtpr-simple/port
-    # или из текущего конфига (fallback 443), домен — из tls_domain
-    # конфига; без них upstream спрашивает порт/домен и может
-    # зависнуть на «Please specify the Server Port».
-    local _port="" _domain="" _cfg="" _info=""
-    if [ -f /opt/mtpr-simple/port ] && [ -s /opt/mtpr-simple/port ]; then
-        _port=$(head -1 /opt/mtpr-simple/port | tr -d '[:space:]')
-    fi
+    # лишний вопрос про язык. Порт — выбранный выше (сохраняем в
+    # /opt/mtpr-simple/port), домен — из tls_domain конфига.
+    local _domain="" _cfg="" _info=""
     _info=$(detect_telemt_advanced)
     _cfg=$(echo "$_info" | cut -d: -f1)
-    [ -z "$_port" ] && _port=$(echo "$_info" | cut -d: -f2)
     if [ -n "$_cfg" ] && [ -f "$_cfg" ]; then
         _domain=$(grep -E '^tls_domain[[:space:]]*=' "$_cfg" 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
     fi
-    [ -z "$_port" ] && _port="443"
+    mkdir -p /opt/mtpr-simple 2>/dev/null || true
+    printf '%s\n' "$_port" > /opt/mtpr-simple/port 2>/dev/null || true
 
     local -a telemt_flags=(-l 2 -p "$_port")
     [ -n "$_domain" ] && telemt_flags+=(-d "$_domain")
@@ -658,7 +708,15 @@ _silent_run_installer() {
 # неверный формат версии.
 install_telemt_silent() {
     local version_input="${1:-}"
+    local port_input="${2:-}"
     local install_version="latest" display_version="последнюю"
+
+    if [ -n "$port_input" ]; then
+        if ! [[ "$port_input" =~ ^[0-9]+$ ]] || [ "$port_input" -lt 1 ] || [ "$port_input" -gt 65535 ]; then
+            echo -e "  ${RED}[✗]${NC} Неверный порт: '${port_input}' (нужно 1-65535)" >&2
+            return 1
+        fi
+    fi
 
     if [ -z "$version_input" ] || [ "$version_input" = "latest" ]; then
         install_version="latest"
@@ -678,8 +736,12 @@ install_telemt_silent() {
     unset INSTALL_DIR
 
     # ── Флаги для upstream-установщика ────────────────────────
+    # Порт: аргумент (2-й) имеет приоритет, иначе /opt/mtpr-simple/port,
+    # иначе автоопределение, иначе 443.
     local _port="" _domain="" _cfg="" _info=""
-    if [ -f /opt/mtpr-simple/port ] && [ -s /opt/mtpr-simple/port ]; then
+    if [ -n "$port_input" ]; then
+        _port="$port_input"
+    elif [ -f /opt/mtpr-simple/port ] && [ -s /opt/mtpr-simple/port ]; then
         _port=$(head -1 /opt/mtpr-simple/port | tr -d '[:space:]')
     fi
     _info=$(detect_telemt_advanced)
@@ -689,6 +751,8 @@ install_telemt_silent() {
         _domain=$(grep -E '^tls_domain[[:space:]]*=' "$_cfg" 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' "')
     fi
     [ -z "$_port" ] && _port="443"
+    mkdir -p /opt/mtpr-simple 2>/dev/null || true
+    printf '%s\n' "$_port" > /opt/mtpr-simple/port 2>/dev/null || true
 
     local -a telemt_flags=(-l 2 -p "$_port")
     [ -n "$_domain" ] && telemt_flags+=(-d "$_domain")
@@ -2776,10 +2840,10 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
             ;;
         --install-silent)
             if [ -n "${2:-}" ]; then
-                install_telemt_silent "$2"
+                install_telemt_silent "$2" "${3:-}"
                 exit $?
             else
-                echo "Использование: $0 --install-silent <версия>" >&2
+                echo "Использование: $0 --install-silent <версия> [порт]" >&2
                 exit 2
             fi
             ;;
@@ -2804,7 +2868,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
             : # меню уже отработало выше
             ;;
         *)
-            echo "Использование: $0 [--purge-silent|--install-silent <версия>|--engine-install <url|путь> [sha256]|--engine-status|--engine-rollback]" >&2
+            echo "Использование: $0 [--purge-silent|--install-silent <версия> [порт]|--engine-install <url|путь> [sha256]|--engine-status|--engine-rollback]" >&2
             exit 2
             ;;
     esac
