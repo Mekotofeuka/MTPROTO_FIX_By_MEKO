@@ -61,6 +61,7 @@ DOCKER_BRIDGE_MODE='${DOCKER_BRIDGE_MODE:-simple}'
 BRIDGE_WATCH_INTERVAL='${BRIDGE_WATCH_INTERVAL:-5}'
 EXTRA_RULES_COUNT='${EXTRA_RULES_COUNT:-0}'
 ZAPRET2_QNUM='${ZAPRET2_QNUM:-200}'
+ZAPRET2_QUEUE_LIMIT='${ZAPRET2_QUEUE_LIMIT:-64}'
 ZAPRET2_OUT_RANGE='${ZAPRET2_OUT_RANGE:-a}'
 ZAPRET2_IN_RANGE='${ZAPRET2_IN_RANGE:-a}'
 ZAPRET2_SPLIT_LEN='${ZAPRET2_SPLIT_LEN:-400}'
@@ -68,8 +69,6 @@ ZAPRET2_WIN_SYNACK='${ZAPRET2_WIN_SYNACK:-1400}'
 ZAPRET2_WIN_ACK='${ZAPRET2_WIN_ACK:-10}'
 ZAPRET2_APPLIED='${ZAPRET2_APPLIED:-false}'
 ZAPRET2_SERVICE_ENABLED='${ZAPRET2_SERVICE_ENABLED:-false}'
-ZAPRET2_RELEASE_REPO='${ZAPRET2_RELEASE_REPO:-Liafanx/MTproxy-reanimation}'
-ZAPRET2_RELEASE_TAG='${ZAPRET2_RELEASE_TAG:-zapret2-bundle}'
 ZAPRET2_FWMARK='${ZAPRET2_FWMARK:-0x40000000}'
 ZAPRET2_DEBUG='${ZAPRET2_DEBUG:-false}'
 ZAPRET2_DEBUG_LOG='${ZAPRET2_DEBUG_LOG:-/var/log/nfqws2-mtproto.log}'
@@ -86,7 +85,7 @@ MEKO_ORIG_DEFAULT_QDISC='${MEKO_ORIG_DEFAULT_QDISC:-}'
 MEKO_ORIG_TCP_CONGESTION='${MEKO_ORIG_TCP_CONGESTION:-}'
 EOF
     # Сохраняем дополнительные правила, только если они есть
-    if [[ "${EXTRA_RULES_COUNT:-0}" =~ ^[0-9]+$ ]] && [ "$EXTRA_RULES_COUNT" -gt 0 ]; then
+    if [[ "${EXTRA_RULES_COUNT:-0}" =~ ^[0-9]+$ ]] && [ "${EXTRA_RULES_COUNT:-0}" -gt 0 ]; then
         for _i in $(seq 1 "$EXTRA_RULES_COUNT"); do
             cat >> "$SETTINGS_FILE" << EOF
 EXTRA_RULES_${_i}_PORT='${EXTRA_RULES_PORT[$_i]:-}'
@@ -116,9 +115,9 @@ load_settings() {
                 IOS2_FIX_APPLIED|IOS2_EXTERNAL_PORT|\
                 IOS2_TARGET_PORT|IOS2_MSS|IOS2_TABLE|\
                 DOCKER_BRIDGE_MODE|BRIDGE_WATCH_INTERVAL|EXTRA_RULES_COUNT|\
-                ZAPRET2_QNUM|ZAPRET2_OUT_RANGE|ZAPRET2_IN_RANGE|ZAPRET2_SPLIT_LEN|\
+                ZAPRET2_QNUM|ZAPRET2_QUEUE_LIMIT|ZAPRET2_OUT_RANGE|ZAPRET2_IN_RANGE|ZAPRET2_SPLIT_LEN|\
                 ZAPRET2_WIN_SYNACK|ZAPRET2_WIN_ACK|ZAPRET2_FWMARK|\
-                ZAPRET2_APPLIED|ZAPRET2_SERVICE_ENABLED|ZAPRET2_RELEASE_REPO|ZAPRET2_RELEASE_TAG|\
+                ZAPRET2_APPLIED|ZAPRET2_SERVICE_ENABLED|\
                 ZAPRET2_DEBUG|ZAPRET2_DEBUG_LOG|\
                 MEKO_OPT_APPLIED|\
                 MEKO_ORIG_KEEPALIVE_TIME|MEKO_ORIG_KEEPALIVE_INTVL|MEKO_ORIG_KEEPALIVE_PROBES|\
@@ -181,8 +180,6 @@ ZAPRET2_WIN_SYNACK="1400"
 ZAPRET2_WIN_ACK="10"
 ZAPRET2_APPLIED="false"
 ZAPRET2_SERVICE_ENABLED="false"
-ZAPRET2_RELEASE_REPO="Liafanx/MTproxy-reanimation"
-ZAPRET2_RELEASE_TAG="zapret2-bundle"
 
 # ── Watcher Docker bridge (zapret2) + авто-детект режима сети ──
 WATCHER_SCRIPT="/usr/local/sbin/mtpr-zapret2-watch.sh"
@@ -243,6 +240,24 @@ zapret2_queue_in_use() {
     local _q="${1:-200}"
     modprobe nfnetlink_queue 2>/dev/null || true
     awk -v q="$_q" '$1 == q { found=1 } END { exit found ? 0 : 1 }' /proc/net/netfilter/nfnetlink_queue 2>/dev/null
+}
+
+# ── Потолок пакетов соединения в очереди ────────────────────
+# Стратегии нужны только первые пакеты: рукопожатие и начало данных клиента.
+# Соединение, которое так и не отпустили (сканер, зависший клиент), иначе
+# гнало бы в Lua каждый свой пакет. FIN/SYN/RST идут в очередь всегда — по ним
+# nfqws2 закрывает свои записи. Пустой результат — потолок выключен.
+zapret2_limit_match() {
+    local _l="${ZAPRET2_QUEUE_LIMIT:-64}"
+    [[ "$_l" =~ ^[0-9]+$ ]] && [ "$_l" -gt 0 ] || return 0
+    echo "tcp flags & (fin | syn | rst) == 0 ct packets > ${_l}"
+}
+
+# Потолку нужен учёт пакетов conntrack: без него правило молча не срабатывает.
+# Новые ядра включают учёт сами, старые — нет.
+zapret2_conntrack_acct() {
+    [ -n "$(zapret2_limit_match)" ] || return 0
+    sysctl -w net.netfilter.nf_conntrack_acct=1 >/dev/null 2>&1 || true
 }
 
 # ── Проверка наличия следов неудачной установки ────────────
@@ -433,25 +448,24 @@ EOF
 
 # ── Запись Lua-скрипта для MTProto ──────────────────────────
 zapret2_write_lua() {
-    mkdir -p "$ZAPRET2_LUA_DIR"
-    cat > "$ZAPRET2_LUA" << LUAEOF
+    local _dst="${1:-$ZAPRET2_LUA}"
+    mkdir -p "$(dirname "$_dst")"
+    cat > "$_dst" << LUAEOF
 -- Zapret2 MTProto fix
 -- Серверный обход: disorder + badsum + window control + iOS fwmark bypass
--- https://github.com/Liafanx/MTproxy-reanimation
 
 function lets_resend(ctx, desync)
     -- iOS fingerprint bypass: пропускаем через fwmark без обработки
     if bitand(desync.dis.tcp.th_flags, TH_SYN + TH_ACK) == TH_SYN then
-        if desync.dis.tcp.th_win == 65535 and
-           #desync.dis.tcp.options == 8 and
-           desync.dis.tcp.options[1].kind == 2 and
-           desync.dis.tcp.options[2].kind == 1 and
-           desync.dis.tcp.options[3].kind == 3 and
-           desync.dis.tcp.options[4].kind == 1 and
-           desync.dis.tcp.options[5].kind == 1 and
-           desync.dis.tcp.options[6].kind == 8 and
-           desync.dis.tcp.options[7].kind == 4 and
-           desync.dis.tcp.options[8].kind == 0 then
+        -- nfqws2 новее v1.0.5 отрезает завершающий EOL, старый — оставляет;
+        -- поэтому восемь опций с EOL считаем как семь без него.
+        local o = desync.dis.tcp.options
+        local n = #o
+        if n == 8 and o[8].kind == 0 then n = 7 end
+        if desync.dis.tcp.th_win == 65535 and n == 7 and
+           o[1].kind == 2 and o[2].kind == 1 and o[3].kind == 3 and
+           o[4].kind == 1 and o[5].kind == 1 and o[6].kind == 8 and
+           o[7].kind == 4 then
             instance_cutoff(ctx, nil)
             desync.arg.fwmark = 0x40000
             rawsend_dissect_segmented(desync)
@@ -496,7 +510,32 @@ function lets_resend(ctx, desync)
     return VERDICT_DROP
 end
 LUAEOF
-    log_success "Lua скрипт записан: ${ZAPRET2_LUA}"
+    [ "$_dst" != "$ZAPRET2_LUA" ] || log_success "Lua скрипт записан: ${ZAPRET2_LUA}"
+    return 0
+}
+
+# Обновление Lua у уже установленного zapret2: если скрипт отличается от
+# текущего, подменяем файл и перезапускаем службу. Нужно тем, кто обновил
+# менеджер, но не трогал настройки: без этого старая копия Lua остаётся жить.
+zapret2_refresh_lua() {
+    [ "${ZAPRET2_APPLIED:-false}" = "true" ] || return 0
+    [ -f "$ZAPRET2_LUA" ] || return 0
+    local _tmp
+    _tmp=$(mktemp 2>/dev/null) || return 0
+    zapret2_write_lua "$_tmp" >/dev/null 2>&1
+    if cmp -s "$_tmp" "$ZAPRET2_LUA"; then
+        rm -f "$_tmp"
+        return 0
+    fi
+    if install -m 644 "$_tmp" "$ZAPRET2_LUA"; then
+        rm -f "$_tmp"
+        log_info "Lua скрипт обновлён, zapret2 перезапускается"
+        systemctl restart "$ZAPRET2_SERVICE" 2>/dev/null || true
+    else
+        rm -f "$_tmp"
+        log_warning "Не удалось обновить Lua скрипт: ${ZAPRET2_LUA}"
+    fi
+    return 0
 }
 
 # ── Создание systemd сервиса для Zapret2 ────────────────────
@@ -528,6 +567,8 @@ PORT="${_port}"
 QNUM="${ZAPRET2_QNUM}"
 CT_MARK="${_ct_mark}"
 COMBINED_MARK="${_combined_mark}"
+# Потолок пакетов соединения в очереди; пусто — без потолка.
+LIMIT_MATCH="$(zapret2_limit_match)"
 IS_BRIDGE="${_is_bridge}"
 IS_PRECISE="${_is_precise}"
 CONTAINER="${_container}"
@@ -561,29 +602,35 @@ if [ "\$IS_BRIDGE" = "true" ]; then
         if [ -n "\$CIP" ]; then
             DADDR_MATCH="ip daddr \$CIP "
             SADDR_MATCH="ip saddr \$CIP "
-            echo "MTproxy-reanimation: zapret2 bridge precise mode with container IP \$CIP"
+            echo "MEKO MTProto: zapret2 bridge precise, IP контейнера \$CIP"
         else
-            echo "MTproxy-reanimation: warning - could not detect container IP for \$CONTAINER, applying without IP match" >&2
+            echo "MEKO MTProto: не удалось определить IP контейнера \$CONTAINER, правила без ip daddr/saddr" >&2
         fi
     fi
 
     nft "add chain ip \$TABLE forward { type filter hook forward priority mangle; policy accept; }"
     nft "add rule ip \$TABLE forward ct state invalid counter drop"
     nft "add rule ip \$TABLE forward ct mark \$CT_MARK counter accept"
+    [ -z "\$LIMIT_MATCH" ] || nft "add rule ip \$TABLE forward \$LIMIT_MATCH counter accept"
     nft "add rule ip \$TABLE forward \${DADDR_MATCH}meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT counter queue num \$QNUM bypass"
     nft "add rule ip \$TABLE forward \${SADDR_MATCH}meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT counter queue num \$QNUM bypass"
 else
     nft "add chain ip \$TABLE postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
     nft "add rule ip \$TABLE postrouting ct mark \$CT_MARK counter accept"
+    [ -z "\$LIMIT_MATCH" ] || nft "add rule ip \$TABLE postrouting \$LIMIT_MATCH counter accept"
     nft "add rule ip \$TABLE postrouting meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT counter queue num \$QNUM bypass"
 
     nft "add chain ip \$TABLE prerouting { type filter hook prerouting priority mangle; policy accept; }"
     nft "add rule ip \$TABLE prerouting ct state invalid counter drop"
     nft "add rule ip \$TABLE prerouting ct mark \$CT_MARK counter accept"
+    [ -z "\$LIMIT_MATCH" ] || nft "add rule ip \$TABLE prerouting \$LIMIT_MATCH counter accept"
     nft "add rule ip \$TABLE prerouting meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT counter queue num \$QNUM bypass"
 fi
 
-echo "MTproxy-reanimation: NFT table \$TABLE applied (port=\$PORT qnum=\$QNUM fwmark=\$FWMARK ctmark=\$CT_MARK bridge=\$IS_BRIDGE precise=\$IS_PRECISE)"
+echo "MEKO MTProto: NFT table \$TABLE applied (port=\$PORT qnum=\$QNUM fwmark=\$FWMARK ctmark=\$CT_MARK bridge=\$IS_BRIDGE precise=\$IS_PRECISE)"
+
+# Учёт пакетов conntrack для потолка очереди (без него правило молча не работает)
+[ -z "\$LIMIT_MATCH" ] || sysctl -w net.netfilter.nf_conntrack_acct=1 >/dev/null 2>&1 || true
 
 # Запускаем nfqws2
 exec ${ZAPRET2_BIN} @${ZAPRET2_CONF}
@@ -592,7 +639,7 @@ NFTSTART
 
     cat > "/etc/systemd/system/${ZAPRET2_SERVICE}" << EOF
 [Unit]
-Description=MTproxy-reanimation Zapret2 MTProto fix
+Description=MEKO MTProto Zapret2 fix
 After=network-online.target nftables.service
 Wants=network-online.target
 
@@ -619,7 +666,7 @@ EOF
         generate_bridge_watch_script "$_nft_script"
         cat > "/etc/systemd/system/${WATCHER_UNIT}" << EOF
 [Unit]
-Description=MTproxy-reanimation Docker bridge watcher
+Description=MEKO MTProto Docker bridge watcher
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
@@ -700,6 +747,9 @@ zapret2_apply_nft() {
     local _combined_mark
     printf -v _combined_mark '0x%08x' "$(( _fwmark | _ct_mark ))"
 
+    local _limit
+    _limit=$(zapret2_limit_match)
+
     if [ -z "$_port" ]; then
         log_error "Порт не задан — невозможно применить NFT правила zapret2"
         return 1
@@ -733,20 +783,25 @@ zapret2_apply_nft() {
         nft "add chain ip $_table forward { type filter hook forward priority mangle; policy accept; }"
         nft "add rule ip $_table forward ct state invalid counter drop"
         nft "add rule ip $_table forward ct mark ${_ct_mark} counter accept"
+        [ -z "$_limit" ] || nft "add rule ip $_table forward ${_limit} counter accept"
         nft "add rule ip $_table forward ${_daddr_match}meta mark and $_fwmark == 0x00000000 tcp dport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
         nft "add rule ip $_table forward ${_saddr_match}meta mark and $_fwmark == 0x00000000 tcp sport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
         log_success "NFT таблица ${_table} применена для Docker bridge (forward: порт=${_port} qnum=${ZAPRET2_QNUM} fwmark=${_fwmark} ctmark=${_ct_mark})"
     else
         nft "add chain ip $_table postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
         nft "add rule ip $_table postrouting ct mark ${_ct_mark} counter accept"
+        [ -z "$_limit" ] || nft "add rule ip $_table postrouting ${_limit} counter accept"
         nft "add rule ip $_table postrouting meta mark and $_fwmark == 0x00000000 tcp sport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
 
         nft "add chain ip $_table prerouting { type filter hook prerouting priority mangle; policy accept; }"
         nft "add rule ip $_table prerouting ct state invalid counter drop"
         nft "add rule ip $_table prerouting ct mark ${_ct_mark} counter accept"
+        [ -z "$_limit" ] || nft "add rule ip $_table prerouting ${_limit} counter accept"
         nft "add rule ip $_table prerouting meta mark and $_fwmark == 0x00000000 tcp dport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
         log_success "NFT таблица ${_table} применена (порт=${_port} qnum=${ZAPRET2_QNUM} fwmark=${_fwmark} ctmark=${_ct_mark})"
     fi
+
+    zapret2_conntrack_acct
 }
 
 # ── Удаление NFT правил Zapret2 ─────────────────────────────
@@ -784,6 +839,7 @@ zapret2_start_existing() {
     fi
     systemctl daemon-reload
     systemctl enable "$ZAPRET2_SERVICE" >/dev/null 2>&1 || true
+    zapret2_refresh_lua
     systemctl start "$ZAPRET2_SERVICE" 2>/dev/null || true
     sleep 1
     zapret2_apply_nft || return 1
@@ -1164,6 +1220,7 @@ show_zapret2_settings_menu() {
         echo -e "  ${DIM}[6]${NC} NFQUEUE num [${ZAPRET2_QNUM}]  ${DIM}(0..65535)${NC}"
         echo -e "  ${DIM}[7]${NC} fwmark      [${ZAPRET2_FWMARK}]"
         echo -e "  ${DIM}[8]${NC} Debug лог   [$([ "${ZAPRET2_DEBUG:-false}" = "true" ] && echo "включён" || echo "выключен")]"
+        echo -e "  ${DIM}[9]${NC} потолок пакетов в очереди [${ZAPRET2_QUEUE_LIMIT}]  ${DIM}(0 — без потолка)${NC}"
         echo ""
         echo -e "  ${DIM}[0]${NC} вернуться"
         echo ""
@@ -1229,6 +1286,14 @@ show_zapret2_settings_menu() {
                     local _yn; { read -r _yn </dev/tty; } 2>/dev/null || true
                     [[ ! "$_yn" =~ ^[nN]$ ]] && { ZAPRET2_DEBUG="true"; save_settings; zapret2_update_config; }
                 fi ;;
+            9)
+                echo -en "  Пакетов соединения в очереди [${ZAPRET2_QUEUE_LIMIT}]: "
+                local _v; { read -r _v </dev/tty; } 2>/dev/null || true
+                if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -le 100000 ]; then
+                    ZAPRET2_QUEUE_LIMIT="$_v"; save_settings; zapret2_update_config
+                elif [ -n "$_v" ]; then
+                    log_error "Диапазон 0..100000 (0 — без потолка)"
+                fi ;;
             0|"") return ;;
             *) log_warning "Неверный выбор: ${_choice}" ;;
         esac
@@ -1256,6 +1321,7 @@ show_zapret2_menu() {
             echo -e "    win SYN+ACK:   ${ZAPRET2_WIN_SYNACK}"
             echo -e "    win ACK:       ${ZAPRET2_WIN_ACK}"
             echo -e "    NFQUEUE num:   ${ZAPRET2_QNUM}"
+            echo -e "    Потолок пакетов: ${ZAPRET2_QUEUE_LIMIT}"
             echo -e "    fwmark:        ${ZAPRET2_FWMARK}"
             echo -e "    Порт:          ${SERVER_PORT:-не задан}"
             echo -e "    Debug:         $([ "${ZAPRET2_DEBUG:-false}" = "true" ] && echo "${YELLOW}включён${NC}" || echo "${DIM}выключен${NC}")"
@@ -1436,7 +1502,7 @@ INTERVAL="${BRIDGE_WATCH_INTERVAL}"
 
 LAST_IP=""
 
-echo "MTproxy-reanimation: watching container \$CONTAINER for bridge precise mode"
+echo "MEKO MTProto: слежение за контейнером \$CONTAINER (bridge precise)"
 
 while true; do
     RUNNING="\$(docker inspect -f '{{.State.Running}}' "\$CONTAINER" 2>/dev/null || true)"
