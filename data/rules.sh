@@ -18,6 +18,13 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 
+# pause_key [подсказка] — ждём клавишу, только если есть терминал
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Файл для хранения порта ─────────────────────────────────
 PORT_FILE="/opt/mtpr-simple/port"
 
@@ -96,7 +103,7 @@ save_port() {
     echo "$1" >"$PORT_FILE"
 }
 
-# ── ПРОВЕРКА НАЛИЧИЯ ЦЕПОЧКИ IPTABLES SYN FIX ────────────────
+# ── Цепочка SYN FIX (iptables): установлена? ────────────────
 is_syn_fix_chain_installed() {
     iptables -L "$SYNFIX_CHAIN" -n >/dev/null 2>&1
 }
@@ -117,7 +124,7 @@ get_synfix_status() {
     fi
 }
 
-# ── ПРОВЕРКА НАЛИЧИЯ NFTABLES SYN FIX ────────────────────────
+# ── Таблица SYN FIX (nftables): установлена? ────────────────
 is_nft_fix_installed() {
     nft list table inet mtpr_synfix &>/dev/null 2>&1
 }
@@ -339,7 +346,7 @@ detect_el_major() {
     printf '%s' "$v"
 }
 
-# Установка kmod-xt_u32 через elrepo с ЯВНОЙ проверкой результата
+# kmod-xt_u32 на RHEL ставится из elrepo; результат проверяем явно, без || true
 install_u32_module_elrepo() {
     local rel elrepo_url sudo_cmd
     if [ "$(id -u)" -eq 0 ]; then sudo_cmd=""; else sudo_cmd="sudo"; fi
@@ -578,12 +585,6 @@ remove_geoip_bypass() {
     log_success "GEOIP-обход SYN-лимита удалён"
 }
 
-_geoip_pause() {
-    if { : </dev/tty; } 2>/dev/null; then
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-        read -rsn1 </dev/tty
-    fi
-}
 
 geoip_menu() {
     while true; do
@@ -602,8 +603,8 @@ geoip_menu() {
         echo -en "  ${BOLD}Выбор:${NC} "
         { read -r geoip_choice </dev/tty; } 2>/dev/null || return 1
         case "$geoip_choice" in
-            1) install_geoip_bypass; _geoip_pause ;;
-            2) remove_geoip_bypass; _geoip_pause ;;
+            1) install_geoip_bypass; pause_key ;;
+            2) remove_geoip_bypass; pause_key ;;
             0) return 0 ;;
             "") echo; return 0 ;;
             *) echo "  Неверный выбор"; sleep 0.3 ;;
@@ -627,7 +628,7 @@ _rules_backup_fix() {
     bash "$bp" --scope fix
 }
 
-# ── УСТАНОВКА SYN FIX (с поддержкой аргументов) ────────────
+# ── Установка SYN FIX (с аргументами) ──────────────────────
 install_syn_fix() {
     local ports_input
     local fix_choice
@@ -809,8 +810,7 @@ install_syn_fix() {
                 echo ""
                 _rules_backup_fix
                 echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу для возврата в меню..."
                 continue
                 ;;
         esac
@@ -877,13 +877,13 @@ install_syn_fix() {
     if [ ${#valid_ports[@]} -eq 0 ]; then
         log_error "Нет корректных портов для установки"
         if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-            read -rsn1 </dev/tty
+            pause_key "Нажмите любую клавишу..."
         fi
         return 1
     fi
 
-    local ports_str=$(IFS=,; echo "${valid_ports[*]}")
+    local ports_str
+    ports_str=$(IFS=,; echo "${valid_ports[*]}")
     log_info "Установка SYN FIX на порты: $ports_str"
     save_port "$ports_str"
 
@@ -901,8 +901,7 @@ install_syn_fix() {
             else
                 log_error "Не удалось установить nftables автоматически"
                 if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
-                    echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                    read -rsn1 </dev/tty
+                    pause_key "Нажмите любую клавишу"
                 fi
                 return 1
             fi
@@ -938,7 +937,6 @@ install_syn_fix() {
         log_info "Установка nftables режима..."
 
         local NFT_SCRIPT="/opt/mtpr-simple/mtpr-synfix-nft.sh"
-        local NFT_TABLE="mtpr_synfix"
 
         cat > "$NFT_SCRIPT" << 'NFT_WRAPPER_EOF'
 #!/bin/sh
@@ -982,8 +980,7 @@ CLASSIC_RULES_EOF
         else
             log_error "Ошибка применения NFT правил"
             if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
-                echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                read -rsn1 </dev/tty
+                pause_key "Нажмите любую клавишу"
             fi
             return 1
         fi
@@ -1013,8 +1010,7 @@ SERVICE_NFT_EOF
 
         log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str"
         if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
-            echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-            read -rsn1 </dev/tty
+            pause_key "Нажмите любую клавишу"
         fi
         return 0
     fi
@@ -1074,16 +1070,14 @@ SERVICE_NFT_EOF
             if [[ -z "$install_u32" || "$install_u32" =~ ^[yY]$ ]]; then
                 if ! install_u32_module_elrepo; then
                     if { : </dev/tty; } 2>/dev/null; then
-                        echo -e "  ${GRAY}Нажмите любую клавишу${NC}"
-                        read -rsn1 </dev/tty
+                        pause_key "Нажмите любую клавишу"
                     fi
                     return 1
                 fi
             else
                 log_info "Установка отменена"
                 if { : </dev/tty; } 2>/dev/null; then
-                    echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-                    read -rsn1 </dev/tty
+                    pause_key "Нажмите любую клавишу..."
                 fi
                 return 0
             fi
@@ -1108,19 +1102,17 @@ SERVICE_NFT_EOF
             log_error "SYN FIX (v3/u32) НЕ применён: правило u32 в таблице mangle отсутствует"
             echo -e "  ${DIM}apply_output:${NC} ${apply_output:-<пусто>}"
             if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
-                echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-                read -rsn1 </dev/tty
+                pause_key "Нажмите любую клавишу..."
             fi
             return 1
         fi
     fi
 
-    if [ $apply_exit_code -ne 0 ]; then
+    if [ "$apply_exit_code" -ne 0 ]; then
         log_error "Ошибка применения правил iptables:"
         echo "$apply_output"
         if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-            read -rsn1 </dev/tty
+            pause_key "Нажмите любую клавишу..."
         fi
         return 1
     fi
@@ -1137,8 +1129,7 @@ SERVICE_NFT_EOF
         open_port_in_firewall "$_fw_port"
     done
     if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-        read -rsn1 </dev/tty || true
+        pause_key "Нажмите любую клавишу..."
     fi
 
     # Успешное завершение интерактивной установки: rc=0 независимо от
@@ -1147,7 +1138,6 @@ SERVICE_NFT_EOF
     return 0
 }
 
-# ── Функция автоматической установки nftables ──────────────
 install_nft_auto() {
     local ports_str="$1"
     IFS=',' read -ra PORTS_ARRAY <<< "$ports_str"
@@ -1165,7 +1155,8 @@ install_nft_auto() {
         return 1
     fi
 
-    local ports_str_clean=$(IFS=,; echo "${valid_ports[*]}")
+    local ports_str_clean
+    ports_str_clean=$(IFS=,; echo "${valid_ports[*]}")
     save_port "$ports_str_clean"
 
     # Проверяем nftables
@@ -1252,7 +1243,7 @@ SERVICE_NFT_EOF
     return 0
 }
 
-# ── УДАЛЕНИЕ SYN FIX ─────────────────────────────────────────
+# ── Удаление SYN FIX ────────────────────────────────────────
 remove_syn_fix() {
     log_info "Удаление SYN FIX..."
 
