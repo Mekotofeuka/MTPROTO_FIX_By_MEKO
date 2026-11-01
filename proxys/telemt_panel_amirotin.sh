@@ -41,6 +41,13 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# pause_key [подсказка] — ждём клавишу, только если есть терминал
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Файл для сохранения пути к конфигу (используем общий с main.sh) ──
 CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
 
