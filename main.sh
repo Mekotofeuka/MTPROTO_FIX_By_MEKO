@@ -18,6 +18,12 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 
+# wait_key <подсказка> — ждём нажатия клавиши; без доступа к /dev/tty дальше работать нечем
+wait_key() {
+    echo -e "  ${GRAY}$1${NC}"
+    { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+}
+
 # ── Режим CLI ────────────────────────────────────────────────
 # MEKOPR_CLI=true       — запуск из командной строки (не меню)
 # MEKOPR_ASSUME_YES=true — подтверждение запросов без ввода (только CLI, -y)
@@ -35,7 +41,6 @@ case "${1:-}" in
         ;;
 esac
 
-# ── Функция обрезки пробелов ──────────────────────────────
 trim() {
     local var="$1"
     var="${var#"${var%%[![:space:]]*}"}"
@@ -70,7 +75,6 @@ if [ -L "$SELF_PATH" ] && command -v readlink >/dev/null 2>&1; then
     fi
 fi
 
-# ── Функция проверки и загрузки rules.sh ────────────────────
 RULES_SCRIPT="$INSTALL_DIR/data/rules.sh"
 RULES_LOADED=0
 
@@ -152,7 +156,7 @@ run_menu_script() {
     return 0
 }
 
-# ── ОСТАЛЬНЫЕ ПЕРЕМЕННЫЕ И ФУНКЦИИ (НЕ ИЗ RULES.SH) ──────────
+# ── Остальные переменные и функции (правила — в rules.sh) ──
 CONFIG_PATH_FILE="$INSTALL_DIR/config_path"
 MTG_CONFIG_PATH_FILE="$INSTALL_DIR/mtg_config_path"
 
@@ -182,7 +186,6 @@ _looks_like_telemt_config() {
 
 # ── Функции для MTG ──────────────────────────────────────────
 
-# Путь к конфигу MTG
 get_mtg_config_path() {
     local path
     if [ -f "$MTG_CONFIG_PATH_FILE" ] && [ -s "$MTG_CONFIG_PATH_FILE" ]; then
@@ -193,15 +196,12 @@ get_mtg_config_path() {
         fi
     fi
     echo "/etc/mtg.toml"
-    return 0
 }
 
-# Проверка установки MTG
 is_mtg_installed() {
     command -v mtg >/dev/null 2>&1
 }
 
-# Получение версии MTG
 get_mtg_version() {
     if command -v mtg >/dev/null 2>&1; then
         mtg --version 2>/dev/null | head -1 | awk '{print $1}'
@@ -210,7 +210,6 @@ get_mtg_version() {
     fi
 }
 
-# Получение порта из конфига MTG
 get_mtg_port() {
     local _cfg="$1"
     _cfg=$(trim "$_cfg")
@@ -228,10 +227,8 @@ get_mtg_port() {
     else
         echo ""
     fi
-    return 0
 }
 
-# ── Функция проверки установки Telemt ──────────────────────
 is_telemt_installed() {
     command -v telemt >/dev/null 2>&1
 }
@@ -288,7 +285,6 @@ detect_all_telemt_configs() {
     echo "$FOUND_CONFIGS"
 }
 
-# ── Функция получения порта из конфига ──────────────────────
 get_port_from_config() {
     local _cfg="$1"
     _cfg=$(trim "$_cfg")
@@ -317,7 +313,6 @@ get_port_from_config() {
     return 0
 }
 
-# ── Функция получения онлайна для конкретного конфига ────────
 get_telemt_online_for_config() {
     local _cfg="$1"
     _cfg=$(trim "$_cfg")
@@ -341,7 +336,6 @@ get_telemt_online_for_config() {
     fi
 }
 
-# ── Проверка MSS в конкретном конфиге ──────────────────────
 is_mss_enabled_for_config() {
     local _cfg="$1"
     _cfg=$(trim "$_cfg")
@@ -396,7 +390,7 @@ else
     
     if [ -n "$TELEMT_VERSION" ]; then
         _detected_configs=$(detect_all_telemt_configs)
-        _detected_path=$(echo "$_detected_configs" | cut -d':' -f1)
+        _detected_path=${_detected_configs%%:*}
         
         if [ -n "$_detected_path" ] && [ -f "$_detected_path" ]; then
             echo -e "  ${NC}${BOLD}Телемт найден по пути: ${GREEN}${BOLD}${_detected_path}${NC}"
@@ -421,7 +415,7 @@ else
     else
         if [ -z "$CONFIG_TELEMT_INPUT" ]; then
             _detected_configs=$(detect_all_telemt_configs)
-            _detected_path=$(echo "$_detected_configs" | cut -d':' -f1)
+            _detected_path=${_detected_configs%%:*}
             
             if [ -n "$_detected_path" ] && [ -f "$_detected_path" ]; then
                 CONFIG_TELEMT_INPUT="$_detected_path"
@@ -919,7 +913,6 @@ is_mtprotozig_installed() {
     command -v mtbuddy >/dev/null 2>&1
 }
 
-# ── Функция получения онлайна Mtprotozig для конфига ────────────
 get_mtprotozig_online() {
     if is_mtprotozig_installed; then
         sudo journalctl -u mtproto-proxy -n 50 2>/dev/null | grep -o 'users_total=[0-9]*' | tail -1 | cut -d'=' -f2
@@ -937,7 +930,7 @@ show_header() {
     echo -e "  ${DIM}══════════════════════════════${NC}"
     echo ""
 
-    # ── ПОЛУЧАЕМ ИНФОРМАЦИЮ ОБ ОС ──────────────────────────
+    # ── Информация об ОС ──────────────────────────────────
     local os_name=""
     local os_version=""
     
@@ -954,10 +947,10 @@ show_header() {
         os_version=$(cat /etc/debian_version)
     elif [ -f /etc/almalinux-release ]; then
         os_name="AlmaLinux"
-        os_version=$(cat /etc/almalinux-release | awk '{print $3}')
+        os_version=$(awk '{print $3}' /etc/almalinux-release)
     elif [ -f /etc/redhat-release ]; then
         os_name="Red Hat"
-        os_version=$(cat /etc/redhat-release | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        os_version=$(grep -oE '[0-9]+\.[0-9]+' /etc/redhat-release | head -1)
     else
         os_name="Unknown OS"
         os_version=""
@@ -969,7 +962,7 @@ show_header() {
         echo -e "  ${BOLD}${os_name}${NC}"
     fi
 
-    # ── ПОЛУЧАЕМ ВЕРСИЮ OPENSSL (теперь сразу после ОС) ───
+    # ── Версия OpenSSL (нужна для SelfSteal SNI) ──────────
     local openssl_version=""
     local openssl_display=""
     local openssl_color=""
@@ -989,7 +982,7 @@ show_header() {
         fi
     fi
 
-    # ── ПОЛУЧАЕМ IP-АДРЕС СЕРВЕРА ──────────────────────────
+    # ── IP сервера ────────────────────────────────────────
     local server_ip=""
     if command -v ip >/dev/null 2>&1; then
         server_ip=$(ip route get 1 2>/dev/null | grep -o 'src [0-9.]*' | awk '{print $2}' | head -1 || true)
@@ -1004,7 +997,7 @@ show_header() {
         server_ip="не определено"
     fi
 
-    # ── ПОЛУЧАЕМ ОТКРЫТЫЕ ПОРТЫ ─────────────────────────────
+    # ── Порты прокси ──────────────────────────────────────
     local open_ports=""
     if [ -f "$PORT_FILE" ] && [ -s "$PORT_FILE" ]; then
         open_ports=$(cat "$PORT_FILE")
@@ -1024,40 +1017,30 @@ show_header() {
     echo -e "  ${BOLD}IP:${NC} ${CYAN}${server_ip}${NC}"
     echo -e "  ${BOLD}Порты для прокси:${NC} ${CYAN}${open_ports}${NC}"
 
-    # ── ПЕРЕЧИТЫВАЕМ ПУТЬ К КОНФИГУ ──────────────────────────
+    # путь к конфигу: сохранённый → CONFIG_TELEMT → автоопределение (один вызов, не два)
     local current_config_path=""
+    local _saved=""
     if [ -f "$CONFIG_PATH_FILE" ] && [ -s "$CONFIG_PATH_FILE" ]; then
-        local _saved=$(cat "$CONFIG_PATH_FILE")
-        if [ "$_saved" != "skip" ] && [ -n "$_saved" ]; then
-            current_config_path="$_saved"
-        fi
+        _saved=$(cat "$CONFIG_PATH_FILE")
+        [ "$_saved" = "skip" ] && _saved=""
     fi
-    if [ -z "$current_config_path" ] && [ -n "$CONFIG_TELEMT" ] && [ "$CONFIG_TELEMT" != "skip" ]; then
-        current_config_path="$CONFIG_TELEMT"
-    fi
-    if [ -n "$current_config_path" ] && [ ! -f "$current_config_path" ]; then
-        local _detected=$(detect_all_telemt_configs)
-        local _first=$(echo "$_detected" | cut -d':' -f1)
-        if [ -n "$_first" ] && [ -f "$_first" ]; then
-            current_config_path="$_first"
-            echo "$_first" > "$CONFIG_PATH_FILE"
-        fi
+    current_config_path="${_saved:-$CONFIG_TELEMT}"
+    [ "$current_config_path" = "skip" ] && current_config_path=""
+
+    if [ -z "$current_config_path" ] || [ ! -f "$current_config_path" ]; then
+        local _detected=""
+        _detected=$(detect_all_telemt_configs)
+        current_config_path="${_detected%%:*}"
     fi
 
     if [ -n "$current_config_path" ] && [ -f "$current_config_path" ]; then
         CONFIG_TELEMT="$current_config_path"
-    elif [ -z "$current_config_path" ] || [ ! -f "$current_config_path" ]; then
-        local _detected=$(detect_all_telemt_configs)
-        local _first=$(echo "$_detected" | cut -d':' -f1)
-        if [ -n "$_first" ] && [ -f "$_first" ]; then
-            CONFIG_TELEMT="$_first"
-            echo "$_first" > "$CONFIG_PATH_FILE"
-        else
-            CONFIG_TELEMT=""
-        fi
+        echo "$current_config_path" > "$CONFIG_PATH_FILE"
+    else
+        CONFIG_TELEMT=""
     fi
 
-    # ── СТАТУС SYN FIX (iptables + nftables) ──────────────
+    # ── Статус SYN FIX (iptables + nftables) ──────────────
     local iptables_status="недоступно"
     local nft_status="недоступно"
     if ensure_rules_loaded 2>/dev/null; then
@@ -1088,7 +1071,7 @@ show_header() {
         echo -e "  ${BOLD}SYN FIX nftables:${NC} ${RED}${BOLD}Недоступно${NC}"
     fi
 
-    # ── СТАТУС ZAPRET2 ──────────────────────────────────────
+    # ── Статус Zapret2 ────────────────────────────────────
     if declare -f zapret2_status &>/dev/null; then
         echo -e "  ${BOLD}Zapret2 fix:${NC} $(zapret2_status)"
     else
@@ -1109,7 +1092,7 @@ show_header() {
         mtg_installed=true
     fi
 
-    # ── ВЫВОДИМ ВСЕ НАЙДЕННЫЕ КОНФИГИ TELEMT ──────────────────
+    # ── Найденные конфиги Telemt ───────────────────────────
     local all_configs=$(detect_all_telemt_configs)
     local configs_array=()
     if [ -n "$all_configs" ]; then
@@ -1178,7 +1161,7 @@ show_header() {
         echo -e "  ${BOLD}Telemt V:${NC} ${version_color}${_version}${NC} ${YELLOW}(конфиг не найден)${NC}"
     fi
 
-    # ── ИНФОРМАЦИЯ О MTPROTOZIG ─────────────────────────────
+    # ── Mtproto.zig ───────────────────────────────────────
     if [ "$mtprotozig_installed" = true ]; then
         local online_count=$(get_mtprotozig_online)
         if [ -n "$online_count" ] && [ "$online_count" -ge 0 ] 2>/dev/null; then
@@ -1190,7 +1173,7 @@ show_header() {
         fi
     fi
 
-    # ── ИНФОРМАЦИЯ О MTG ──────────────────────────────────────
+    # ── MTG ───────────────────────────────────────────────
     if [ "$mtg_installed" = true ]; then
         local mtg_version=$(get_mtg_version)
         local mtg_config_path=$(get_mtg_config_path)
@@ -1207,13 +1190,12 @@ show_header() {
         fi
     fi
 
-    # ── ПРОВЕРКА: ЕСТЬ ЛИ ХОТЯ БЫ ОДИН ПРОКСИ ──────────────
+    # ── Есть ли хотя бы один прокси ───────────────────────
     if [ "$telemt_installed" = false ] && [ "$mtprotozig_installed" = false ] && [ "$mtg_installed" = false ]; then
         echo -e "  ${NC}${BOLD}Прокси: ${GRAY} не установлены${NC}"
     fi
 }
 
-# ── Функция проверки статуса базовой оптимизации ──────────
 is_optimization_applied() {
     local check_count=0
 
@@ -1233,7 +1215,6 @@ is_optimization_applied() {
     [ "$check_count" -ge 2 ]
 }
 
-# ── Функция открытия меню прокси ──────────────────────────
 open_proxy_menu() {
     local PROXY_MENU_SCRIPT="$INSTALL_DIR/proxys/proxymenu.sh"
     if [ -f "$PROXY_MENU_SCRIPT" ]; then
@@ -1242,12 +1223,10 @@ open_proxy_menu() {
         run_menu_script "$PROXY_MENU_SCRIPT"
     else
         log_error "Файл $PROXY_MENU_SCRIPT не найден"
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+        wait_key "Нажмите любую клавишу для возврата в меню..."
     fi
 }
 
-# ── Функция проверки ограничений сервера ──────────────────
 check_censor() {
     echo ""
     log_info "Проверка ограничений на сервере..."
@@ -1267,23 +1246,19 @@ check_censor() {
         rm -f "$_cc_tmp"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+    wait_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Главное меню ─────────────────────────────────────────────
 main_menu() {
-    local auto_install=false
     if [[ "$1" == "-auto_install" ]]; then
-        auto_install=true
         local forced_port="$2"
         echo -e "  ${BLUE}[i]${NC} Запуск в режиме авто-установки SYN FIX..."
         if ensure_rules_loaded; then
             install_syn_fix -auto_install "$forced_port"
         else
             log_error "Невозможно выполнить автоустановку: rules.sh не загружен"
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+            wait_key "Нажмите любую клавишу..."
         fi
         return 0
     fi
@@ -1336,8 +1311,7 @@ main_menu() {
             echo ""
             if ! ensure_rules_loaded; then
                 log_error "Невозможно выполнить действие: rules.sh не загружен"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+                wait_key "Нажмите любую клавишу для возврата в меню..."
                 continue
             fi
 
@@ -1355,8 +1329,7 @@ main_menu() {
                     log_info "Отмена удаления"
                 fi
                 echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+                wait_key "Нажмите любую клавишу для возврата в меню..."
                 continue
             fi
             
@@ -1371,8 +1344,7 @@ main_menu() {
                     log_info "Отмена удаления"
                 fi
                 echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+                wait_key "Нажмите любую клавишу для возврата в меню..."
                 continue
             fi
             
@@ -1402,8 +1374,7 @@ main_menu() {
             
             if [ -z "$OPENSSL_VERSION" ]; then
                 log_error "Не удалось определить версию OpenSSL"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+                wait_key "Нажмите любую клавишу для возврата в меню..."
                 continue
             fi
             
@@ -1412,8 +1383,7 @@ main_menu() {
                 echo -e "  ${RED}${BOLD}❌ Данная функция доступна только на ОС с OpenSSL 3.5 и выше${NC}"
                 echo -e "  ${YELLOW}Ваша версия OpenSSL: ${OPENSSL_VERSION}${NC}"
                 echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+                wait_key "Нажмите любую клавишу для возврата в меню..."
                 continue
             fi
             
@@ -1423,8 +1393,7 @@ main_menu() {
                 python3 "$CHECKER_SCRIPT"
             else
                 log_error "Файл $CHECKER_SCRIPT не найден"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+                wait_key "Нажмите любую клавишу для возврата в меню..."
             fi
             ;;
 
@@ -1433,8 +1402,7 @@ main_menu() {
             if ensure_data_script "data/extra_menu.sh"; then
                 run_menu_script "$INSTALL_DIR/data/extra_menu.sh"
             else
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+                wait_key "Нажмите любую клавишу для возврата в меню..."
             fi
             ;;
         9)
@@ -1586,15 +1554,13 @@ update_script() {
     if mv "$temp" "$SELF_PATH"; then
         echo -e "  ${GREEN}[✓]${NC} Обновление успешно!"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+        wait_key "Нажмите любую клавишу для возврата в меню..."
         exec bash "$SELF_PATH"
     else
         echo -e "  ${RED}[✗]${NC} Не удалось перезаписать файл"
         rm -f "$temp"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+        wait_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 }
@@ -1733,13 +1699,11 @@ install_node_manager() {
     if [ -f "$MANAGER_SCRIPT" ]; then
         echo -e "${NC}${BOLD}Для открытия Node Manager не через меню используйте команду: ${GREEN}${BOLD} mekomanager"
         echo -e ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для запуска Node Manager${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+        wait_key "Нажмите любую клавишу для запуска Node Manager"
         exec bash "$MANAGER_SCRIPT"
     else
         log_error "Не удалось найти $MANAGER_SCRIPT после установки."
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+        wait_key "Нажмите любую клавишу для возврата в меню..."
     fi
 }
 
