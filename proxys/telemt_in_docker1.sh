@@ -84,6 +84,44 @@ if ! command -v docker &>/dev/null; then
     fi
 fi
 
+# ── Проверка docker compose ──────────────────────────────────
+# Docker из apt (docker.io) ставится БЕЗ плагина compose, и тогда
+# `docker compose up -d` падает с «unknown shorthand flag: 'd' in -d»
+# уже после того, как config.toml и docker-compose.yml созданы.
+COMPOSE_CMD=""
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
+else
+    log_warning "docker compose не найден — устанавливаю"
+    # Пакеты называются по-разному, а apt падает на всём списке, если хотя бы
+    # одного имени нет в репозитории, — поэтому пробуем их по одному.
+    if command -v apt-get >/dev/null 2>&1; then
+        for _pkg in docker-compose-v2 docker-compose-plugin docker-compose; do
+            docker compose version >/dev/null 2>&1 && break
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$_pkg" >/dev/null 2>&1 || true
+        done
+    fi
+    if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+        for _tool in dnf yum; do
+            command -v "$_tool" >/dev/null 2>&1 || continue
+            "$_tool" install -y -q docker-compose-plugin >/dev/null 2>&1 || true
+            break
+        done
+    fi
+    if docker compose version >/dev/null 2>&1; then
+        COMPOSE_CMD="docker compose"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        COMPOSE_CMD="docker-compose"
+    else
+        log_error "docker compose недоступен — поставьте docker-compose-v2 (Debian/Ubuntu) или docker-compose-plugin (RHEL) и повторите"
+        pause_key "Нажмите любую клавишу для возврата..."
+        return 1 2>/dev/null || exit 1
+    fi
+    log_success "docker compose установлен"
+fi
+
 # ── Заголовок ─────────────────────────────────────────────────
 clear 2>/dev/null || true
 echo ""
@@ -323,7 +361,7 @@ fi
 
 # Запускаем
 log_info "Запуск Docker контейнера..."
-if ! docker compose up -d; then
+if ! $COMPOSE_CMD up -d; then
     log_error "Ошибка запуска Telemt"
     return 1 2>/dev/null || exit 1
 fi
@@ -346,7 +384,7 @@ if [ -n "$LINK" ]; then
     echo -e "  ${CYAN}${LINK}${NC}"
 else
     echo -e "  ${YELLOW}Ссылка пока не доступна. Попробуйте позже:${NC}"
-    echo -e "  ${DIM}  docker compose logs -f${NC}"
+    echo -e "  ${DIM}  $COMPOSE_CMD logs -f${NC}"
     echo -e "  ${DIM}  Или проверьте вручную: curl http://localhost:9091/v1/users${NC}"
 fi
 
@@ -359,10 +397,10 @@ echo -e "  ${BOLD}Порт:${NC} ${CYAN}${port}${NC}"
 echo -e "  ${BOLD}TLS домен:${NC} ${CYAN}${tls_domain}${NC}"
 echo ""
 echo -e "  ${BOLD}Команды управления:${NC}"
-echo -e "  ${DIM}  docker compose logs -f  # просмотр логов${NC}"
-echo -e "  ${DIM}  docker compose restart  # перезапуск${NC}"
-echo -e "  ${DIM}  docker compose down     # остановка${NC}"
-echo -e "  ${DIM}  docker compose up -d    # запуск после остановки${NC}"
+echo -e "  ${DIM}  $COMPOSE_CMD logs -f  # просмотр логов${NC}"
+echo -e "  ${DIM}  $COMPOSE_CMD restart  # перезапуск${NC}"
+echo -e "  ${DIM}  $COMPOSE_CMD down     # остановка${NC}"
+echo -e "  ${DIM}  $COMPOSE_CMD up -d    # запуск после остановки${NC}"
 echo -e "  ${BOLD}${GREEN}═════════════════════════════════════════════════${NC}"
 echo ""
 

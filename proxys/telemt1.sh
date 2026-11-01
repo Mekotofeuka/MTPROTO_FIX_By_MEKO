@@ -48,6 +48,18 @@ pause_key() {
     read -rsn1 </dev/tty || true
 }
 
+# _compose <аргументы> — docker compose в двух вариантах записи: плагин (v2)
+# или отдельный бинарь docker-compose (v1). Docker из apt идёт без плагина.
+_compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        return 127
+    fi
+}
+
 # ── Файл для сохранения пути к конфигу (используем общий с main.sh) ──
 CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
 
@@ -930,7 +942,7 @@ purge_telemt_docker() {
     # 1. Останавливаем и удаляем контейнеры
     if [ -f "$TELEMT_PATH/docker-compose.yml" ]; then
         echo -e "  ${BLUE}[i]${NC} Остановка и удаление контейнеров..."
-        cd "$TELEMT_PATH" && docker compose down -v 2>/dev/null || echo -e "  ${YELLOW}[!]${NC} Контейнеры не найдены или уже удалены"
+        cd "$TELEMT_PATH" && _compose down -v 2>/dev/null || echo -e "  ${YELLOW}[!]${NC} Контейнеры не найдены или уже удалены"
     else
         echo -e "  ${YELLOW}[!]${NC} docker-compose.yml не найден, пропускаем остановку контейнеров"
     fi
@@ -2233,7 +2245,7 @@ purge_telemt_silent() {
     if [ "$docker_present" -eq 1 ] && command -v docker >/dev/null 2>&1; then
         echo -e "  ${BLUE}[i]${NC} Обнаружен Docker-Telemt — удаляю"
         if [ -f /root/telemt/docker-compose.yml ]; then
-            ( cd /root/telemt && docker compose down -v ) >/dev/null 2>&1 || true
+            ( cd /root/telemt && _compose down -v ) >/dev/null 2>&1 || true
         fi
         docker rm -f telemt >/dev/null 2>&1 || true
         docker rm -f watchtower >/dev/null 2>&1 || true
