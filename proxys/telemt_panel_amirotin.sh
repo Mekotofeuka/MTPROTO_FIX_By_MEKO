@@ -82,7 +82,8 @@ get_telemt_version() {
 
 # ── Функция получения порта(ов) из конфига ──────────────────
 get_telemt_ports() {
-    local config_path=$(get_config_path)
+    local config_path
+    config_path=$(get_config_path)
     if [ ! -f "$config_path" ]; then
         echo ""
         return 1
@@ -178,21 +179,25 @@ show_telemt_info() {
     if is_telemt_installed; then
         echo -e "  ${BOLD}Telemt:${NC} ${GREEN}${BOLD}установлен${NC}"
         
-        local version=$(get_telemt_version)
+        local version
+        version=$(get_telemt_version)
         if [ -n "$version" ]; then
             echo -e "  ${BOLD}Версия:${NC} ${GREEN}${BOLD}${version}${NC}"
         fi
         
-        local ports=$(get_telemt_ports)
+        local ports
+        ports=$(get_telemt_ports)
         if [ -n "$ports" ]; then
             echo -e "  ${BOLD}Порт(ы):${NC} ${CYAN}${ports}${NC}"
         fi
         
         # Получаем путь к конфигу
-        local config_path=$(get_config_path)
+        local config_path
+        config_path=$(get_config_path)
         if [ -f "$config_path" ]; then
             # Извлекаем путь к папке из пути к конфигу
-            local telemt_dir=$(dirname "$config_path")
+            local telemt_dir
+            telemt_dir=$(dirname "$config_path")
             echo -e "  ${BOLD}Путь к папке:${NC} ${CYAN}${telemt_dir}${NC}  ${DIM}(скопируйте это, когда установщик спросит - вставьте)${NC}"
             echo -e "  ${BOLD}Путь к конфигу:${NC} ${CYAN}${config_path}${NC}"
             
@@ -244,8 +249,7 @@ install_panel() {
         if [[ ! "$confirm" =~ ^[yY]$ ]]; then
             echo -e "  ${GRAY}Установка отменена${NC}"
             echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата в меню"
             return 1
         fi
     fi
@@ -256,8 +260,7 @@ install_panel() {
     if ! fix_sudo_for_panel; then
         echo -e "  ${GRAY}Установка отменена${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню"
         return 1
     fi
     
@@ -270,8 +273,7 @@ install_panel() {
     if [[ "$confirm" =~ ^[nN]$ ]]; then
         echo -e "  ${GRAY}Установка отменена${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню"
         return 1
     fi
     
@@ -284,8 +286,10 @@ install_panel() {
         echo ""
         echo -e "  ${GREEN}${BOLD}[✓]${NC} Панель Telemt Panel успешно установлена!"
         
-        local panel_port=$(get_panel_port)
-        local server_ip=$(get_public_ip)
+        local panel_port
+        panel_port=$(get_panel_port)
+        local server_ip
+        server_ip=$(get_public_ip)
         if [ -n "$panel_port" ] && [ -n "$server_ip" ]; then
             echo ""
             echo -e "  ${BOLD}Панель доступна по адресу:${NC}"
@@ -297,8 +301,7 @@ install_panel() {
     fi
     
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню"
 }
 
 # ── Функция удаления панели ──────────────────────────────────
@@ -343,8 +346,7 @@ uninstall_panel() {
             if [[ ! "$confirm" =~ ^[yY]$ ]]; then
                 echo -e "  ${GRAY}Удаление отменено${NC}"
                 echo ""
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу для возврата в меню"
                 return 1
             fi
             echo ""
@@ -367,8 +369,7 @@ uninstall_panel() {
     esac
     
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню"
 }
 
 # ── Функция перезапуска панели ──────────────────────────────
@@ -383,8 +384,7 @@ restart_panel() {
         echo -e "  ${GRAY}Попробуйте сначала установить панель${NC}"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню"
 }
 
 # ── Функция просмотра логов панели ──────────────────────────
@@ -392,12 +392,10 @@ view_panel_logs() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Просмотр логов Telemt Panel (Ctrl+C для выхода)..."
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для продолжения..."
     journalctl -u telemt-panel -f
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню"
 }
 
 # ── Функция открытия конфига панели ─────────────────────────
@@ -409,8 +407,7 @@ edit_panel_config() {
         echo -e "  ${YELLOW}[!]${NC}${BOLD} Файл конфига не найден по пути: $config_path"
         echo -e "  ${GRAY}Возможно, панель ещё не установлена${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню"
         return 1
     fi
     
@@ -420,36 +417,31 @@ edit_panel_config() {
     if command -v nano >/dev/null 2>&1; then
         echo -e "  ${GRAY}После редактирования сохраните файл (Ctrl+O) и закройте (Ctrl+X)${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         nano "$config_path"
     elif command -v vim >/dev/null 2>&1; then
         echo -e "  ${YELLOW}[!]${NC} nano не установлен. Использую vim."
         echo -e "  ${GRAY}Для сохранения: ESC → :wq, для выхода без сохранения: ESC → :q!${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         vim "$config_path"
     elif command -v vi >/dev/null 2>&1; then
         echo -e "  ${YELLOW}[!]${NC} Использую vi."
         echo -e "  ${GRAY}Для сохранения: ESC → :wq, для выхода без сохранения: ESC → :q!${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         vi "$config_path"
     else
         echo -e "  ${RED}[✗]${NC} Ни один редактор не найден (nano, vim, vi)"
         echo -e "  ${GRAY}Установите один из редакторов: apt install nano или vim${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню"
         return 1
     fi
     
     echo ""
     echo -e "  ${GREEN}${BOLD}[✓]${NC} Редактирование завершено"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню"
 }
 
 # ── Функция обновления панели ───────────────────────────────
@@ -459,7 +451,8 @@ update_panel() {
     echo ""
     
     # Проверяем текущую версию
-    local current_version=$(get_panel_version)
+    local current_version
+    current_version=$(get_panel_version)
     if [ -n "$current_version" ]; then
         echo -e "  ${BOLD}Текущая версия:${NC} ${GREEN}${BOLD}${current_version}${NC}"
     fi
@@ -470,7 +463,8 @@ update_panel() {
     
     if fetch_and_run bash "https://raw.githubusercontent.com/amirotin/telemt_panel/main/install.sh"; then
         echo ""
-        local new_version=$(get_panel_version)
+        local new_version
+        new_version=$(get_panel_version)
         echo -e "  ${GREEN}${BOLD}[✓]${NC} Панель обновлена!"
         if [ -n "$new_version" ] && [ "$new_version" != "$current_version" ]; then
             echo -e "  ${BOLD}Новая версия:${NC} ${GREEN}${BOLD}${new_version}${NC}"
@@ -481,8 +475,7 @@ update_panel() {
     fi
     
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню"
 }
 
 # ── Главное меню ─────────────────────────────────────────────

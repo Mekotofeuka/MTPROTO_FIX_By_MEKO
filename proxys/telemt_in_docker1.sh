@@ -18,6 +18,13 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 
+# pause_key [подсказка] — ждём клавишу, только если есть терминал
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Проверка root ────────────────────────────────────────────
 # `return N 2>/dev/null || exit N` работает в обоих режимах запуска:
 #   source из proxys/telemt1.sh -> return из файла (меню не гибнет);
@@ -60,22 +67,19 @@ if ! command -v docker &>/dev/null; then
         if ! curl -fsSL --max-time 60 https://get.docker.com -o "$docker_inst" || [ ! -s "$docker_inst" ]; then
             rm -f "$docker_inst"
             log_error "Не удалось скачать установщик Docker"
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата..."
             return 1 2>/dev/null || exit 1
         fi
         if ! sh "$docker_inst"; then
             rm -f "$docker_inst"
             log_error "Установка Docker не удалась"
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата..."
             return 1 2>/dev/null || exit 1
         fi
         rm -f "$docker_inst"
     else
         log_info "Установка отменена"
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 0 2>/dev/null || exit 0
     fi
 fi
@@ -93,8 +97,7 @@ echo -en "  ${BOLD}Продолжить установку? y/N:${NC} "
 { read -r confirm </dev/tty; } 2>/dev/null || true
 if [[ ! "$confirm" =~ ^[yY]$ ]]; then
     log_info "Установка отменена"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
     return 0 2>/dev/null || exit 0
 fi
 
@@ -363,6 +366,5 @@ echo -e "  ${DIM}  docker compose up -d    # запуск после остан�
 echo -e "  ${BOLD}${GREEN}═════════════════════════════════════════════════${NC}"
 echo ""
 
-echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-{ read -rsn1 </dev/tty; } 2>/dev/null || true
+pause_key "Нажмите любую клавишу для возврата в меню..."
 return 0 2>/dev/null || exit 0

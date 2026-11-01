@@ -52,6 +52,13 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 
+# pause_key [подсказка] — ждём клавишу, только если есть терминал
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Файл для сохранения пути к конфигу (используем общий с main.sh) ──
 CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
 
@@ -215,7 +222,8 @@ get_public_ip() {
 
 # ── Функция получения списка пользователей из конфига ──────
 get_users_list() {
-    local config_path=$(get_config_path)
+    local config_path
+    config_path=$(get_config_path)
     if ! ssh_exec "[ -f \"$config_path\" ]"; then
         return 1
     fi
@@ -234,7 +242,8 @@ print_user_links() {
     local user_name="$1"
     local user_secret="$2"
     local config_path="$(get_config_path)"
-    local detected_info=$(detect_telemt_advanced)
+    local detected_info
+    detected_info=$(detect_telemt_advanced)
     local IFS=':'
     local parts=($detected_info)
     unset IFS
@@ -371,37 +380,35 @@ find_user_link() {
         echo ""
         echo -e "  ${YELLOW}[!]${NC} Введите имя пользователя"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     
     # Получаем список пользователей
-    local users=$(get_users_list)
+    local users
+    users=$(get_users_list)
     if [ -z "$users" ]; then
         echo ""
         echo -e "  ${YELLOW}[!]${NC} В конфиге нет пользователей в секции [access.users]"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     
     # Ищем совпадения (регистронезависимо)
-    local matches=$(echo "$users" | grep -i "$search_query")
-    
+    local matches
+    matches=$(grep -i "$search_query" <<<"$users")
     if [ -z "$matches" ]; then
         echo ""
         echo -e "  ${YELLOW}[!]${NC} Пользователь с именем \"$search_query\" не найден"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     
     # Проверяем сколько совпадений
-    local match_count=$(echo "$matches" | wc -l)
-    
+    local match_count
+    match_count=$(wc -l <<<"$matches")
     if [ "$match_count" -gt 1 ]; then
         echo ""
         echo -e "  ${YELLOW}[!]${NC} Найдено несколько совпадений:"
@@ -412,15 +419,15 @@ find_user_link() {
         echo ""
         echo -e "  ${BOLD}Уточните запрос для выбора конкретного пользователя${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     
     # Одно совпадение — показываем ссылку
-    local user_name=$(echo "$matches" | cut -d':' -f1)
-    local user_secret=$(echo "$matches" | cut -d':' -f2)
-    
+    local user_name
+    user_name=$(cut -d: -f1 <<<"$matches")
+    local user_secret
+    user_secret=$(cut -d: -f2 <<<"$matches")
     echo ""
     echo -e "  ${GREEN}✓${NC} Найден пользователь: ${BOLD}${user_name}${NC}"
     echo ""
@@ -436,8 +443,7 @@ find_user_link() {
     fi
     
     print_user_links "$user_name" "$user_secret"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
 }
 
 # ── Функция проверки, установлен ли Telemt ──────────────────
@@ -452,7 +458,8 @@ get_telemt_version() {
 
 # ── Функция получения порта(ов) из конфига ──────────────────
 get_telemt_ports() {
-    local config_path=$(get_config_path)
+    local config_path
+    config_path=$(get_config_path)
     if ! ssh_exec "[ -f \"$config_path\" ]"; then
         echo ""
         return 1
@@ -504,8 +511,7 @@ update_config_path() {
     ssh_exec "mkdir -p /opt/mtpr-simple && echo \"$CONFIG_TELEMT_INPUT\" > \"$CONFIG_PATH_FILE\""
     echo -e "  ${GREEN}[✓]${NC} Путь сохранён: $CONFIG_TELEMT_INPUT"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
     return 0
 }
 
@@ -514,12 +520,10 @@ view_logs() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Просмотр логов Telemt (Ctrl+C для выхода)..."
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для продолжения..."
     ssh_interactive "journalctl -u telemt -f"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция установки Telemt ────────────────────────────────
@@ -539,8 +543,7 @@ install_telemt() {
         echo ""
         echo -e "  ${GRAY}Установка отменена${NC}"
         echo ""
-        echo -e "  ${GRAY}${BOLD}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 0
     fi
 
@@ -554,8 +557,7 @@ install_telemt() {
         else
             echo ""
             echo -e "  ${YELLOW}[!]${NC} Некорректный формат версии. Используйте формат X.Y.Z"
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата в меню..."
             return 1
         fi
     fi
@@ -571,8 +573,8 @@ install_telemt() {
     # tls_domain конфига ноды.
     local _info="" _port="" _domain=""
     _info=$(detect_telemt_advanced)
-    _port=$(echo "$_info" | cut -d: -f2)
-    _domain=$(echo "$_info" | cut -d: -f8)
+    _port=$(cut -d: -f2 <<<"$_info")
+    _domain=$(cut -d: -f8 <<<"$_info")
     if [ -z "$_port" ]; then
         _port=$(ssh_exec "if [ -s /opt/mtpr-simple/port ]; then head -1 /opt/mtpr-simple/port; fi" | tr -d '[:space:]')
     fi
@@ -596,8 +598,7 @@ install_telemt() {
     fi
     
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Неинтерактивная установка Telemt на ноде (--install-silent) ─
@@ -624,8 +625,8 @@ install_telemt_silent() {
     # ── Флаги для upstream-установщика на ноде ────────────────
     local _info="" _port="" _domain=""
     _info=$(detect_telemt_advanced)
-    _port=$(echo "$_info" | cut -d: -f2)
-    _domain=$(echo "$_info" | cut -d: -f8)
+    _port=$(cut -d: -f2 <<<"$_info")
+    _domain=$(cut -d: -f8 <<<"$_info")
     if [ -z "$_port" ]; then
         _port=$(ssh_exec "if [ -s /opt/mtpr-simple/port ]; then head -1 /opt/mtpr-simple/port; fi" | tr -d '[:space:]')
     fi
@@ -654,8 +655,7 @@ install_telemt_silent() {
 install_telemt_docker() {
     echo ""
     echo -e "  ${RED}[✗]${NC} Установка Telemt в Docker на удалённой ноде пока не поддерживается"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция удаления Telemt (стандартный) ────────────────────
@@ -676,8 +676,7 @@ purge_telemt() {
     if [[ ! "$confirm" =~ ^[yY]$ ]]; then
         echo -e "  ${GRAY}Удаление отменено${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 
@@ -690,8 +689,7 @@ purge_telemt() {
         echo -e "  ${RED}[✗]${NC} Ошибка удаления Telemt"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция удаления Telemt из Docker ────────────────────────
@@ -718,8 +716,7 @@ purge_telemt_docker() {
         if [[ ! "$force_remove" =~ ^[yY]$ ]]; then
             echo -e "  ${GRAY}Удаление отменено${NC}"
             echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата в меню..."
             return 1
         fi
     fi
@@ -732,8 +729,7 @@ purge_telemt_docker() {
     if [[ ! "$confirm" =~ ^[yY]$ ]]; then
         echo -e "  ${GRAY}Удаление отменено${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 
@@ -784,8 +780,7 @@ purge_telemt_docker() {
     echo ""
     echo -e "  ${GREEN}[✓]${NC} Telemt из Docker успешно удалён!"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция выбора удаления ──────────────────────────────────
@@ -827,8 +822,7 @@ edit_config() {
         echo -e "  ${YELLOW}[!]${NC} Файл конфига не найден по пути: $config_path"
         echo -e "  ${GRAY}Используйте пункт 4 для обновления пути к конфигу${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
     
@@ -838,8 +832,7 @@ edit_config() {
     
     echo ""
     echo -e "  ${GREEN}[✓]${NC} Редактирование завершено"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция перезапуска Telemt ──────────────────────────────
@@ -854,13 +847,11 @@ restart_telemt() {
         echo -e "  ${GRAY}Попробуйте сначала установить Telemt (пункт 1)${NC}"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── ФУНКЦИИ УПРАВЛЕНИЯ MSS (скопированы из main.sh) ────────
 
-# ── Проверка MSS в конкретном конфиге ──────────────────────
 is_mss_enabled_for_config() {
     local _cfg="$1"
     _cfg=$(trim "$_cfg")
@@ -899,13 +890,13 @@ are_bad_options_enabled_for_config() {
 
 # ── ВКЛЮЧЕНИЕ MSS И MSS_BULK ───────────────────────────────
 enable_mss_options() {
-    local config_path=$(get_config_path)
+    local config_path
+    config_path=$(get_config_path)
     if [ -z "$config_path" ] || ! ssh_exec "[ -f \"$config_path\" ]"; then
         echo ""
         echo -e "  ${RED}[✗]${NC} Файл конфига не найден или не указан"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 
@@ -914,9 +905,10 @@ enable_mss_options() {
     local mss_bulk_value="1200"
 
     # Проверяем наличие строк (даже закомментированных)
-    local has_mss=$(ssh_exec "grep -E '^[[:space:]]*#?[[:space:]]*client_mss[[:space:]]*=' \"$config_path\" | head -1")
-    local has_mss_bulk=$(ssh_exec "grep -E '^[[:space:]]*#?[[:space:]]*mss_bulk[[:space:]]*=' \"$config_path\" | head -1")
-
+    local has_mss
+    has_mss=$(ssh_exec "grep -E '^[[:space:]]*#?[[:space:]]*client_mss[[:space:]]*=' \"$config_path\" | head -1")
+    local has_mss_bulk
+    has_mss_bulk=$(ssh_exec "grep -E '^[[:space:]]*#?[[:space:]]*mss_bulk[[:space:]]*=' \"$config_path\" | head -1")
     if [ -n "$has_mss" ]; then
         ssh_exec "sed -i 's/^[[:space:]]*#[[:space:]]*client_mss[[:space:]]*=.*/client_mss = $mss_value/' \"$config_path\""
         changed=1
@@ -970,19 +962,18 @@ enable_mss_options() {
         echo -e "  ${BLUE}[i]${NC} Не удалось добавить параметры client_mss и mss_bulk"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── ОТКЛЮЧЕНИЕ MSS, MSS_BULK И SYN_LIMIT ───────────────────
 disable_bad_options() {
-    local config_path=$(get_config_path)
+    local config_path
+    config_path=$(get_config_path)
     if [ -z "$config_path" ] || ! ssh_exec "[ -f \"$config_path\" ]"; then
         echo ""
         echo -e "  ${RED}[✗]${NC} Файл конфига не найден или не указан"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 
@@ -1011,19 +1002,18 @@ disable_bad_options() {
         echo -e "  ${BLUE}[i]${NC} Активные строки client_mss, mss_bulk или synlimit не найдены"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── УПРАВЛЕНИЕ MSS В КОНФИГЕ ──────────────────────────────
 manage_mss() {
-    local config_path=$(get_config_path)
+    local config_path
+    config_path=$(get_config_path)
     if [ -z "$config_path" ] || ! ssh_exec "[ -f \"$config_path\" ]"; then
         echo ""
         echo -e "  ${RED}[✗]${NC} Файл конфига не найден или не указан"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 
@@ -1038,8 +1028,7 @@ manage_mss() {
         else
             echo -e "  ${BLUE}[i]${NC} Отмена"
             echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата в меню..."
         fi
     else
         echo ""
@@ -1052,8 +1041,7 @@ manage_mss() {
         else
             echo -e "  ${BLUE}[i]${NC} Отмена"
             echo ""
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата в меню..."
         fi
     fi
 }
@@ -1068,7 +1056,7 @@ _gen_secret() {
         sec=$(head -c 16 /dev/urandom 2>/dev/null | od -An -tx1 2>/dev/null | tr -d ' \n')
     fi
     if [ -z "$sec" ] && command -v sha256sum >/dev/null 2>&1; then
-        sec=$((date +%s%N 2>/dev/null; printf '%s' "$RANDOM$RANDOM$RANDOM") | sha256sum 2>/dev/null | cut -c1-32)
+        sec=$( { date +%s%N 2>/dev/null; printf '%s' "$RANDOM$RANDOM$RANDOM"; } | sha256sum 2>/dev/null | cut -c1-32 )
     fi
     printf '%s' "$sec"
 }
@@ -1273,8 +1261,7 @@ add_users_menu() {
         add_users_to_config "$raw" || true
         echo ""
     done
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
     return 0
 }
 
@@ -1414,8 +1401,7 @@ web_proxy_menu() {
                 fi
                 echo ""
                 echo -e "  ${YELLOW}[!]${NC} Управление WEB (установка/путь/отчёты) выполняется на самой ноде."
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу для возврата..."
                 rm -f "$tmp"
                 return 0
             fi
@@ -1431,8 +1417,7 @@ web_proxy_menu() {
     echo -e "  ${DIM}конфига telemt и nginx + сертификат Let's Encrypt.${NC}"
     echo -e "  ${DIM}Выполните установку на самой ноде или через CLI.${NC}"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
     return 1
 }
 
@@ -1488,8 +1473,7 @@ telemt_backup_menu() {
     log_info "Бэкап/восстановление Telemt на ноде ${REMOTE_USER}@${REMOTE_IP}"
     if ! _ensure_backup_panel_node; then
         log_warning "На ноде нет /opt/mtpr-simple/data/backup_panel.sh — обновите ноду, пропускаю"
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата"
         return 1
     fi
     if ssh_exec "grep -q -- '--scope' /opt/mtpr-simple/data/backup_panel.sh"; then
@@ -1906,7 +1890,7 @@ while true; do
         # Порт(ы)
         ports=$(get_telemt_ports)
         if [ -n "$ports" ]; then
-            port_count=$(echo "$ports" | wc -l)
+            port_count=$(wc -l <<<"$ports")
             if [ "$port_count" -eq 1 ]; then
                 echo -e "  ${BOLD}Порт:${NC} ${CYAN}${ports}${NC}"
             else
@@ -2018,8 +2002,7 @@ while true; do
         a|A)
             echo ""
             echo "  [✗] Меню панели Telemt не поддерживается в удалённом режиме"
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для возврата"
             ;;
         u|U)
             add_users_menu || true
