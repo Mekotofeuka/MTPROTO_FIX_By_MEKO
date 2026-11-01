@@ -571,12 +571,7 @@ while true; do
             edit_panel_config
             ;;
         0)
-            if [ -f "/opt/mtpr-simple/proxys/proxymenu.sh" ]; then
-                exec bash /opt/mtpr-simple/proxys/proxymenu.sh
-            else
-                echo -e "  ${RED}[✗] Файл proxymenu.sh не найден${NC}"
-                sleep 1
-            fi
+            # Только выходим: proxymenu.sh запущен выше и сам вернётся в цикл.
             break
             ;;
         *)

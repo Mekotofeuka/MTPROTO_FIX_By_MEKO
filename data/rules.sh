@@ -32,6 +32,30 @@ trim() {
     printf '%s' "$var"
 }
 
+# ── Открыть TCP-порт в активном файрволе ────────────────────
+# ufw и firewalld держат собственные цепочки в INPUT: без явного allow
+# пакеты до прокси не доходят, даже когда SYN-фикс применён (issue #34).
+# Идемпотентно; молча выходим, если файрвол не активен.
+open_port_in_firewall() {
+    local p="$1"
+    [ -z "$p" ] && return 0
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi '^Status: active'; then
+        if ufw allow "$p"/tcp >/dev/null 2>&1; then
+            log_success "ufw: открыт порт $p/tcp"
+        else
+            log_warning "ufw: не удалось открыть порт $p/tcp (проверьте вручную)"
+        fi
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+        if firewall-cmd --permanent --add-port="$p"/tcp >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1; then
+            log_success "firewalld: открыт порт $p/tcp"
+        else
+            log_warning "firewalld: не удалось открыть порт $p/tcp (проверьте вручную)"
+        fi
+    fi
+    return 0
+}
+
 # ── Функция определения порта SSH ────────────────────────────
 get_ssh_port() {
     local port
@@ -1107,6 +1131,11 @@ SERVICE_NFT_EOF
         || log_error "Не удалось выполнить systemctl restart mtpr-synfix.service (правила в ядре применены, но автозапуск не активен)"
     log_info "Автозапуск mtpr-synfix.service: $(systemctl is-enabled mtpr-synfix.service 2>/dev/null || echo неизвестно)"
     log_success "SYN FIX успешно установлен на порты: $ports_str"
+    # Порт должен быть разрешён и в активном файрволе (ufw/firewalld), иначе
+    # входящие SYN не доходят до прокси (issue #34).
+    for _fw_port in "${valid_ports[@]}"; do
+        open_port_in_firewall "$_fw_port"
+    done
     if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
         echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
         read -rsn1 </dev/tty || true
@@ -1216,6 +1245,10 @@ SERVICE_NFT_EOF
     log_info "Автозапуск mtpr-nft-synfix.service: $(systemctl is-enabled mtpr-nft-synfix.service 2>/dev/null || echo неизвестно)"
 
     log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str_clean"
+    # Разрешаем порты и в активном файрволе (ufw/firewalld) — issue #34.
+    for _fw_port in "${valid_ports[@]}"; do
+        open_port_in_firewall "$_fw_port"
+    done
     return 0
 }
 

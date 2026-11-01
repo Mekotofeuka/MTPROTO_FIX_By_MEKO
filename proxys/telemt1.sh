@@ -556,10 +556,50 @@ _telemt_port_busy_by_other() {
     return 0
 }
 
+# ── Открыть TCP-порт в активном файрволе ────────────────────
+# ufw и firewalld держат собственные цепочки в INPUT, поэтому ни
+# SYN-фикс, ни живой процесс их не обходят: без явного allow пакеты
+# до прокси не доходят. Молча выходим, если файрвол не активен.
+open_port_in_firewall() {
+    local p="$1"
+    [ -z "$p" ] && return 0
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi '^Status: active'; then
+        if ufw allow "$p"/tcp >/dev/null 2>&1; then
+            echo -e "  ${GREEN}[✓]${NC} ufw: открыт порт $p/tcp"
+        else
+            echo -e "  ${YELLOW}[!]${NC} ufw: не удалось открыть порт $p/tcp"
+        fi
+    fi
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+        if firewall-cmd --permanent --add-port="$p"/tcp >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1; then
+            echo -e "  ${GREEN}[✓]${NC} firewalld: открыт порт $p/tcp"
+        else
+            echo -e "  ${YELLOW}[!]${NC} firewalld: не удалось открыть порт $p/tcp"
+        fi
+    fi
+    return 0
+}
+
 # ── Спросить порт (только интерактивный путь) ───────────────
 # Результат — в TELEMT_PORT_CHOSEN. rc=1 — отмена пользователем.
 ask_telemt_port() {
-    local default_port="443" reply
+    # По умолчанию — порт, который уже используется: при обновлении Enter
+    # должен сохранять текущий порт, а не молча переставлять всё на 443.
+    local default_port="" reply _info _cur
+    _info=$(detect_telemt_advanced 2>/dev/null) || _info=""
+    _cur=$(printf '%s\n' "$_info" | cut -d: -f2)
+    if ! [[ "$_cur" =~ ^[0-9]+$ ]] && [ -s /opt/mtpr-simple/port ]; then
+        _cur=$(head -1 /opt/mtpr-simple/port 2>/dev/null | tr -d '[:space:]')
+    fi
+    if ! [[ "$_cur" =~ ^[0-9]+$ ]]; then
+        # Только не-loopback сокет: у telemt есть служебный 127.0.0.1:9091.
+        _cur=$(ss -ltnp 2>/dev/null | grep '[t]elemt' | awk '$4 !~ /^(127\.|\[::1\])/ {print $4}' | sed -n 's/.*:\([0-9]\{1,5\}\)$/\1/p' | head -1)
+    fi
+    if [[ "$_cur" =~ ^[0-9]+$ ]] && [ "$_cur" -ge 1 ] && [ "$_cur" -le 65535 ]; then
+        default_port="$_cur"
+    else
+        default_port="443"
+    fi
     while true; do
         echo ""
         echo -e "  ${NC}${BOLD}Укажите порт для прокси${NC} ${GRAY}(по умолчанию: ${default_port})${NC}"
@@ -662,10 +702,12 @@ install_telemt() {
     local -a telemt_flags=(-l 2 -p "$_port")
     [ -n "$_domain" ] && telemt_flags+=(-d "$_domain")
 
+    local _installed=0
     if [ "$install_version" = "latest" ]; then
         if fetch_and_run sh "https://raw.githubusercontent.com/telemt/telemt/main/install.sh" "${telemt_flags[@]}"; then
             echo ""
             echo -e "  ${GREEN}[✓]${NC} Telemt успешно установлен (последняя версия)"
+            _installed=1
         else
             echo ""
             echo -e "  ${RED}[✗]${NC} Ошибка установки Telemt"
@@ -674,10 +716,17 @@ install_telemt() {
         if fetch_and_run sh "https://raw.githubusercontent.com/telemt/telemt/main/install.sh" "$install_version" "${telemt_flags[@]}"; then
             echo ""
             echo -e "  ${GREEN}[✓]${NC} Telemt версии ${install_version} успешно установлен"
+            _installed=1
         else
             echo ""
             echo -e "  ${RED}[✗]${NC} Ошибка установки Telemt версии ${install_version}"
         fi
+    fi
+
+    # Порт на нестандартном значении не пройдёт, если ufw/firewalld его не
+    # разрешают (issue #34): открываем явно после успешной установки.
+    if [ "$_installed" = 1 ]; then
+        open_port_in_firewall "$_port"
     fi
     
     echo ""
@@ -772,6 +821,9 @@ install_telemt_silent() {
         else
             echo -e "  ${RED}[✗]${NC} Ошибка установки Telemt версии ${install_version}"
         fi
+    fi
+    if [ "$rc" = 0 ]; then
+        open_port_in_firewall "$_port"
     fi
     return $rc
 }
@@ -2792,7 +2844,8 @@ while true; do
             ;;
         a|A)
             if [ -f "/opt/mtpr-simple/proxys/telemt_panel_amirotin.sh" ]; then
-                exec bash /opt/mtpr-simple/proxys/telemt_panel_amirotin.sh
+                # Без exec: панель — дочерний процесс, меню Telemt остаётся живым.
+                bash /opt/mtpr-simple/proxys/telemt_panel_amirotin.sh </dev/tty || true
             else
                 echo ""
                 echo "  [✗] Файл /opt/mtpr-simple/proxys/telemt_panel_amirotin.sh не найден"
@@ -2813,14 +2866,9 @@ while true; do
             engine_menu || true
             ;;
         0)
-            if [ -f "/opt/mtpr-simple/proxys/proxymenu.sh" ]; then
-                exec bash /opt/mtpr-simple/proxys/proxymenu.sh
-            else
-                echo ""
-                echo "  [✗] Файл /opt/mtpr-simple/proxys/proxymenu.sh не найден"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || true
-            fi
+            # Выход из меню Telemt. proxymenu.sh ждёт нас как дочерний
+            # процесс и сам вернётся в свой цикл; exec плодил копии (issue #35).
+            break
             ;;
         *)
             echo "  Неверный выбор"

@@ -1237,7 +1237,9 @@ is_optimization_applied() {
 open_proxy_menu() {
     local PROXY_MENU_SCRIPT="$INSTALL_DIR/proxys/proxymenu.sh"
     if [ -f "$PROXY_MENU_SCRIPT" ]; then
-        exec bash "$PROXY_MENU_SCRIPT"
+        # Дочерний запуск, НЕ exec: иначе главное меню заменяется прокси-меню
+        # и стек меню растёт на каждый заход (issue #35).
+        run_menu_script "$PROXY_MENU_SCRIPT"
     else
         log_error "Файл $PROXY_MENU_SCRIPT не найден"
         echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"

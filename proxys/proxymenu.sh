@@ -96,9 +96,8 @@ while true; do
             fi
             ;;
         0)
-            if [ -x "/opt/mtpr-simple/main.sh" ]; then
-                bash /opt/mtpr-simple/main.sh || true
-            fi
+            # Только выходим: main.sh запущен выше как дочерний процесс и сам
+            # вернётся в свой цикл. Запуск его здесь копил вложенность (issue #35).
             break
             ;;
         *)
