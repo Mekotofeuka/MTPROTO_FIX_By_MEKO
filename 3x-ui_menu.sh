@@ -44,8 +44,9 @@ get_public_ip() {
 
 # ── Пауза «нажмите любую клавишу» ────────────────────────────
 pause_key() {
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу для возврата...}${NC}"
+    read -rsn1 </dev/tty || true
 }
 
 # ── Ввод домена (пустой ввод = значение по умолчанию) ────────
@@ -145,7 +146,7 @@ install_3xui() {
     local wait_seconds=0
     local max_wait=120
     while command -v fuser >/dev/null 2>&1 && fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-        if [ $wait_seconds -ge $max_wait ]; then
+        if [ "$wait_seconds" -ge "$max_wait" ]; then
             log_error "Блокировка apt не снята за $max_wait секунд."
             log_error "Попробуйте остановить unattended-upgrades вручную: sudo systemctl stop unattended-upgrades"
             pause_key
@@ -220,7 +221,7 @@ install_3xui() {
     fi
     rm -f "$installer"
 
-    if [ $rc -eq 0 ]; then
+    if [ "$rc" -eq 0 ]; then
         log_success "3x-ui установлен"
     else
         log_error "Ошибка установки 3x-ui (код возврата $rc)"
@@ -240,7 +241,7 @@ install_3xui() {
     log_info "Применение патча 3x-ui..."
     wait_seconds=0
     while command -v fuser >/dev/null 2>&1 && fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-        if [ $wait_seconds -ge $max_wait ]; then
+        if [ "$wait_seconds" -ge "$max_wait" ]; then
             log_warning "Блокировка apt не снята, патч может не примениться."
             break
         fi
@@ -258,7 +259,7 @@ install_3xui() {
         bash "$patcher" </dev/null || rc=$?
     fi
     rm -f "$patcher"
-    if [ $rc -eq 0 ]; then
+    if [ "$rc" -eq 0 ]; then
         log_success "Патч применён"
     else
         log_warning "Патч не применился (возможно, он не требуется или apt всё ещё занят)"
@@ -277,8 +278,7 @@ run_xui_cmd() {
     if ! is_3xui_installed; then
         echo ""
         log_error "Панель 3x-ui не установлена. Сначала выполните установку (пункт 1)."
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key
         return 1
     fi
     
@@ -295,8 +295,7 @@ run_xui_cmd() {
             ;;
     esac
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Главное меню 3x-ui ────────────────────────────────────────
@@ -394,13 +393,11 @@ while true; do
                 else
                     log_info "Удаление отменено."
                 fi
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу для возврата в меню..."
             else
                 echo ""
                 log_error "Панель не установлена."
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key
             fi
             ;;
         0)
@@ -411,8 +408,7 @@ while true; do
         *)
             echo ""
             log_warning "Неверный выбор."
-            echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу для продолжения..."
             ;;
     esac
 done

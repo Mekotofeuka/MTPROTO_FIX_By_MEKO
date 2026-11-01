@@ -56,6 +56,12 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1" >&2; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1" >&2; }
 
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу...}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Проверка root ────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
     echo -e "${RED}[✗]${NC} Запустите от root" >&2
@@ -137,7 +143,6 @@ run_syn_fix() {
     # Восстанавливаем stdin в обеих ветвях
     exec <&3 2>/dev/null || true
     exec 3<&- 2>/dev/null || true
-    return 0
 }
 
 # ── Функция проверки и загрузки файла прокси ──────────────────
@@ -155,7 +160,6 @@ ensure_proxy_file() {
         fi
     fi
     chmod +x "$dest" 2>/dev/null || true
-    return 0
 }
 
 # ── Функция получения публичного IP ──────────────────────────
@@ -232,8 +236,7 @@ auto_install_mode() {
         log_success "Telemt ${telemt_version} установлен успешно"
     else
         log_error "Ошибка установки Telemt ${telemt_version}"
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key
         return
     fi
     
@@ -243,8 +246,7 @@ auto_install_mode() {
         log_success "SYN FIX установлен успешно"
     else
         log_error "Ошибка установки SYN FIX"
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key
         return
     fi
     

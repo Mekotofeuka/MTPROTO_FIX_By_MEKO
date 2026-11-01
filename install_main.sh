@@ -126,16 +126,16 @@ download_file() {
     
     echo -e "  ${CYAN}⏳${NC}${BOLD} Загрузка ${GREEN}${BOLD}${name}${NC}${BOLD} (${desc})"
     
-    while [ $count -lt $attempts ]; do
+    while [ "$count" -lt "$attempts" ]; do
         # Убираем подавление ошибок, чтобы видеть причину
         if curl -fsSL --connect-timeout 10 --max-time 120 "$url" -o "$dest" 2>"$errfile"; then
             echo -e "  ${GREEN}${BOLD}✓${NC}${BOLD} Скачан успешно:${NC} ${GREEN}${BOLD}${name}${NC} (${size_str})"
             success=1
             break
         else
-            err_msg=$(cat "$errfile" 2>/dev/null | head -1)
+            err_msg=$(head -1 "$errfile" 2>/dev/null)
             count=$((count + 1))
-            if [ $count -lt $attempts ]; then
+            if [ "$count" -lt "$attempts" ]; then
                 echo -e "  ${YELLOW}⚠${NC} Попытка $count не удалась (${err_msg:-неизвестная ошибка}), повтор через 1 сек..."
                 sleep 1
             fi
@@ -143,11 +143,10 @@ download_file() {
     done
     rm -f "$errfile"
     
-    if [ $success -eq 0 ]; then
+    if [ "$success" -eq 0 ]; then
         echo -e "  ${RED}✗${NC} ${RED}${name}${NC} — ошибка загрузки (после $attempts попыток, последняя ошибка: ${err_msg:-неизвестна})"
         return 1
     fi
-    return 0
 }
 export -f download_file
 export BASE_URL INSTALL_DIR
@@ -206,12 +205,27 @@ echo -e "  ${BOLD}Загрузка файлов...${NC}"
 echo ""
 
 MAX_PARALLEL=6
+
+# `wait -n` появился только в bash 4.3 (CentOS 7 везёт 4.2): там он падает, а
+# очередь не уменьшается — цикл крутится вечно. Поэтому на старом bash ждём
+# конкретный PID.
+wait_one() {
+    if (( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3) )); then
+        wait -n || true
+    else
+        local pid
+        pid=$(jobs -rp | head -1)
+        [ -n "$pid" ] && wait "$pid"
+    fi
+    return 0
+}
+
 while IFS= read -r entry; do
     [ -z "$entry" ] && continue
     IFS='|' read -r file_path description <<< "$entry"
     download_file "$file_path" "$description" &
     while [ "$(jobs -rp | wc -l)" -ge "$MAX_PARALLEL" ]; do
-        wait -n || true
+        wait_one
     done
 done < <(printf '%s\n' "${FILES_TO_DOWNLOAD[@]}")
 wait || true

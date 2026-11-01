@@ -7,7 +7,6 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-GRAY='\033[0;90m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
@@ -52,18 +51,18 @@ ensure_ssh_key() {
 
 # ── Получение списка серверов ──────────────────────────────
 get_servers() {
-    local servers=()
-    if [[ -d "$SERVERS_DIR" ]]; then
-        for f in "$SERVERS_DIR"/*.conf; do
-            [[ -f "$f" ]] && servers+=("$(basename "$f" .conf)")
-        done
-    fi
-    echo "${servers[@]}"
+    local f
+    for f in "$SERVERS_DIR"/*.conf; do
+        [ -f "$f" ] && basename "$f" .conf
+    done
 }
 
 get_server_count() {
-    local servers=($(get_servers))
-    echo ${#servers[@]}
+    local n=0 f
+    for f in "$SERVERS_DIR"/*.conf; do
+        [ -f "$f" ] && n=$((n + 1))
+    done
+    echo "$n"
 }
 
 # ── Загрузка конфига сервера ──────────────────────────────
@@ -177,9 +176,11 @@ add_server() {
     { read -r input </dev/tty; } 2>/dev/null || input=""
 
     local parsed
-    parsed=($(parse_input "$input")) || { echo -n "Нажмите Enter для возврата..."; { read -r _ </dev/tty; } 2>/dev/null || true; return 1; }
-    local user="${parsed[0]}"
-    local ip="${parsed[1]}"
+    if ! parsed=$(parse_input "$input"); then
+        echo -n "Нажмите Enter для возврата..."; { read -r _ </dev/tty; } 2>/dev/null || true; return 1
+    fi
+    local user ip
+    read -r user ip <<< "$parsed"
 
     # Сначала порт, потом TCP-проверка доступности.
     # Раньше проверка шла ДО ввода порта и через check_ssh_key: у ещё
@@ -224,8 +225,7 @@ add_server() {
         log_info "Доступ по ключу отсутствует. Будет выполнена команда:"
         echo -e "  ${CYAN}ssh-copy-id -p $port $user@$ip${NC}"
         echo -e "  ${BOLD}Введите пароль пользователя ${GREEN}$user${NC}${BOLD}, если потребуется.${NC}"
-        ssh-copy-id -p "$port" "$user@$ip"
-        if [[ $? -eq 0 ]]; then
+        if ssh-copy-id -p "$port" "$user@$ip"; then
             log_success "Ключ успешно скопирован."
         else
             log_error "Не удалось скопировать ключ. Проверьте пароль и доступность."
@@ -511,8 +511,8 @@ sync_clients_from_local() {
 
     # Клиенты, которых нет локально: НЕ удаляем, только предупреждаем.
     local extra_count=0
-    local rname rsec
-    while IFS=: read -r rname rsec; do
+    local rname
+    while IFS=: read -r rname _; do
         [ -z "$rname" ] && continue
         if ! printf '%s\n' "$local_clients" | cut -d: -f1 | grep -qxF "$rname"; then
             printf "  %-24s %-10s %-10s %s\n" "$rname" "нет" "да" "лишний (не удаляю)"
@@ -694,7 +694,8 @@ REMOTE_SYNC
 # ── Список серверов ─────────────────────────────────────────
 list_servers() {
     clear 2>/dev/null || true
-    local servers=($(get_servers))
+    local servers=()
+    mapfile -t servers < <(get_servers)
     if [[ ${#servers[@]} -eq 0 ]]; then
         echo ""
         log_warning "Нет сохранённых серверов. Добавьте их с помощью пункта [1]"
@@ -716,14 +717,12 @@ list_servers() {
     local choice
     { read -r choice </dev/tty; } 2>/dev/null || { echo; return 0; }
 
-    if [[ "$choice" -eq 0 ]]; then
-        return 0
-    fi
-    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [[ "$choice" -lt 1 ]] || [[ "$choice" -gt ${#servers[@]} ]]; then
+    if [[ ! "$choice" =~ ^[0-9]+$ ]] || [[ "$choice" -gt ${#servers[@]} ]]; then
         log_error "Неверный номер."
         echo -n "Нажмите Enter для продолжения..."; { read -r _ </dev/tty; } 2>/dev/null || true
         return 1
     fi
+    [[ "$choice" -eq 0 ]] && return 0
     local selected_ip="${servers[$((choice-1))]}"
     server_submenu "$selected_ip"
 }
@@ -732,9 +731,9 @@ list_servers() {
 server_submenu() {
     local ip="$1"
     local config
-    config=($(load_server_config "$ip"))
-    local user="${config[0]}"
-    local port="${config[1]}"
+    config=$(load_server_config "$ip") || return 1
+    local user="${config%% *}"
+    local port="${config##* }"
 
     if [[ -z "$user" ]]; then
         log_error "Не удалось загрузить конфиг для $ip."
@@ -839,7 +838,8 @@ server_submenu() {
 main_menu() {
     while true; do
         clear 2>/dev/null || true
-        local server_count=$(get_server_count)
+        local server_count
+        server_count=$(get_server_count)
         echo ""
         echo -e "  ${BOLD}MEKO ${CYAN}| ${NC}${BOLD}NODE MANAGER v0.1 ${NC}"
         echo -e "  ${DIM}══════════════════════════════════════════════${NC}"

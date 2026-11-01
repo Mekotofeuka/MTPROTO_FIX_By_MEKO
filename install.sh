@@ -99,7 +99,6 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# ── Функция скачивания файла ─────────────────────────────────
 download_file() {
     local file="$1"
     local dest="$2"
@@ -110,12 +109,10 @@ download_file() {
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
         chmod +x "$dest" 2>/dev/null || true
         return 0
-    else
-        return 1
     fi
+    return 1
 }
 
-# ── Функция проверки и загрузки файла ────────────────────────
 ensure_file() {
     local file="$1"
     local dest="$INSTALL_DIR/$file"
@@ -130,10 +127,8 @@ ensure_file() {
         fi
     fi
     chmod +x "$dest" 2>/dev/null || true
-    return 0
 }
 
-# ── Функция обрезки пробелов ──────────────────────────────
 trim() {
     local var="$1"
     var="${var#"${var%%[![:space:]]*}"}"
@@ -144,7 +139,6 @@ trim() {
 # ── Файл для сохранения пути к конфигу ──────────────────────
 CONFIG_PATH_FILE="/opt/mtpr-simple/config_path"
 
-# ── Функция получения текущего пути к конфигу ──────────────
 get_config_path() {
     if [ -f "$CONFIG_PATH_FILE" ] && [ -s "$CONFIG_PATH_FILE" ]; then
         local path
@@ -155,7 +149,6 @@ get_config_path() {
         fi
     fi
     echo "/etc/telemt/telemt.toml"
-    return 0
 }
 
 # ── Функции для работы с TOML (из telemt1.sh) ──────────────
@@ -303,7 +296,6 @@ detect_telemt_advanced() {
     echo "$DETECTED_CONFIG_PATH:$DETECTED_PORT:$DETECTED_IP:$DETECTED_PUBLIC_HOST:$DETECTED_CLASSIC:$DETECTED_SECURE:$DETECTED_TLS:$DETECTED_TLS_DOMAIN:$DETECTED_SECRET"
 }
 
-# ── Функция получения публичного IP ──────────────────────────
 get_public_ip() {
     local _ip=""
     _ip=$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null) ||
@@ -313,7 +305,6 @@ get_public_ip() {
     echo "$_ip"
 }
 
-# ── Функция генерации ссылок для подключения (ИСПРАВЛЕНА) ────
 generate_proxy_links() {
     local config_path
     config_path=$(get_config_path)
@@ -324,9 +315,8 @@ generate_proxy_links() {
     # Получаем данные из конфига через расширенное обнаружение
     local detected_info
     detected_info=$(detect_telemt_advanced)
-    local IFS=':'
-    local parts=($detected_info)
-    unset IFS
+    local parts=()
+    IFS=':' read -r -a parts <<< "$detected_info"
     
     local detected_path="${parts[0]}"
     local detected_port="${parts[1]}"
@@ -573,7 +563,6 @@ add_public_host_to_config() {
     return 0
 }
 
-# ── Функция получения последней версии Telemt ──────────────
 get_latest_telemt_version() {
     local version=""
     version=$(timeout 10 curl -fsS --max-time 5 "https://api.github.com/repos/telemt/telemt/releases/latest" 2>/dev/null | awk -F'"' '/"tag_name"/ {print $4}')
@@ -671,7 +660,6 @@ setup_web_config() {
     log_success "WEB-конфиг сохранён в $config_path"
     
     rm -f "$web_template"
-    return 0
 }
 
 # ── Функция установки и настройки Nginx для WEB-режима ──────
@@ -783,7 +771,6 @@ EOF
     fi
     
     log_success "Nginx настроен для $web_host"
-    return 0
 }
 
 # ── СТАРОЕ МЕНЮ (ПРОКСИ) ──────────────────────────────────────

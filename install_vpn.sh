@@ -27,6 +27,12 @@ log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_error() { echo -e "  ${RED}[✗]${NC} $1" >&2; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу для возврата...}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Проверка root ────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
     echo -e "${RED}[✗]${NC} Запустите от root" >&2
@@ -44,9 +50,8 @@ download_file() {
     if curl -fsSL "$url" -o "$dest" 2>/dev/null; then
         chmod +x "$dest" 2>/dev/null || true
         return 0
-    else
-        return 1
     fi
+    return 1
 }
 
 # ── Открытие меню 3x-ui ──────────────────────────────────────
@@ -61,8 +66,7 @@ open_3xui_menu() {
             log_success "Меню 3x-ui загружено"
         else
             log_error "Не удалось загрузить меню 3x-ui"
-            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-            { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key
             return
         fi
     fi

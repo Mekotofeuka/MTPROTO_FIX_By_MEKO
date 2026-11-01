@@ -300,12 +300,12 @@ _sec_api_meta() {
 }
 
 _sec_collect_line() {
-    local st meta lim ret cap dr pe ent
+    local st meta lim ret dr pe ent
     st=$(_sec_api_state)
     case "$st" in
         enabled)
             meta=$(_sec_api_meta 2>/dev/null || true)
-            IFS=$'\t' read -r lim ret cap dr pe ent <<< "$meta" || true
+            IFS=$'\t' read -r lim ret _ dr pe ent <<< "$meta" || true
             printf 'сбор ВКЛ (записей %s, лимит Top-N %s, хранение %sс, отброшено %s, ошибок разбора %s)' \
                 "${ent:-0}" "${lim:-0}" "${ret:-0}" "${dr:-0}" "${pe:-0}"
             ;;
@@ -377,7 +377,8 @@ _sec_collect_enable() {
     if [ "$st" = "enabled" ]; then
         log_info "Сбор отпечатков уже включён"; return 0
     fi
-    local bak="${SEC_CFG}.bak-security.$(date +%Y%m%d%H%M%S)"
+    local bak
+    bak="${SEC_CFG}.bak-security.$(date +%Y%m%d%H%M%S)"
     cp "$SEC_CFG" "$bak" || { log_error "Не удалось сделать бэкап конфига"; return 1; }
     log_info "Бэкап конфига: $bak"
     _sec_cfg_drop_section "$SEC_CFG" "tls_fingerprints" || true
@@ -416,7 +417,8 @@ _sec_collect_disable() {
     case "$st" in
         disabled:*|no-engine) log_info "Сбор отпечатков уже выключен"; return 0 ;;
     esac
-    local bak="${SEC_CFG}.bak-security.$(date +%Y%m%d%H%M%S)"
+    local bak
+    bak="${SEC_CFG}.bak-security.$(date +%Y%m%d%H%M%S)"
     cp "$SEC_CFG" "$bak" || { log_error "Не удалось сделать бэкап конфига"; return 1; }
     log_info "Бэкап конфига: $bak"
     if ! _sec_cfg_set "$SEC_CFG" "server.api" "runtime_edge_enabled" "false"; then
@@ -534,7 +536,8 @@ _sec_val_ip() {
         *)
             case "$ip" in .*|*.|*..*) return 1 ;; esac
             local IFS='.'
-            local -a o=($ip)
+            local -a o=()
+            IFS='.' read -r -a o <<< "$ip"
             [ "${#o[@]}" -eq 4 ] || return 1
             for part in "${o[@]}"; do
                 case "$part" in ''|*[!0-9]*) return 1 ;; esac
@@ -656,7 +659,8 @@ _sec_nft_sync_set() {
     local -A H=()
     if [ -n "$want" ]; then
         local IFS=','
-        local -a parts=($want)
+        local -a parts=()
+        IFS=',' read -r -a parts <<< "$want"
         for e in "${parts[@]}"; do
             norm="$e"
             norm="${norm#"${norm%%[![:space:]]*}"}"
