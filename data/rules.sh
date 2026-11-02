@@ -692,13 +692,23 @@ install_syn_fix() {
         if [ -z "$forced_ports" ]; then
             forced_ports="443"
         fi
+        # Служба, nft-правила и Lua для v4 лежат в отдельном файле.
+        # Из меню его подключают заранее, а при запуске из CLI он ещё не загружен.
+        if ! declare -f zapret2_install_auto &>/dev/null; then
+            _zapret2_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/zapret2_fix.sh"
+            if [ ! -r "$_zapret2_file" ]; then
+                _zapret2_file="/opt/mtpr-simple/data/zapret2_fix.sh"
+            fi
+            if [ -r "$_zapret2_file" ]; then
+                . "$_zapret2_file"
+            fi
+        fi
         log_info "Установка Zapret2 (v4) на порт $forced_ports..."
-        # Вызываем функцию, которая будет реализована в zapret2_fix.sh
         if declare -f zapret2_install_auto &>/dev/null; then
             zapret2_install_auto "$forced_ports"
             return $?
         else
-            log_error "Функция zapret2_install_auto не найдена. Сначала обновите zapret2_fix.sh"
+            log_error "Функция zapret2_install_auto не найдена: файл data/zapret2_fix.sh отсутствует или повреждён"
             return 1
         fi
     fi
