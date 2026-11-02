@@ -4,7 +4,7 @@
 # ── Цвета ─────────────────────────────────────────────────────
 if [ -z "$RED" ]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
-    BLUE='\033[0;34m'; CYAN='\033[0;36m'; GRAY='\033[0;90m'
+    BLUE='\033[0;34m'; CYAN='\033[0;36m'
     BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 fi
 
@@ -13,6 +13,13 @@ log_info()    { echo -e "  ${BLUE}[i]${NC} $1"; }
 log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
 log_warning() { echo -e "  ${YELLOW}[!]${NC} $1" >&2; }
 log_error()   { echo -e "  ${RED}[✗]${NC} $1" >&2; }
+
+# Возврат в меню после пункта: без tty (auto-режим, pipe) просто идём дальше.
+pause_key() {
+    echo ""
+    echo -en "  Нажмите любую клавишу для возврата в меню"
+    read -rsn1 </dev/tty 2>/dev/null || true
+}
 
 # ── Путь к файлу настроек  ─────────────
 INSTALL_DIR="/opt/mtpr-simple"
@@ -128,19 +135,19 @@ load_settings() {
                     ;;
                 EXTRA_RULES_*_PORT)
                     local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_PORT}"
-                    EXTRA_RULES_PORT[$_idx]="$_val"
+                    EXTRA_RULES_PORT[_idx]="$_val"
                     ;;
                 EXTRA_RULES_*_IP)
                     local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_IP}"
-                    EXTRA_RULES_IP[$_idx]="$_val"
+                    EXTRA_RULES_IP[_idx]="$_val"
                     ;;
                 EXTRA_RULES_*_RATE)
                     local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_RATE}"
-                    EXTRA_RULES_RATE[$_idx]="$_val"
+                    EXTRA_RULES_RATE[_idx]="$_val"
                     ;;
                 EXTRA_RULES_*_BURST)
                     local _idx="${_key#EXTRA_RULES_}"; _idx="${_idx%_BURST}"
-                    EXTRA_RULES_BURST[$_idx]="$_val"
+                    EXTRA_RULES_BURST[_idx]="$_val"
                     ;;
             esac
         fi
@@ -416,7 +423,6 @@ zapret2_download_bundle() {
     fi
 
     log_success "zapret2 ${_ver} установлен в ${ZAPRET2_DIR}"
-    return 0
 }
 
 # ── Запись конфига Zapret2 (использует SERVER_PORT) ────────
@@ -511,7 +517,6 @@ function lets_resend(ctx, desync)
 end
 LUAEOF
     [ "$_dst" != "$ZAPRET2_LUA" ] || log_success "Lua скрипт записан: ${ZAPRET2_LUA}"
-    return 0
 }
 
 # Обновление Lua у уже установленного zapret2: если скрипт отличается от
@@ -535,7 +540,6 @@ zapret2_refresh_lua() {
         rm -f "$_tmp"
         log_warning "Не удалось обновить Lua скрипт: ${ZAPRET2_LUA}"
     fi
-    return 0
 }
 
 # ── Создание systemd сервиса для Zapret2 ────────────────────
@@ -687,6 +691,38 @@ EOF
     fi
 }
 
+zapret2_write_all() {
+    zapret2_write_conf
+    zapret2_write_lua
+    zapret2_write_service
+}
+
+# SYN limiter v2/v3 живёт в цепочке MTPR_SYNFIX, nft-вариант — в таблице
+# inet telemt_limit. Проверяем оба, иначе при переходе v3 -> v4 лимитер
+# остаётся включённым и рубит SYN раньше zapret2.
+_syn_limiter_present() {
+    [ "${NFT_SERVICE_ENABLED:-false}" = "true" ] && return 0
+    nft list table inet "${NFT_TABLE:-telemt_limit}" >/dev/null 2>&1 && return 0
+    iptables -t filter -S MTPR_SYNFIX >/dev/null 2>&1 && return 0
+    return 1
+}
+
+# Файл запускают и самостоятельно (`bash zapret2_fix.sh`), тогда rules.sh
+# не подключён и remove_syn_fix не существует — дочитываем его сами.
+_syn_limiter_remove() {
+    if ! declare -f remove_syn_fix >/dev/null 2>&1; then
+        local _rules
+        _rules="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/rules.sh"
+        [ -r "$_rules" ] && . "$_rules"
+    fi
+    if declare -f remove_syn_fix >/dev/null 2>&1; then
+        remove_syn_fix
+        return $?
+    fi
+    log_warning "remove_syn_fix недоступна — SYN limiter не отключён, возможен конфликт"
+    return 1
+}
+
 # ── Определение IP контейнера для bridge+precise режима ─────
 docker_container_ip() {
     local _container="$1"
@@ -735,7 +771,6 @@ detect_network_mode() {
         DETECTED_CONTAINER="$_cid"
         DETECTED_NETWORK_MODE="bridge"
     fi
-    return 0
 }
 
 # ── Применение NFT правил для Zapret2 ──────────────────────
@@ -1037,7 +1072,7 @@ zapret2_install() {
     local _had_limiter="false"
     local _had_limiter_service="false"
     local _limiter_ports=""
-    if [ "${NFT_SERVICE_ENABLED:-false}" = "true" ] || nft list table inet "${NFT_TABLE:-telemt_limit}" &>/dev/null 2>&1; then
+    if _syn_limiter_present; then
         _had_limiter="true"
         _limiter_ports="$(cat "$PORT_FILE" 2>/dev/null || true)"
         [ -z "$_limiter_ports" ] && _limiter_ports="${SERVER_PORT:-443}"
@@ -1050,16 +1085,9 @@ zapret2_install() {
         echo -en "  ${BOLD}Отключить SYN limiter? [Y/n]:${NC} "
         local _yn_syn; { read -r _yn_syn </dev/tty; } 2>/dev/null || true
         if [[ ! "$_yn_syn" =~ ^[nN]$ ]]; then
-            if declare -f remove_syn_fix >/dev/null 2>&1; then
-                if remove_syn_fix; then
-                    log_success "SYN limiter отключён"
-                else
-                    log_warning "Не удалось отключить SYN limiter — возможен конфликт"
-                    _had_limiter="false"
-                    _had_limiter_service="false"
-                fi
+            if _syn_limiter_remove; then
+                log_success "SYN limiter отключён"
             else
-                log_warning "remove_syn_fix недоступна — SYN limiter не отключён, возможен конфликт"
                 _had_limiter="false"
                 _had_limiter_service="false"
             fi
@@ -1097,9 +1125,7 @@ zapret2_install() {
         fi
     fi
 
-    zapret2_write_conf
-    zapret2_write_lua
-    zapret2_write_service
+    zapret2_write_all
 
     if ! zapret2_start; then
         log_warning "zapret2 не запустился — выполняю откат"
@@ -1186,9 +1212,7 @@ zapret2_update_config() {
         log_warning "Zapret2 не установлен"
         return 1
     fi
-    zapret2_write_conf
-    zapret2_write_lua
-    zapret2_write_service
+    zapret2_write_all
     systemctl daemon-reload
     systemctl enable "$ZAPRET2_SERVICE" >/dev/null 2>&1 || true
     systemctl restart "$ZAPRET2_SERVICE" 2>/dev/null || true
@@ -1297,7 +1321,7 @@ show_zapret2_settings_menu() {
             0|"") return ;;
             *) log_warning "Неверный выбор: ${_choice}" ;;
         esac
-        echo ""; echo -en "  Нажмите любую клавишу для возврата в меню"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key
     done
 }
 
@@ -1485,7 +1509,7 @@ show_zapret2_menu() {
             0|"") return ;;
             *) log_warning "Неверный выбор: ${_choice}" ;;
         esac
-        echo ""; echo -en "  Нажмите любую клавишу для возврата в меню"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key
     done
 }
 
@@ -1549,13 +1573,9 @@ zapret2_install_auto() {
         zapret2_download_bundle || { log_error "Не удалось скачать zapret2"; return 1; }
     fi
 
-    if [ "${NFT_SERVICE_ENABLED:-false}" = "true" ] || nft list table inet "${NFT_TABLE:-telemt_limit}" &>/dev/null 2>&1; then
+    if _syn_limiter_present; then
         log_info "Отключаем SYN limiter..."
-        if declare -f remove_syn_fix >/dev/null 2>&1; then
-            remove_syn_fix || log_warning "Не удалось отключить SYN limiter"
-        else
-            log_warning "remove_syn_fix недоступна — SYN limiter не отключён, возможен конфликт"
-        fi
+        _syn_limiter_remove || true
     fi
 
     if zapret2_queue_in_use "${ZAPRET2_QNUM}"; then
@@ -1571,9 +1591,7 @@ zapret2_install_auto() {
         fi
     fi
 
-    zapret2_write_conf
-    zapret2_write_lua
-    zapret2_write_service
+    zapret2_write_all
 
     if ! zapret2_start; then
         log_error "Не удалось запустить zapret2, откат..."
