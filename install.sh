@@ -951,6 +951,29 @@ WEB_USER=""
 WEB_SECRET=""
 WEB_HOST=""
 
+# Опция без значения: под set -e `shift 2` падает с «shift count out of range»
+# и человек видит ошибку bash вместо причины. Проверяем заранее.
+_need_arg() {
+    local opt="$1" val="${2:-}"
+    if [ -z "$val" ] || [[ "$val" == -* ]]; then
+        echo -e "  ${RED}[✗]${NC} ${opt}: не указано значение"
+        echo -e "  ${DIM}Справка по опциям: -h${NC}"
+        exit 1
+    fi
+}
+
+# Домен или IPv4: остальное ломает конфиг Telemt и ссылки для клиентов.
+_is_host() {
+    [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] ||
+        [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+}
+
+_invalid_arg() {
+    echo -e "  ${RED}[✗]${NC} ${1}: недопустимое значение '${2}'"
+    echo -e "  ${DIM}${3}${NC}"
+    exit 1
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -telemt)
@@ -978,14 +1001,23 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -web-user)
+            _need_arg "-web-user" "${2:-}"
+            [[ "$2" =~ ^[A-Za-z0-9_.-]{1,32}$ ]] ||
+                _invalid_arg "-web-user" "$2" "Имя WEB-пользователя: латиница, цифры, точка, тире, подчёркивание."
             WEB_USER="$2"
             shift 2
             ;;
         -web-secret)
+            _need_arg "-web-secret" "${2:-}"
+            if [[ "$2" =~ [[:space:]\"\\] ]]; then
+                _invalid_arg "-web-secret" "$2" "Секрет не должен содержать пробелов, кавычек и обратных слешей."
+            fi
             WEB_SECRET="$2"
             shift 2
             ;;
         -web-host)
+            _need_arg "-web-host" "${2:-}"
+            _is_host "$2" || _invalid_arg "-web-host" "$2" "Нужен домен вида example.com."
             WEB_HOST="$2"
             shift 2
             ;;
@@ -1017,20 +1049,33 @@ while [[ $# -gt 0 ]]; do
             fi
             ;;
         -domain)
+            _need_arg "-domain" "${2:-}"
+            _is_host "$2" || _invalid_arg "-domain" "$2" "Нужен домен вида example.com — без схемы, слешей и пробелов."
             DOMAIN="$2"
             shift 2
             ;;
         -version)
+            _need_arg "-version" "${2:-}"
+            [[ "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$2" == "latest" ]] ||
+                _invalid_arg "-version" "$2" "Ожидается версия вида 3.5.6 или latest."
             TELEMT_VERSION="$2"
             shift 2
             ;;
         -ad_tag)
+            _need_arg "-ad_tag" "${2:-}"
+            [[ "$2" =~ ^[0-9a-fA-F]{32}$ ]] ||
+                _invalid_arg "-ad_tag" "$2" "ad_tag — 32 hex-символа (16 байт), как в README."
             AD_TAG="$2"
             shift 2
             ;;
         -user)
+            _need_arg "-user" "${2:-}"
+            [[ "$2" =~ ^[A-Za-z0-9_.-]{1,32}$ ]] ||
+                _invalid_arg "-user" "$2" "Имя пользователя: латиница, цифры, точка, тире, подчёркивание (до 32 символов)."
             USER_NAME="$2"
-            if [[ -n "$3" && ! "$3" =~ ^- ]]; then
+            if [[ -n "${3:-}" && ! "$3" =~ ^- ]]; then
+                [[ "$3" =~ ^[0-9a-fA-F]+$ ]] ||
+                    _invalid_arg "-user" "$3" "Секрет — hex-строка. Не указывать вовсе — сгенерируется автоматически."
                 USER_SECRET="$3"
                 shift 3
             else
@@ -1039,6 +1084,8 @@ while [[ $# -gt 0 ]]; do
             fi
             ;;
         -public_host)
+            _need_arg "-public_host" "${2:-}"
+            _is_host "$2" || _invalid_arg "-public_host" "$2" "Нужен домен или IPv4, который видят клиенты."
             PUBLIC_HOST="$2"
             shift 2
             ;;
