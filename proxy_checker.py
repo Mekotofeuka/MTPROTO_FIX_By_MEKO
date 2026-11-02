@@ -22,6 +22,16 @@ import time
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# Консоль с однобайтовой кодировкой (Windows-терминал, `LANG=C`, ssh без UTF-8)
+# не умеет '━' и '🔎' и роняет отчёт UnicodeEncodeError прямо посреди вывода.
+# errors="replace" оставляет отчёт читаемым вместо трейсбека.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
 # ── Цвета ─────────────────────────────────────────────────────
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
@@ -404,11 +414,6 @@ def check_ip(ip, port, sni):
         "pq_output": pq,
         "std_output": std
     }
-
-TG_SCHEMES = ("tg://proxy", "tg://webproxy", "tg://socks", "tg://http",
-              "https://t.me/proxy", "https://t.me/socks", "t.me/proxy",
-              "tg://")
-
 
 def decode_secret_sni(secret_hex):
     """Достаёт SNI (маскировочный домен) из MTProto-секрета.
@@ -909,10 +914,12 @@ def check_domain(domain, want_cert=False):
         connect = f"{d_ip}:{port}"
         res["detail_ip"] = d_ip
 
+        # Вывод PQ-пробы уже лежит в detail: check_ip() только что делала её
+        # на этом же IP. Повторный вызов стоил бы ещё один RATE_DELAY.
         if OPENSSL_SUPPORTS_PQ:
-            pq = run_openssl(["s_client", "-connect", connect,
-                              "-servername", host,
-                              "-groups", "X25519MLKEM768", "-brief"])
+            pq = detail.get("pq_output") or run_openssl(
+                ["s_client", "-connect", connect,
+                 "-servername", host, "-groups", "X25519MLKEM768", "-brief"])
         else:
             pq = "SKIPPED"
 
@@ -1000,6 +1007,13 @@ def run_batch(targets, show_table=True, show_details=True):
         for ln in render_table(summaries):
             print(ln)
 
+    # --quiet: одна строка итога. Без неё режим печатал вообще ничего,
+    # хотя в --help обещан «только итог одной строкой».
+    if not show_table and not show_details:
+        bad = sum(1 for s in summaries if s["verdict"] in ("danger", "partial"))
+        unknown = sum(1 for s in summaries if s["verdict"] in ("fail", "unknown"))
+        print(f"ИТОГ: проверено {len(summaries)}, риск {bad}, без вердикта {unknown}")
+
     if show_details:
         for t, r in results:
             for ln in render_domain(t, r, verbose=VERBOSE):
@@ -1066,6 +1080,7 @@ def _cli_usage():
     print(f"    python3 proxy_checker.py --quiet a.ru b.ru   только итог одной строкой")
     print("")
     print(f"  {BOLD}В интерактивном режиме можно вводить несколько доменов через пробел.{NC}")
+    print(f"  {BOLD}Код возврата:{NC} 0 — всё хорошо, 1 — есть риск блокировки, 2 — не проверить")
     print("")
 
 
@@ -1109,6 +1124,11 @@ def main():
         sys.exit(0)
 
     # ── Интерактивный режим ───────────────────────────────
+    if not sys.stdin.isatty():
+        print_warning("Нет терминала для интерактивного режима — передайте цели аргументами")
+        _cli_usage()
+        sys.exit(2)
+
     while True:
         os.system('clear 2>/dev/null || true' if os.name == 'posix' else 'cls')
         _print_banner()
@@ -1117,8 +1137,8 @@ def main():
         print(f"  {DIM}Примеры:{NC}")
         print(f"  {DIM}  • ozon.ru{NC}")
         print(f"  {DIM}  • rutube.ru youtube.com vk.com{NC}")
-        print(f"  {DIM}  • 123.645.789.012:443{NC}")
-        print(f"  {DIM}  • tg://proxy?server=123.645.789.012&port=443&secret=...{NC}")
+        print(f"  {DIM}  • 203.0.113.10:443{NC}")
+        print(f"  {DIM}  • tg://proxy?server=203.0.113.10&port=443&secret=...{NC}")
         print(f"  {NC}{BOLD}  • 0, n или q — назад в меню{NC}")
         print("")
 
