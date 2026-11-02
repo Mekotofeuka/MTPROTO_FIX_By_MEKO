@@ -55,7 +55,7 @@ _MEKO currently uses the [more accurate V3 version](https://github.com/Mekotofeu
 - "Infinite update" on iOS,
 - Media not loading – videos/photos/GIFs/voice messages/stickers.
 
-**Tested on: Telemt 3.4.25, MTProto.zig 1.9.0, Mtg 2.2.8, Erlang mtproto proxy, MTProtoProxy, JSMTProxy**
+**Tested on: Telemt 3.5.16, MTProto.zig 1.13.0, MTG 2.2.8 and 1.0.12, Erlang mtproto proxy, MTProtoProxy, JSMTProxy**
 
 This script is for servers with MTProto proxies; it fixes slow initial TCP client connections or complete failure (cannot connect to proxy). **Advantages**:
 - Fast connection even with many clients and devices on one IP (Wi‑Fi)
@@ -84,7 +84,7 @@ This script is for servers with MTProto proxies; it fixes slow initial TCP clien
 2. **Install standard Telemt**, or "**MTPROTO.zig**" or **MTG**
    > (all proxies can be installed via our script menu; you don't need to install them beforehand on the server, and order doesn't matter – proxy first or fix first)
 4. Apply the fix to your proxy by pressing **[1] Install SYN FIX** in the main menu
-5. **Disable built‑in MSS and SYN** from Telemt config by pressing **[5]** (if it was previously added to the config)
+5. **Disable built‑in MSS and SYN** from Telemt config by pressing **[8]** (if it was previously added to the config)
 6. Check **SNI** via button **[7]** in menu, or via bot **@Sni_checker_bot** – you must select a domain that shows: 🟢 **Marker: NO**. Otherwise, iOS users will experience problems.
 7. If you use SelfSteal, ensure your server has **OpenSSL 3.5** or higher – otherwise, similar iOS issues will occur. If you can't install **OpenSSL 3.5+**, then use any popular domain that shows "🟢 **Marker: NO**" instead of SelfSteal. Alternative solutions are described in the [documentation](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md).
 8. Done.
@@ -94,6 +94,42 @@ Button **3** performs basic server optimisation for proxies – in tests it show
 
 **Open menu**:
 <pre><code>mekopr</code></pre>
+
+## Automatic installation
+
+`install.sh` supports fully automatic installation of an MTProto proxy, a WEB proxy and the fix — all parameters are passed straight from the command line.
+
+Install only the **v3** fix on port `443`:
+<pre><code>curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -fix -fix-port 443 -fix-type v3</code></pre>
+
+Install **Telemt** with the **v3 fix** on port `443`, domain `ozon.ru`, **ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95` and **user** `Vasya` with secret `68…dedb`:
+<pre><code>curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.5.16 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb</code></pre>
+
+### Automatic installation parameters
+| Flag | Default | Description |
+| --- | --- | --- |
+| `-telemt` | — | Install [Telemt](https://github.com/telemt/telemt) |
+| `-zig` | — | Install [MTProto.zig](https://github.com/sleep3r/mtproto.zig) |
+| `-mtg` | — | Install [MTG](https://github.com/9seconds/mtg) 2.x (1.0.x can be chosen in the proxy menu) |
+| `-fix` | — | Install [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO) |
+| `-no-fix` | — | Do not install the fix |
+| `-fix-type {v2\|v3\|v4\|nft}` | `v3` | Fix type: `v2`/`v3` — iptables, `nft` — v3 via nftables, `v4` — zapret2 (nfqws2) |
+| `-fix-port <port>` | `-port` or `443` | Port the fix is applied to |
+| `-port <port>` | `443` | Proxy port |
+| `-domain <domain>` | `ozon.ru` | Domain used for TLS masking |
+| `-version <version>` | latest | [Telemt](https://github.com/telemt/telemt) version |
+| `-ad_tag <tag>` | — | Add `ad_tag` to the `[general]` section of the Telemt config |
+| `-user <name> [secret]` | — | Add a user to `[access.users]`; if the secret is omitted it is asked for or generated |
+| `-public_host <domain>` | — | Add or update `public_host` in `[server.links]` |
+| `-web` | — | Install Telemt in **WEB mode** (requires `-web-host`) |
+| `-web-user <name>` | `webuser` | WEB profile user (`[web.vhosts.profiles]`) |
+| `-web-secret <secret>` | generated | WEB user secret (16 bytes hex) |
+| `-web-host <domain>` | — | **Required** WEB host domain (FQDN clients connect to) |
+| `-nginx` | — | Install and configure **Nginx + Certbot** for WEB mode |
+| `-h`, `--help` | — | Show available arguments |
+
+> If the Telemt version and fix type are not specified, they are requested during installation.
+> Without command-line parameters the installer opens the standard menu.
 
 # How the fix works:
 

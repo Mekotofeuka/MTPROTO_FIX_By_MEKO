@@ -54,7 +54,7 @@ _MEKO 目前使用 [更精确的 V3 版本](https://github.com/Mekotofeuka/MTPRO
 - iOS 上出现“无限更新”。
 - 媒体加载失败——视频/图片/GIF/语音/贴纸无法显示。
 
-**已在以下版本测试通过：Telemt 3.4.25, MTProto.zig 1.9.0, Mtg 2.2.8, Erlang mtproto proxy, MTProtoProxy, JSMTProxy**
+**已在以下版本测试通过：Telemt 3.5.16, MTProto.zig 1.13.0, MTG 2.2.8 和 1.0.12, Erlang mtproto proxy, MTProtoProxy, JSMTProxy**
 
 本脚本用于 MTProto 代理服务器，修复客户端 TCP 初始连接缓慢或完全无法连接的问题。**优势**：
 - 即便同一 IP（Wi-Fi）下设备众多，也能快速连接。
@@ -83,7 +83,7 @@ _MEKO 目前使用 [更精确的 V3 版本](https://github.com/Mekotofeuka/MTPRO
 2. **安装标准 Telemt**，或 "**MTPROTO.zig**" 或 **MTG**
    > （所有代理均可通过脚本菜单安装，无需提前在服务器上安装，且安装顺序无关紧要——先代理后修复或先修复后代理均可）
 4. 在主菜单中按 **[1] 安装 SYN FIX** 应用修复
-5. 按 **[5]** 禁用 Telemt 配置中的内置 MSS 和 SYN（如果之前已添加到配置中）
+5. 按 **[8]** 禁用 Telemt 配置中的内置 MSS 和 SYN（如果之前已添加到配置中）
 6. 通过菜单中的 **[7]** 按钮或机器人 **@Sni_checker_bot** 检查 **SNI**——必须选择显示 🟢 **标记：无** 的域名，否则 iOS 用户会遇到问题。
 7. 如果使用 SelfSteal，请确保服务器安装 **OpenSSL 3.5** 或更高版本——否则同样会出现 iOS 问题。如果无法安装 **OpenSSL 3.5+**，则改用任何显示“🟢 **标记：无**”的流行域名替代 SelfSteal。替代方案详见[文档](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/blob/main/data/dictionary.md)。
 8. 完成。
@@ -93,6 +93,42 @@ _MEKO 目前使用 [更精确的 V3 版本](https://github.com/Mekotofeuka/MTPRO
 
 **打开菜单**：
 <pre><code>mekopr</code></pre>
+
+## 自动安装
+
+`install.sh` 支持完全自动安装 MTProto 代理、WEB 代理和修复，所有参数可直接从命令行传入。
+
+仅在 `443` 端口安装 **v3** 修复：
+<pre><code>curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -fix -fix-port 443 -fix-type v3</code></pre>
+
+安装 **Telemt** 和 **v3 修复** 到 `443` 端口，域名 `ozon.ru`，**ad_tag** `4c4140a4c40c5e2b080578a7e4e38c95`，用户 `Vasya`，密钥 `68…dedb`：
+<pre><code>curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash -s -- -telemt -domain ozon.ru -port 443 -fix -fix-type v3 -version 3.5.16 -ad_tag 4c4140a4c40c5e2b080578a7e4e38c95 -user Vasya 68ae8284982465dfcb198342d01cdedb</code></pre>
+
+### 自动安装参数
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `-telemt` | — | 安装 [Telemt](https://github.com/telemt/telemt) |
+| `-zig` | — | 安装 [MTProto.zig](https://github.com/sleep3r/mtproto.zig) |
+| `-mtg` | — | 安装 [MTG](https://github.com/9seconds/mtg) 2.x（1.0.x 可在代理菜单中选择） |
+| `-fix` | — | 安装 [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO) |
+| `-no-fix` | — | 不安装修复 |
+| `-fix-type {v2\|v3\|v4\|nft}` | `v3` | 修复类型：`v2`/`v3` — iptables，`nft` — 通过 nftables 的 v3，`v4` — zapret2 (nfqws2) |
+| `-fix-port <端口>` | `-port` 或 `443` | 应用修复的端口 |
+| `-port <端口>` | `443` | 代理端口 |
+| `-domain <域名>` | `ozon.ru` | 用于 TLS 伪装的域名 |
+| `-version <版本>` | 最新版 | [Telemt](https://github.com/telemt/telemt) 版本 |
+| `-ad_tag <标签>` | — | 在 Telemt 配置的 `[general]` 段添加 `ad_tag` |
+| `-user <名称> [密钥]` | — | 在 `[access.users]` 中添加用户；未提供密钥时会询问或自动生成 |
+| `-public_host <域名>` | — | 在 `[server.links]` 中添加或更新 `public_host` |
+| `-web` | — | 以 **WEB 模式** 安装 Telemt（需要 `-web-host`） |
+| `-web-user <名称>` | `webuser` | WEB 配置文件名（`[web.vhosts.profiles]`） |
+| `-web-secret <密钥>` | 自动生成 | WEB 用户密钥（16 字节 hex） |
+| `-web-host <域名>` | — | **必填**，客户端连接的 WEB 主机域名（FQDN） |
+| `-nginx` | — | 为 WEB 模式安装并配置 **Nginx + Certbot** |
+| `-h`, `--help` | — | 显示可用参数 |
+
+> 如果未指定 Telemt 版本和修复类型，安装过程中会询问。
+> 若未使用命令行参数，安装程序将打开标准菜单。
 
 # 修复原理：
 
