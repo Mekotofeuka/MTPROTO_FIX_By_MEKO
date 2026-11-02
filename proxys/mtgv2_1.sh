@@ -940,8 +940,13 @@ while true; do
     echo ""
 
     if is_mtg_installed; then
-        current_path=$(get_config_path)
-        echo -e "  ${DIM}Текущий путь к конфигу: ${current_path}${NC}"
+        if [ "$(get_mtg_gen)" = "v1" ]; then
+            # У 1.0.x нет файла конфига: параметры передаются флагами в службе.
+            echo -e "  ${DIM}Конфиг: нет (MTG 1.0.x работает без файла)${NC}"
+        else
+            current_path=$(get_config_path)
+            echo -e "  ${DIM}Текущий путь к конфигу: ${current_path}${NC}"
+        fi
         echo ""
     fi
 
