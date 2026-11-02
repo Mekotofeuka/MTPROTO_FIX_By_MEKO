@@ -11,7 +11,6 @@ REMOTE_IP="$1"
 REMOTE_USER="$2"
 REMOTE_PORT="$3"
 
-# ── Функция выполнения команд через SSH ─────────────────────
 ssh_exec() {
     ssh -p "$REMOTE_PORT" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_IP" "$1" 2>/dev/null
 }
@@ -30,6 +29,12 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Логирование ─────────────────────────────────────────────
 log_info() { echo -e "  ${BLUE}[i]${NC} $1"; }
 log_success() { echo -e "  ${GREEN}[✓]${NC} $1"; }
@@ -45,10 +50,6 @@ SYNFIX_CHAIN="MTPR_SYNFIX"
 # ── u32-фильтр для v3 (используется для явной проверки применения) ──
 U32_FILTER="32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000"
 
-# ── Список стран, для которых GEOIP-обход SYN-лимита НЕ применяется ──
-GEOIP_CC_LIST="RU,CN,IR,VN,CU,SO,NP,TM,OM,UA"
-
-# ── Функция определения порта SSH на удалённом сервере ──────
 get_ssh_port() {
     local port
     port=$(ssh_exec "if command -v sshd >/dev/null 2>&1; then timeout 3 sshd -T 2>/dev/null | grep '^port ' | awk '{print \$2}' | head -1; fi")
@@ -70,14 +71,13 @@ get_ssh_port() {
     fi
 
     echo "22"
-    return 0
 }
 
 save_port() {
     ssh_exec "echo \"$1\" > \"$PORT_FILE\""
 }
 
-# ── ПРОВЕРКА НАЛИЧИЯ ЦЕПОЧКИ IPTABLES SYN FIX ────────────────
+# ── Цепочка MTPR_SYNFIX в iptables ───────────────────────────
 is_syn_fix_chain_installed() {
     ssh_exec "iptables -L \"$SYNFIX_CHAIN\" -n >/dev/null 2>&1" && return 0 || return 1
 }
@@ -98,7 +98,7 @@ get_synfix_status() {
     fi
 }
 
-# ── ПРОВЕРКА НАЛИЧИЯ NFTABLES SYN FIX ────────────────────────
+# ── Таблица mtpr_synfix в nftables ───────────────────────────
 is_nft_fix_installed() {
     ssh_exec "nft list table inet mtpr_synfix &>/dev/null 2>&1" && return 0 || return 1
 }
@@ -122,7 +122,8 @@ get_nft_fix_status() {
 # ── Получение статуса Zapret2 с удалённого сервера ───────────
 get_zapret2_status_remote() {
     # Проверяем наличие zapret2_fix.sh и загружаем его, если нужно
-    local has_zapret2=$(ssh_exec "[ -f /opt/mtpr-simple/data/zapret2_fix.sh ] && echo 'yes'")
+    local has_zapret2
+    has_zapret2=$(ssh_exec "[ -f /opt/mtpr-simple/data/zapret2_fix.sh ] && echo 'yes'")
     if [ "$has_zapret2" != "yes" ]; then
         echo -e "${DIM}не установлен${NC}"
         return
@@ -142,7 +143,6 @@ get_zapret2_status_remote() {
 generate_apply_script() {
     local fix_type="${1:-new}"
     shift
-    local ports=("$@")
     local script_content
 
     if [ "$fix_type" = "old" ]; then
@@ -267,7 +267,8 @@ chmod +x /opt/mtpr-simple/apply-mtpr-synfix.sh"
 
 # ── Генерация systemd юнита (удалённо) ──────────────────────
 generate_service_unit() {
-    local service_content=$(cat <<'SERVICE_UNIT_EOF'
+    local service_content
+    service_content=$(cat <<'SERVICE_UNIT_EOF'
 [Unit]
 Description=MTProto SYN FIX rules for Telemt
 After=network-online.target netfilter-persistent.service docker.service ufw.service
@@ -345,7 +346,7 @@ install_u32_module_remote() {
 }
 
 
-# ── УСТАНОВКА SYN FIX ──────────────────────────────────────
+# ── Установка SYN FIX ────────────────────────────────────────
 install_syn_fix() {
     local ports_input
     local fix_choice
@@ -353,13 +354,12 @@ install_syn_fix() {
     local forced_ports=""
     local FIX_TYPE="new"
 
-    if [[ "$1" == "-auto_install" ]]; then
+    if [[ "${1:-}" == "-auto_install" ]]; then
         auto_install=true
-        forced_ports="$2"
+        forced_ports="${2:-}"
         FIX_TYPE="new"
     fi
 
-    ssh_port=$(get_ssh_port)
 
     if [ "$auto_install" = true ]; then
         if [[ -n "$forced_ports" ]]; then
@@ -464,11 +464,12 @@ install_syn_fix() {
     if [ ${#valid_ports[@]} -eq 0 ]; then
         log_error "Нет корректных портов для установки"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу..."
         return 1
     fi
 
-    local ports_str=$(IFS=,; echo "${valid_ports[*]}")
+    local ports_str
+    ports_str=$(IFS=,; echo "${valid_ports[*]}")
     log_info "Установка SYN FIX на порты: $ports_str"
     save_port "$ports_str"
 
@@ -478,10 +479,9 @@ install_syn_fix() {
         # Проверяем nftables на удалённом сервере
         if ! ssh_exec "command -v nft >/dev/null 2>&1"; then
             log_warning "nftables не установлен на удалённом сервере, устанавливаю..."
-            ssh_exec "if command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y -qq nftables; elif command -v yum >/dev/null 2>&1; then yum install -y -q nftables; elif command -v dnf >/dev/null 2>&1; then dnf install -y -q nftables; else echo 'Не удалось установить nftables'; exit 1; fi"
-            if [ $? -ne 0 ]; then
+            if ! ssh_exec "if command -v apt-get >/dev/null 2>&1; then apt-get update -qq && apt-get install -y -qq nftables; elif command -v yum >/dev/null 2>&1; then yum install -y -q nftables; elif command -v dnf >/dev/null 2>&1; then dnf install -y -q nftables; else echo 'Не удалось установить nftables'; exit 1; fi"; then
                 log_error "Не удалось установить nftables на удалённом сервере"
-                echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу..."
                 return 1
             fi
         fi
@@ -545,19 +545,19 @@ EOF
 chmod +x $NFT_SCRIPT"
 
         # Применяем скрипт
-        ssh_interactive "bash $NFT_SCRIPT"
-        if [ $? -eq 0 ]; then
+        if ssh_interactive "bash $NFT_SCRIPT"; then
             echo ""
             log_success "NFT правила применены успешно"
         else
             echo ""
             log_error "Ошибка применения NFT правил"
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу..."
             return 1
         fi
 
         # Создаём systemd сервис
-        local service_nft_content=$(cat <<'SERVICE_NFT_EOF'
+        local service_nft_content
+        service_nft_content=$(cat <<'SERVICE_NFT_EOF'
 [Unit]
 Description=MTProto SYN FIX (nftables) for Telemt/Docker
 After=network-online.target netfilter-persistent.service docker.service
@@ -583,7 +583,7 @@ systemctl restart mtpr-nft-synfix.service 2>/dev/null || true"
         echo ""
         log_info "Автозапуск mtpr-nft-synfix.service: $(ssh_exec "systemctl is-enabled mtpr-nft-synfix.service 2>/dev/null || echo неизвестно")"
         log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str"
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу..."
         return 0
     fi
 
@@ -629,12 +629,12 @@ systemctl restart mtpr-nft-synfix.service 2>/dev/null || true"
             { read -r install_u32 </dev/tty; } 2>/dev/null || install_u32=""
             if [[ -z "$install_u32" || "$install_u32" =~ ^[yY]$ ]]; then
                 if ! install_u32_module_remote; then
-                    echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+                    pause_key "Нажмите любую клавишу..."
                     return 1
                 fi
             else
                 log_info "Установка отменена"
-                echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу..."
                 return 0
             fi
         fi
@@ -656,31 +656,31 @@ systemctl restart mtpr-nft-synfix.service 2>/dev/null || true"
         if ! ssh_exec "iptables -t mangle -C PREROUTING -m u32 --u32 '$U32_FILTER' -j MARK --set-mark 0x400"; then
             log_error "SYN FIX (v3/u32) НЕ применён: правило u32 в mangle отсутствует"
             echo -e "  ${DIM}apply_output:${NC} ${apply_output:-<пусто>}"
-            echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+            pause_key "Нажмите любую клавишу..."
             return 1
         fi
     fi
 
-    if [ $apply_exit_code -ne 0 ]; then
+    if [ "$apply_exit_code" -ne 0 ]; then
         echo ""
         log_error "Ошибка применения правил iptables:"
         echo "$apply_output"
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу..."
         return 1
     fi
 
     if ! ssh_exec "systemctl enable mtpr-synfix.service && systemctl restart mtpr-synfix.service"; then
         log_error "Не удалось включить/перезапустить mtpr-synfix.service"
-        echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу..."
         return 1
     fi
     echo ""
     log_info "Автозапуск mtpr-synfix.service: $(ssh_exec "systemctl is-enabled mtpr-synfix.service 2>/dev/null || echo неизвестно")"
     log_success "SYN FIX успешно установлен на порты: $ports_str"
-    echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу..."
 }
 
-# ── УДАЛЕНИЕ SYN FIX ─────────────────────────────────────────
+# ── Удаление SYN FIX ─────────────────────────────────────────
 remove_syn_fix() {
     log_info "Удаление SYN FIX..."
 
@@ -772,14 +772,14 @@ main_menu() {
             2)
                 echo ""
                 remove_syn_fix
-                echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу..."
                 ;;
             3)
                 echo ""
                 echo -e "  Статус iptables: $(get_synfix_status)"
                 echo -e "  Статус nftables: $(get_nft_fix_status)"
                 echo -e "  Zapret2 fix: $(get_zapret2_status_remote)"
-                echo -e "  ${GRAY}Нажмите любую клавишу...${NC}"; { read -rsn1 </dev/tty; } 2>/dev/null || true
+                pause_key "Нажмите любую клавишу..."
                 ;;
             4)
                 echo ""

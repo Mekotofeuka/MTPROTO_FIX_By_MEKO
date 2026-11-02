@@ -12,6 +12,12 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
+    read -rsn1 </dev/tty || true
+}
+
 # ── Файл для сохранения пути к конфигу (как в telemt1.sh) ──
 CONFIG_PATH_FILE="/opt/mtpr-simple/mtg_config_path"
 
@@ -33,7 +39,6 @@ get_config_path() {
         fi
     fi
     echo "/etc/mtg.toml"
-    return 0
 }
 
 # ── Функции для работы с TOML ──────────────────────────────
@@ -78,7 +83,6 @@ get_mtg_port() {
     else
         echo ""
     fi
-    return 0
 }
 
 # ── Получение секрета из конфига ────────────────────────────
@@ -209,8 +213,7 @@ mtg_doctor() {
     if [ ! -f "$config_path" ]; then
         echo -e "  ${RED}[✗] Конфиг не найден: $config_path${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     
@@ -222,8 +225,7 @@ mtg_doctor() {
     if [ -z "$output" ]; then
         echo -e "  ${RED}[✗] Не удалось выполнить проверку. Убедитесь, что MTG запущен.${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     
@@ -236,7 +238,7 @@ mtg_doctor() {
         secret_hex=$(echo "$secret_line" | sed -E 's/^secret[[:space:]]*=[[:space:]]*"//; s/".*$//')
         # Удаляем префикс ee (2 символа) и 32 символа секрета
         local domain_hex
-        domain_hex=$(echo "$secret_hex" | sed -E 's/^ee[0-9a-f]{32}//')
+        domain_hex="${secret_hex:34}"
         if [ -n "$domain_hex" ]; then
             # Конвертируем hex в текст через printf (без od)
             domain=$(printf '%b' "$(echo "$domain_hex" | sed 's/../\\x&/g')" 2>/dev/null)
@@ -270,15 +272,15 @@ mtg_doctor() {
             dc_count=$((dc_count + 1))
             if echo "$line" | grep -q "✅"; then
                 dc_ok=$((dc_ok + 1))
-                echo -e "    ${GREEN}✓${NC} $(echo "$line" | sed 's/^[[:space:]]*//')"
+                echo -e "    ${GREEN}✓${NC} $(trim "$line")"
             else
-                echo -e "    ${RED}✗${NC} $(echo "$line" | sed 's/^[[:space:]]*//')"
+                echo -e "    ${RED}✗${NC} $(trim "$line")"
             fi
         fi
     done <<< "$output"
-    if [ $dc_count -gt 0 ] && [ $dc_count -eq $dc_ok ]; then
+    if [ "$dc_count" -gt 0 ] && [ "$dc_count" -eq "$dc_ok" ]; then
         echo -e "    ${GREEN}Все DC доступны${NC}"
-    elif [ $dc_count -gt 0 ]; then
+    elif [ "$dc_count" -gt 0 ]; then
         echo -e "    ${YELLOW}Некоторые DC недоступны${NC}"
     else
         echo -e "    ${YELLOW}⚠ Не удалось проверить DC${NC}"
@@ -303,8 +305,10 @@ mtg_doctor() {
     
     if echo "$sni_line" | grep -q "Hostname"; then
         # Парсим строку
-        local domain_name=$(echo "$sni_line" | sed -E 's/.*Hostname ([^ ]*) .*/\1/')
-        local resolved_ips=$(echo "$sni_line" | grep -o '"\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
+        local domain_name
+        domain_name=$(echo "$sni_line" | sed -E 's/.*Hostname ([^ ]*) .*/\1/')
+        local resolved_ips
+        resolved_ips=$(echo "$sni_line" | grep -o '"\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
         
         echo -e "  ${CYAN}ℹ${NC} SNI-информация:"
         echo -e "     ${CYAN}Домен:${NC} ${domain_name}"
@@ -327,8 +331,7 @@ mtg_doctor() {
     fi
     
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция установки MTG ────────────────────────────────────
@@ -351,8 +354,7 @@ install_mtg() {
         echo ""
         echo -e "  ${RED}[✗] Не удалось установить MTG${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 
@@ -513,8 +515,7 @@ EOF
     echo ""
     echo -e "  ${GREEN}✓${NC} Установка MTG завершена!"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция открытия конфига ─────────────────────────────────
@@ -525,8 +526,7 @@ edit_config() {
         echo -e "  ${YELLOW}[!] Файл конфига не найден по пути: $config_path"
         echo -e "  ${GRAY}Используйте пункт 4 для обновления пути к конфигу${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     echo ""
@@ -534,33 +534,28 @@ edit_config() {
     if command -v nano >/dev/null 2>&1; then
         echo -e "  ${GRAY}После редактирования сохраните файл (Ctrl+O) и закройте (Ctrl+X)${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         nano "$config_path"
     elif command -v vim >/dev/null 2>&1; then
         echo -e "  ${YELLOW}[!] nano не установлен. Использую vim.${NC}"
         echo -e "  ${GRAY}Для сохранения: ESC → :wq, для выхода без сохранения: ESC → :q!${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         vim "$config_path"
     elif command -v vi >/dev/null 2>&1; then
         echo -e "  ${YELLOW}[!] Использую vi.${NC}"
         echo -e "  ${GRAY}Для сохранения: ESC → :wq, для выхода без сохранения: ESC → :q!${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         vi "$config_path"
     else
         echo -e "  ${RED}[✗] Ни один редактор не найден (nano, vim, vi)${NC}"
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     echo ""
     echo -e "  ${GREEN}[✓] Редактирование завершено"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
 }
 
 # ── Функция перезапуска MTG ──────────────────────────────────
@@ -574,8 +569,7 @@ restart_mtg() {
         echo -e "  ${CYAN}mtg run /etc/mtg.toml${NC}"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
 }
 
 # ── Функция просмотра логов ──────────────────────────────────
@@ -583,12 +577,10 @@ view_logs() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Просмотр логов MTG (Ctrl+C для выхода)..."
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для продолжения..."
     journalctl -u mtg.service -f
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
 }
 
 # ── Функция удаления MTG ─────────────────────────────────────
@@ -609,8 +601,7 @@ purge_mtg() {
     if [[ ! "$confirm" =~ ^[yY]$ ]]; then
         echo -e "  ${GRAY}Удаление отменено${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
 
@@ -620,8 +611,7 @@ purge_mtg() {
 
     echo -e "  ${GREEN}[✓] MTG успешно удалён"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
 }
 
 # ── Функция обновления пути к конфигу ──────────────────────
@@ -652,8 +642,7 @@ update_config_path() {
     echo "$input" > "$CONFIG_PATH_FILE"
     echo -e "  ${GREEN}[✓] Путь сохранён: $input"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
 }
 
 # ── Функция показа ссылки ────────────────────────────────────
@@ -668,8 +657,7 @@ show_link() {
     
     if [ -z "$secret" ]; then
         echo -e "  ${RED}[✗] Не удалось получить секрет из конфига.${NC}"
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата..."
         return 1
     fi
     
@@ -694,8 +682,7 @@ show_link() {
     echo -e "  ${BOLD}Порт:${NC} ${port}"
     echo -e "  ${BOLD}Секрет:${NC} ${secret}"
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата..."
 }
 
 # ── Главное меню ─────────────────────────────────────────────

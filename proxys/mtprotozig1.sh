@@ -27,7 +27,7 @@ fetch_and_run() {
         *)         rc=1 ;;
     esac
     rm -f "$tmp"
-    return $rc
+    return "$rc"
 }
 
 # ── Цвета ─────────────────────────────────────────────────────
@@ -40,6 +40,12 @@ GRAY='\033[0;90m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
+
+pause_key() {
+    { : </dev/tty; } 2>/dev/null || return 0
+    echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
+    read -rsn1 </dev/tty || true
+}
 
 # ── Функция проверки, установлен ли MTProtoZig ──────────────
 is_mtprotozig_installed() {
@@ -108,8 +114,7 @@ install_zig_cli() {
         echo -e "  ${RED}[✗]${NC} Ошибка установки Zig CLI"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция установки прокси ────────────────────────────────
@@ -177,8 +182,7 @@ install_proxy() {
             ;;
     esac
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция открытия конфига ────────────────────────────────
@@ -190,8 +194,7 @@ edit_config() {
         echo -e "  ${YELLOW}[!]${NC} Файл конфига не найден по пути: $config_path"
         echo -e "  ${GRAY}Возможно, прокси ещё не установлен${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
     
@@ -202,37 +205,32 @@ edit_config() {
     if command -v nano >/dev/null 2>&1; then
         echo -e "  ${GRAY}После редактирования сохраните файл (Ctrl+O) и закройте (Ctrl+X)${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         sudo nano "$config_path"
     elif command -v vim >/dev/null 2>&1; then
         echo -e "  ${YELLOW}[!]${NC} nano не установлен. Используем vim для открытия файла."
         echo -e "  ${GRAY}Для сохранения: нажмите ESC, затем введите :wq и Enter${NC}"
         echo -e "  ${GRAY}Для выхода без сохранения: ESC, затем :q! и Enter${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         sudo vim "$config_path"
     elif command -v vi >/dev/null 2>&1; then
         echo -e "  ${YELLOW}[!]${NC} Использую vi."
         echo -e "  ${GRAY}Для сохранения: нажмите ESC, затем введите :wq и Enter${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для продолжения..."
         sudo vi "$config_path"
     else
         echo -e "  ${RED}[✗]${NC} Ни один редактор не найден (nano, vim, vi)"
         echo -e "  ${GRAY}Установите один из редакторов: apt install nano или vim${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
     
     echo ""
     echo -e "  ${GREEN}[✓]${NC} Редактирование завершено"
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция перезапуска прокси ──────────────────────────────
@@ -247,8 +245,7 @@ restart_proxy() {
         echo -e "  ${GRAY}Попробуйте сначала установить прокси (пункт 2)${NC}"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция просмотра логов ──────────────────────────────────
@@ -256,12 +253,10 @@ view_logs() {
     echo ""
     echo -e "  ${BLUE}[i]${NC} Просмотр логов MTProtoZig (Ctrl+C для выхода)..."
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для продолжения..."
     sudo journalctl -u mtproto-proxy -f
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Функция удаления прокси ──────────────────────────────────
@@ -282,8 +277,7 @@ purge_proxy() {
     if [[ ! "$confirm" =~ ^[yY]$ ]]; then
         echo -e "  ${GRAY}Удаление отменено${NC}"
         echo ""
-        echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-        { read -rsn1 </dev/tty; } 2>/dev/null || true
+        pause_key "Нажмите любую клавишу для возврата в меню..."
         return 1
     fi
 
@@ -298,8 +292,7 @@ purge_proxy() {
         echo -e "  ${RED}[✗]${NC} Ошибка удаления MTProtoZig"
     fi
     echo ""
-    echo -e "  ${GRAY}Нажмите любую клавишу для возврата в меню...${NC}"
-    { read -rsn1 </dev/tty; } 2>/dev/null || true
+    pause_key "Нажмите любую клавишу для возврата в меню..."
 }
 
 # ── Главное меню ─────────────────────────────────────────────

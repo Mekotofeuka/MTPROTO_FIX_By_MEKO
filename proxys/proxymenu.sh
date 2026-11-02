@@ -3,14 +3,17 @@
 
 # ── Цвета ─────────────────────────────────────────────────────
 RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 GRAY='\033[0;90m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
+
+pause_or_break() {
+    echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
+    { read -rsn1 </dev/tty; } 2>/dev/null || { echo; return 1; }
+}
+
 
 while true; do
     clear 2>/dev/null || true
@@ -35,8 +38,7 @@ while true; do
             else
                 echo ""
                 echo "  [✗] Файл /opt/mtpr-simple/proxys/telemt1.sh не найден или не исполняем"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; break; }
+                pause_or_break || break
             fi
             ;;
         2)
@@ -61,8 +63,7 @@ while true; do
                         else
                             echo ""
                             echo "  [✗] Файл /opt/mtpr-simple/proxys/telemt_panel_amirotin.sh не найден или не исполняем"
-                            echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-                            { read -rsn1 </dev/tty; } 2>/dev/null || { echo; break; }
+                            pause_or_break || break
                         fi
                         ;;
                     0)
@@ -81,8 +82,7 @@ while true; do
             else
                 echo ""
                 echo "  [✗] Файл /opt/mtpr-simple/proxys/mtprotozig1.sh не найден или не исполняем"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; break; }
+                pause_or_break || break
             fi
             ;;
         4)
@@ -91,8 +91,7 @@ while true; do
             else
                 echo ""
                 echo "  [✗] Файл /opt/mtpr-simple/proxys/mtgv2_1.sh не найден или не исполняем"
-                echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
-                { read -rsn1 </dev/tty; } 2>/dev/null || { echo; break; }
+                pause_or_break || break
             fi
             ;;
         0)
