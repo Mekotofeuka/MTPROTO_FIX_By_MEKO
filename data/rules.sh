@@ -100,6 +100,8 @@ get_ssh_port() {
 }
 
 save_port() {
+    # Пишем порт только после успешной установки: иначе отменённая установка
+    # оставляет в файле порт, который реально нигде не открыт.
     mkdir -p "$(dirname "$PORT_FILE")"
     echo "$1" >"$PORT_FILE"
 }
@@ -896,7 +898,6 @@ install_syn_fix() {
     local ports_str
     ports_str=$(IFS=,; echo "${valid_ports[*]}")
     log_info "Установка SYN FIX на порты: $ports_str"
-    save_port "$ports_str"
 
     # ── nftables режимы ──────────────────────────────────────
     if [ "$FIX_TYPE" = "docker_smart" ] || [ "$FIX_TYPE" = "docker_classic" ]; then
@@ -1019,6 +1020,7 @@ SERVICE_NFT_EOF
             || log_error "Не удалось выполнить systemctl restart mtpr-nft-synfix.service (правила в ядре применены, но автозапуск не активен)"
         log_info "Автозапуск mtpr-nft-synfix.service: $(systemctl is-enabled mtpr-nft-synfix.service 2>/dev/null || echo неизвестно)"
 
+        save_port "$ports_str"
         log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str"
         if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
             pause_key "Нажмите любую клавишу"
@@ -1095,6 +1097,9 @@ SERVICE_NFT_EOF
         fi
     fi
 
+    # Скрипт применения читает порты из файла, поэтому пишем его здесь —
+    # после всех подтверждений, но до применения правил.
+    save_port "$ports_str"
     generate_apply_script "$FIX_TYPE" "${valid_ports[@]}"
     generate_service_unit
     systemctl daemon-reload || log_warning "systemctl daemon-reload завершился с ошибкой"
@@ -1168,7 +1173,7 @@ install_nft_auto() {
 
     local ports_str_clean
     ports_str_clean=$(IFS=,; echo "${valid_ports[*]}")
-    save_port "$ports_str_clean"
+
 
     # Проверяем nftables
     if ! command -v nft &>/dev/null; then
@@ -1246,6 +1251,7 @@ SERVICE_NFT_EOF
         || log_error "Не удалось выполнить systemctl restart mtpr-nft-synfix.service (правила в ядре применены, но автозапуск не активен)"
     log_info "Автозапуск mtpr-nft-synfix.service: $(systemctl is-enabled mtpr-nft-synfix.service 2>/dev/null || echo неизвестно)"
 
+    save_port "$ports_str_clean"
     log_success "SYN FIX (nftables) успешно установлен на порты: $ports_str_clean"
     # Разрешаем порты и в активном файрволе (ufw/firewalld) — issue #34.
     for _fw_port in "${valid_ports[@]}"; do

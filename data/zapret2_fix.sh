@@ -1148,6 +1148,11 @@ zapret2_install() {
     ZAPRET2_SERVICE_ENABLED="true"
     save_settings
 
+    # Менеджер показывает порт из этого файла; пишем после успешного запуска,
+    # чтобы отменённая или упавшая установка его не оставляла.
+    mkdir -p "$(dirname "$PORT_FILE")"
+    echo "${_user_port:-${SERVER_PORT:-443}}" >"$PORT_FILE"
+
     # контрольная проверка
     if systemctl is-enabled "$ZAPRET2_SERVICE" >/dev/null 2>&1; then
         log_success "Автозапуск ${ZAPRET2_SERVICE} включён"
@@ -1203,6 +1208,9 @@ zapret2_remove() {
     ZAPRET2_APPLIED="false"
     ZAPRET2_SERVICE_ENABLED="false"
     save_settings
+    # Файл порта ведёт менеджер: после снятия фикса он не должен показывать
+    # порт, на котором больше ничего не открыто.
+    rm -f "$PORT_FILE"
 
     log_success "Zapret2 MTProto fix полностью удалён"
 }
@@ -1603,6 +1611,11 @@ zapret2_install_auto() {
     ZAPRET2_APPLIED="true"
     ZAPRET2_SERVICE_ENABLED="true"
     save_settings
+
+    # Менеджер показывает порт из этого файла; пишем его здесь, чтобы путь
+    # через меню и через CLI вели себя одинаково.
+    mkdir -p "$(dirname "$PORT_FILE")"
+    echo "$port" >"$PORT_FILE"
 
     # Проверка и автоматическая корректировка wscale
     zapret2_check_wscale "auto"
