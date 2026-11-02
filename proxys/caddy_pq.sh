@@ -46,6 +46,7 @@ pause() {
     echo ""
     echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
     { read -rsn1 </dev/tty; } 2>/dev/null || { echo; return 1; }
+    IFS= read -r -t 0.05 _ </dev/tty 2>/dev/null || true
 }
 
 # ── Проверка root ─────────────────────────────────────────────

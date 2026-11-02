@@ -19,6 +19,7 @@ pause_key() {
     echo ""
     echo -en "  Нажмите любую клавишу для возврата в меню"
     read -rsn1 </dev/tty 2>/dev/null || true
+    IFS= read -r -t 0.05 _ </dev/tty 2>/dev/null || true
 }
 
 # ── Путь к файлу настроек  ─────────────

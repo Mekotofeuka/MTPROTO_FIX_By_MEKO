@@ -22,6 +22,7 @@ log_warning() { echo -e "  ${YELLOW}[!]${NC} $1"; }
 wait_key() {
     echo -e "  ${GRAY}$1${NC}"
     { read -rsn1 </dev/tty; } 2>/dev/null || { echo; log_error "Нет доступа к терминалу для ввода. Выход."; exit 1; }
+    IFS= read -r -t 0.05 _ </dev/tty 2>/dev/null || true
 }
 
 # ── Режим CLI ────────────────────────────────────────────────
@@ -513,6 +514,7 @@ _opt_pause() {
     echo ""
     echo -e "  ${GRAY}Нажмите любую клавишу для продолжения...${NC}"
     { read -rsn1 </dev/tty; } 2>/dev/null || true
+    IFS= read -r -t 0.05 _ </dev/tty 2>/dev/null || true
 }
 
 # optimization_status — подробный статус: применена ли и что именно задано

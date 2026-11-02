@@ -46,6 +46,7 @@ pause_key() {
     { : </dev/tty; } 2>/dev/null || return 0
     echo -e "  ${GRAY}${1:-Нажмите любую клавишу}${NC}"
     read -rsn1 </dev/tty || true
+    IFS= read -r -t 0.05 _ </dev/tty 2>/dev/null || true
 }
 
 # _compose <аргументы> — docker compose в двух вариантах записи: плагин (v2)

@@ -12,6 +12,7 @@ NC='\033[0m'
 pause_or_break() {
     echo -e "  ${GRAY}Нажмите любую клавишу для возврата...${NC}"
     { read -rsn1 </dev/tty; } 2>/dev/null || { echo; return 1; }
+    IFS= read -r -t 0.05 _ </dev/tty 2>/dev/null || true
 }
 
 
