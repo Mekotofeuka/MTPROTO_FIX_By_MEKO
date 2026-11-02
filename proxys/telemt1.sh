@@ -570,7 +570,9 @@ view_logs() {
 _telemt_port_busy_by_other() {
     local p="$1" line
     [ -z "$p" ] && return 1
-    line=$(ss -ltnp 2>/dev/null | awk -v p=":$p" 'index($4, p) == length($4) - length(p) + 1 { print }')
+    # Сравниваем порт целиком (с двоеточием): index() без проверки "найден ли"
+    # давал ложное совпадение, когда length($4) - length(p) + 1 == 0.
+    line=$(ss -ltnp 2>/dev/null | awk -v p=":$p" '$4 ~ p"$" { print }')
     [ -z "$line" ] && return 1
     case "$line" in *telemt*) return 1 ;; esac
     return 0
