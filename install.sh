@@ -1097,7 +1097,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "  ${BOLD}Опции:${NC}"
             echo -e "    -telemt                установить Telemt"
             echo -e "    -zig                   установить Mtproto.zig"
-            echo -e "    -mtg                   установить MTG (пока не реализовано)"
+            echo -e "    -mtg                   установить MTG 2.x (последняя ветка)"
             echo -e "    -fix                   установить фикс"
             echo -e "    -fix-type {v2|v3|v4|nft}   тип фикса (по умолчанию v3)"
             echo -e "    -fix-port <порт>       порт для фикса (если не указан, берётся из -port или спросится)"
@@ -1154,7 +1154,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
     # ── 1. Запрос недостающих параметров ──────────────────────
 
     # Домен (если ставится прокси)
-    if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" ]]; then
+    if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" ]]; then
         if [ -z "$DOMAIN" ]; then
             while true; do
                 echo -en "  ${BOLD}Введите SNI домен${NC} ${DIM}(по умолчанию: ozon.ru)${NC}: " >&2
@@ -1490,9 +1490,17 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
         log_success "Mtproto.zig установлен"
     fi
 
-    # MTG (пока заглушка)
+    # MTG ставим 2.x: ветку 1.0.x выбирают в интерактивном меню прокси
     if [[ -n "$FLAG_MTG" ]]; then
-        log_warning "Установка MTG пока не реализована в автоматическом режиме."
+        log_info "Установка MTG (2.x) на порт $PROXY_PORT..."
+        if ensure_file "proxys/mtgv2_1.sh" &&
+           bash "$INSTALL_DIR/proxys/mtgv2_1.sh" --install-silent v2 "$PROXY_PORT" "$DOMAIN" >&2 &&
+           systemctl is-active --quiet mtg.service; then
+            log_success "MTG установлен"
+        else
+            log_error "Не удалось установить MTG"
+            exit 1
+        fi
     fi
 
     # ── 4. Установка фикса ──────────────────────────────────

@@ -22,6 +22,12 @@ pause_key() {
 # ── Файл для сохранения пути к конфигу (как в telemt1.sh) ──
 CONFIG_PATH_FILE="/opt/mtpr-simple/mtg_config_path"
 
+# 2.x живёт с конфигом /etc/mtg.toml, 1.0.x — только флагами запуска,
+# поэтому выбранное поколение храним отдельно и читаем в каждой операции.
+MTG_GEN_FILE="/opt/mtpr-simple/mtg_gen"
+MTG_V1_CONF="/opt/mtpr-simple/mtg_v1.conf"
+MTG_V1_TAG="v1.0.12"
+
 # ── Функция обрезки пробелов ──────────────────────────────
 trim() {
     local var="$1"
@@ -60,7 +66,8 @@ is_mtg_installed() {
 get_mtg_version() {
     if command -v mtg >/dev/null 2>&1; then
         # Берём первую часть до пробела — это версия
-        mtg --version 2>/dev/null | head -1 | awk '{print $1}'
+        # 1.0.x печатает версию в stderr, 2.x — в stdout
+        mtg --version 2>&1 | head -1 | awk '{print $1}'
     else
         echo ""
     fi
@@ -97,6 +104,42 @@ get_mtg_secret() {
     grep -E '^secret[[:space:]]*=' "$_cfg" 2>/dev/null | head -1 | sed -E 's/^[[:space:]]*secret[[:space:]]*=[[:space:]]*"//; s/".*$//'
 }
 
+# ── Поколение MTG: v2 (конфиг) или v1 (только флаги) ─────────
+get_mtg_gen() {
+    if [ -f "$MTG_GEN_FILE" ]; then
+        local saved; saved=$(trim "$(cat "$MTG_GEN_FILE" 2>/dev/null)")
+        case "$saved" in v1|v2) echo "$saved"; return 0 ;; esac
+    fi
+    # Фолбэк по версии: у 1.0.x она начинается с "1."
+    case "$(get_mtg_version)" in
+        1.*) echo "v1" ;;
+        *)   echo "v2" ;;
+    esac
+}
+
+_mtg_v1_get() {
+    [ -f "$MTG_V1_CONF" ] || return 0
+    grep -E "^$1=" "$MTG_V1_CONF" 2>/dev/null | head -1 | cut -d= -f2-
+}
+
+mtg_current_port() {
+    if [ "$(get_mtg_gen)" = "v1" ]; then
+        _mtg_v1_get port
+    else
+        get_mtg_port "$(get_config_path)"
+    fi
+}
+
+# У 2.x секрет печатается через --hex, у 1.0.x — только -c <домен> tls
+_gen_mtg_secret() {
+    local _domain="$1" _gen="$2"
+    if [ "$_gen" = "v1" ]; then
+        mtg generate-secret -c "$_domain" tls 2>/dev/null
+    else
+        mtg generate-secret --hex "$_domain" 2>/dev/null
+    fi
+}
+
 # ── Получение публичного IP ──────────────────────────────────
 get_public_ip() {
     local _ip="" _u=""
@@ -111,6 +154,7 @@ get_public_ip() {
 
 # ── Функция скачивания и установки бинарника MTG ────────────
 install_mtg_binary() {
+    local gen="${1:-v2}"
     echo -e "  ${BLUE}[i]${NC} Скачивание и установка MTG..."
 
     # Определяем архитектуру
@@ -135,9 +179,18 @@ install_mtg_binary() {
 
     echo -e "  ${BLUE}[i]${NC} Загрузка MTG для архитектуры ${mtg_arch}..."
     
-    # Получаем URL последней версии
-    local download_url
-    download_url=$(curl -fsSL --max-time 20 https://api.github.com/repos/9seconds/mtg/releases/latest | grep -o "https://.*mtg-.*-linux-${mtg_arch}.*\.tar\.gz" | head -1)
+    # Ветка 1.0.x закрыта — тег фиксирован, у 2.x берём последний релиз
+    local download_url=""
+    if [ "$gen" = "v1" ]; then
+        download_url="https://github.com/9seconds/mtg/releases/download/${MTG_V1_TAG}/mtg-${MTG_V1_TAG#v}-linux-${mtg_arch}.tar.gz"
+    else
+        # К сборкам с суффиксом -v3 добавлены инструкции AVX2: на старых CPU
+        # они падают с SIGILL, поэтому берём обычную сборку, а -v3 только фолбэком
+        local _assets
+        _assets=$(curl -fsSL --max-time 20 https://api.github.com/repos/9seconds/mtg/releases/latest | grep -o "https://.*mtg-.*-linux-${mtg_arch}.*\.tar\.gz")
+        download_url=$(printf '%s\n' "$_assets" | grep -v -- '-v3\.tar\.gz$' | head -1)
+        [ -z "$download_url" ] && download_url=$(printf '%s\n' "$_assets" | head -1)
+    fi
     
     if [ -z "$download_url" ]; then
         echo -e "  ${RED}[✗] Не удалось найти последнюю версию MTG${NC}"
@@ -197,6 +250,7 @@ purge_mtg_silent() {
     rm -f /usr/local/bin/mtg
     rm -f /etc/mtg.toml
     rm -f "$CONFIG_PATH_FILE"
+    rm -f "$MTG_GEN_FILE" "$MTG_V1_CONF"
     # Чистим остатки прежних установок только в известном каталоге (не в cwd)
     rm -f /root/mtg-latest.tar.gz /root/mtg-*.tar.gz 2>/dev/null || true
     rm -rf /root/mtg-*/ 2>/dev/null || true
@@ -204,6 +258,13 @@ purge_mtg_silent() {
 
 # ── Функция проверки MTG (doctor) ────────────────────────────
 mtg_doctor() {
+    if [ "$(get_mtg_gen)" = "v1" ]; then
+        echo ""
+        echo -e "  ${YELLOW}[!] doctor есть только в MTG 2.x, у 1.0.x проверка недоступна${NC}"
+        echo ""
+        pause_key "Нажмите любую клавишу для возврата..."
+        return 0
+    fi
     local config_path
     config_path=$(get_config_path)
     
@@ -350,8 +411,21 @@ install_mtg() {
         purge_mtg_silent
     fi
 
+    # Поколение: у 1.0.x нет конфиг-файла, запуск собирается из флагов
+    local gen
+    echo -e "  ${BOLD}Какое поколение MTG ставить?${NC}"
+    echo -e "  ${CYAN}[1]${NC} 2.x   — актуальная ветка, конфиг /etc/mtg.toml"
+    echo -e "  ${CYAN}[2]${NC} 1.0.x — старая ветка, запуск только флагами"
+    echo -en "  ${BOLD}Выбор [1]:${NC} "
+    { read -r gen_input </dev/tty; } 2>/dev/null || true
+    case "$gen_input" in
+        2) gen="v1" ;;
+        *) gen="v2" ;;
+    esac
+    echo ""
+
     # 1. Сначала устанавливаем бинарник mtg
-    if ! install_mtg_binary; then
+    if ! install_mtg_binary "$gen"; then
         echo ""
         echo -e "  ${RED}[✗] Не удалось установить MTG${NC}"
         echo ""
@@ -398,7 +472,7 @@ install_mtg() {
     while true; do
         # Генерируем секрет при первом проходе или при gen
         if [ -z "$SECRET" ]; then
-            SECRET=$(mtg generate-secret --hex "$domain" 2>/dev/null)
+            SECRET=$(_gen_mtg_secret "$domain" "$gen")
             if [ -z "$SECRET" ]; then
                 echo -e "  ${RED}[✗] Не удалось сгенерировать секрет. Попробуйте ввести вручную.${NC}"
                 SECRET=""
@@ -418,7 +492,7 @@ install_mtg() {
         { read -r secret_input </dev/tty; } 2>/dev/null || true
         
         if [[ "$secret_input" =~ ^[Gg][Ee][Nn]$ ]]; then
-            SECRET=$(mtg generate-secret --hex "$domain" 2>/dev/null)
+            SECRET=$(_gen_mtg_secret "$domain" "$gen")
             if [ -z "$SECRET" ]; then
                 echo -e "  ${RED}[✗] Не удалось сгенерировать секрет.${NC}"
                 sleep 1
@@ -429,8 +503,9 @@ install_mtg() {
             echo ""
             continue
         elif [[ -n "$secret_input" ]] && [[ ! "$secret_input" =~ ^[yY]$ ]]; then
-            if [[ ! "$secret_input" =~ ^[0-9a-fA-F]{32}$ ]] && [[ ! "$secret_input" =~ ^[0-9a-fA-F]{34}$ ]]; then
-                echo -e "  ${RED}[✗] Секрет должен быть hex-строкой из 32 или 34 символов (34 — с префиксом ee).${NC}"
+            # 2.x: 34 hex (ee + ключ), 1.0.x tls: 66 hex (ee + ключ + домен)
+            if [[ ! "$secret_input" =~ ^[0-9a-fA-F]{32,66}$ ]] || (( ${#secret_input} % 2 )); then
+                echo -e "  ${RED}[✗] Секрет должен быть hex-строкой чётной длины (обычно 32, 34 или 66 символов).${NC}"
                 continue
             fi
             SECRET="$secret_input"
@@ -451,15 +526,24 @@ install_mtg() {
         fi
     done
 
-    # Создание конфига
-    echo ""
-    echo -e "  ${BLUE}[i]${NC} Создание конфига /etc/mtg.toml..."
-    cat > /etc/mtg.toml << EOF
+    mkdir -p /opt/mtpr-simple
+    if [ "$gen" = "v1" ]; then
+        # У 1.0.x конфига нет: параметры запуска храним в своём файле
+        printf 'gen=v1\nsecret=%s\nport=%s\ndomain=%s\n' "$SECRET" "$port" "$domain" > "$MTG_V1_CONF"
+        rm -f "$CONFIG_PATH_FILE"
+        echo ""
+        echo -e "  ${BLUE}[i]${NC} Параметры запуска сохранены: ${MTG_V1_CONF}"
+    else
+        echo ""
+        echo -e "  ${BLUE}[i]${NC} Создание конфига /etc/mtg.toml..."
+        cat > /etc/mtg.toml << EOF
 secret = "${SECRET}"
 bind-to = "0.0.0.0:${port}"
 EOF
+    fi
 
-    # Добавление опций keep-alive (по желанию) с новыми значениями
+    # keep-alive описывается в конфиге, у 1.0.x конфига нет
+    if [ "$gen" = "v2" ]; then
     echo ""
     echo -e "  ${BOLD}Добавить настройки TCP keep-alive для мобильных клиентов?${NC}"
     echo -e "  ${DIM}Это улучшает стабильность на iOS/Android.${NC}"
@@ -477,9 +561,13 @@ EOF
         echo -e "  ${GREEN}✓${NC} Настройки keep-alive добавлены (idle=10s, interval=10s, count=3)."
     fi
 
-    # Сохраняем путь к конфигу
-    mkdir -p /opt/mtpr-simple
-    echo "/etc/mtg.toml" > "$CONFIG_PATH_FILE"
+    fi
+
+    # Путь к конфигу нужен только 2.x
+    if [ "$gen" = "v2" ]; then
+        echo "/etc/mtg.toml" > "$CONFIG_PATH_FILE"
+    fi
+    echo "$gen" > "$MTG_GEN_FILE"
 
     # Запуск через systemd (если доступен)
     echo ""
@@ -487,7 +575,24 @@ EOF
     echo -en "  ${BOLD}Установить? [Y/n]:${NC} "
     { read -r add_systemd </dev/tty; } 2>/dev/null || true
     if [[ ! "$add_systemd" =~ ^[nN]$ ]]; then
-        cat > /etc/systemd/system/mtg.service << 'EOF'
+        if [ "$gen" = "v1" ]; then
+            cat > /etc/systemd/system/mtg.service << EOF
+[Unit]
+Description=MTG - MTProto proxy (1.0.x)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mtg run -b 0.0.0.0:${port} ${SECRET}
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        else
+            cat > /etc/systemd/system/mtg.service << 'EOF'
 [Unit]
 Description=MTG - MTProto proxy
 After=network.target
@@ -502,6 +607,7 @@ LimitNOFILE=65536
 [Install]
 WantedBy=multi-user.target
 EOF
+        fi
         systemctl daemon-reload 2>/dev/null || true
         systemctl enable mtg.service 2>/dev/null || true
         if systemctl start mtg.service; then
@@ -510,7 +616,11 @@ EOF
             echo -e "  ${YELLOW}[!]${NC} Служба mtg.service установлена, но не запустилась. Проверьте: systemctl status mtg.service"
         fi
     else
-        echo -e "  ${YELLOW}[!] Для запуска используйте: mtg run /etc/mtg.toml${NC}"
+        if [ "$gen" = "v1" ]; then
+            echo -e "  ${YELLOW}[!] Для запуска используйте: mtg run -b 0.0.0.0:${port} ${SECRET}${NC}"
+        else
+            echo -e "  ${YELLOW}[!] Для запуска используйте: mtg run /etc/mtg.toml${NC}"
+        fi
     fi
 
     echo ""
@@ -521,6 +631,13 @@ EOF
 
 # ── Функция открытия конфига ─────────────────────────────────
 edit_config() {
+    if [ "$(get_mtg_gen)" = "v1" ]; then
+        echo ""
+        echo -e "  ${YELLOW}[!] У MTG 1.0.x нет конфиг-файла: параметры задаются при установке${NC}"
+        echo ""
+        pause_key "Нажмите любую клавишу для возврата..."
+        return 0
+    fi
     config_path=$(get_config_path)
     if [ ! -f "$config_path" ]; then
         echo ""
@@ -617,6 +734,13 @@ purge_mtg() {
 
 # ── Функция обновления пути к конфигу ──────────────────────
 update_config_path() {
+    if [ "$(get_mtg_gen)" = "v1" ]; then
+        echo ""
+        echo -e "  ${YELLOW}[!] У MTG 1.0.x нет конфиг-файла, путь указывать нечему${NC}"
+        echo ""
+        pause_key "Нажмите любую клавишу для возврата..."
+        return 0
+    fi
     echo ""
     local default_path="/etc/mtg.toml"
     local input
@@ -651,10 +775,13 @@ show_link() {
     echo ""
     echo -e  "  ${BLUE}[i]${NC} Генерация ссылки для подключения..."
     
-    local config_path
+    local config_path secret
     config_path=$(get_config_path)
-    local secret
-    secret=$(get_mtg_secret "$config_path")
+    if [ "$(get_mtg_gen)" = "v1" ]; then
+        secret=$(_mtg_v1_get secret)
+    else
+        secret=$(get_mtg_secret "$config_path")
+    fi
     
     if [ -z "$secret" ]; then
         echo -e "  ${RED}[✗] Не удалось получить секрет из конфига.${NC}"
@@ -669,7 +796,7 @@ show_link() {
     fi
     
     local port
-    port=$(get_mtg_port "$config_path")
+    port=$(mtg_current_port)
     if [ -z "$port" ]; then
         port="443"
     fi
@@ -686,6 +813,92 @@ show_link() {
     pause_key "Нажмите любую клавишу для возврата..."
 }
 
+# ── Неинтерактивная установка (install.sh, автоматизация) ────
+install_mtg_silent() {
+    local gen="${1:-v2}" port="${2:-443}" domain="${3:-rutube.ru}"
+    local secret=""
+
+    if is_mtg_installed; then
+        purge_mtg_silent
+    fi
+    install_mtg_binary "$gen" || return 1
+
+    secret=$(_gen_mtg_secret "$domain" "$gen")
+    if [ -z "$secret" ]; then
+        echo -e "  ${RED}[✗] Не удалось сгенерировать секрет${NC}" >&2
+        return 1
+    fi
+
+    mkdir -p /opt/mtpr-simple
+    if [ "$gen" = "v1" ]; then
+        printf 'gen=v1\nsecret=%s\nport=%s\ndomain=%s\n' "$secret" "$port" "$domain" > "$MTG_V1_CONF"
+        rm -f "$CONFIG_PATH_FILE"
+        cat > /etc/systemd/system/mtg.service << EOF
+[Unit]
+Description=MTG - MTProto proxy (1.0.x)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mtg run -b 0.0.0.0:${port} ${secret}
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    else
+        cat > /etc/mtg.toml << EOF
+secret = "${secret}"
+bind-to = "0.0.0.0:${port}"
+EOF
+        echo "/etc/mtg.toml" > "$CONFIG_PATH_FILE"
+        cat > /etc/systemd/system/mtg.service << 'EOF'
+[Unit]
+Description=MTG - MTProto proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mtg run /etc/mtg.toml
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    fi
+    echo "$gen" > "$MTG_GEN_FILE"
+
+    # Порт на MTG ставится тот же, что и для других прокси: без правила
+    # в ufw входящие SYN приходят, а ответа нет (issue #34)
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi '^Status: active'; then
+        ufw allow "$port"/tcp >/dev/null 2>&1 && echo -e "  ${GREEN}[✓] ufw: открыт порт ${port}/tcp${NC}"
+    fi
+
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable mtg.service >/dev/null 2>&1 || true
+    if systemctl restart mtg.service 2>/dev/null; then
+        echo -e "  ${GREEN}[✓] MTG (${gen}) установлен на порт ${port}${NC}"
+    else
+        echo -e "  ${RED}[✗] Служба mtg.service не запустилась${NC}" >&2
+        return 1
+    fi
+
+    local ip
+    ip=$(get_public_ip)
+    [ -z "$ip" ] && ip="SERVER_IP"
+    echo "  https://t.me/proxy?server=${ip}&port=${port}&secret=${secret}"
+    return 0
+}
+
+if [ "${1:-}" = "--install-silent" ]; then
+    install_mtg_silent "${2:-v2}" "${3:-443}" "${4:-rutube.ru}"
+    exit $?
+fi
+
 # ── Главное меню ─────────────────────────────────────────────
 while true; do
     clear 2>/dev/null || true
@@ -700,12 +913,14 @@ while true; do
         if [ -n "$version" ]; then
             echo -e "  ${NC}${BOLD}Версия:${NC} ${GREEN}${version}${NC}"
         fi
-        config_path=$(get_config_path)
-        if [ -f "$config_path" ]; then
-            port=$(get_mtg_port "$config_path")
-            if [ -n "$port" ]; then
-                echo -e "  ${BOLD}Порт:${NC} ${CYAN}${port}${NC}"
-            fi
+        if [ "$(get_mtg_gen)" = "v1" ]; then
+            echo -e "  ${BOLD}Поколение:${NC} 1.0.x"
+        else
+            echo -e "  ${BOLD}Поколение:${NC} 2.x"
+        fi
+        port=$(mtg_current_port)
+        if [ -n "$port" ]; then
+            echo -e "  ${BOLD}Порт:${NC} ${CYAN}${port}${NC}"
         fi
         echo ""
     else
