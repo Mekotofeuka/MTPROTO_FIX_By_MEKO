@@ -649,10 +649,15 @@ setup_web_config() {
     # Заменяем имя пользователя в access.users (если отличается от "hello")
     if [ "$web_user" != "hello" ]; then
         web_config_content="${web_config_content//hello = /$web_user = }"
-        # Меняем в links_show
-        web_config_content="${web_config_content//links_show = \[\"hello\"\]/links_show = [\"$web_user\"]}"
+        web_config_content="${web_config_content//show = \[\"hello\"\]/show = [\"$web_user\"]}"
         # Меняем в профиле
         web_config_content="${web_config_content//user = \"hello\"/user = \"$web_user\"}"
+    fi
+
+    if ! grep -qF -- "show = [\"$web_user\"]" <<< "$web_config_content"; then
+        log_error "WEB-конфиг: не удалось ограничить [general.links].show на пользователя $web_user"
+        rm -f "$web_template"
+        return 1
     fi
     
     # Сохраняем полученный конфиг
@@ -1156,15 +1161,26 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
     # Домен (если ставится прокси)
     if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" ]]; then
         if [ -z "$DOMAIN" ]; then
+            # При обновлении домен берём из текущего конфига: иначе повторная
+            # установка молча переписывала tls_domain на ozon.ru.
+            default_sni_domain="ozon.ru" _cur_cfg="" _cur_dom=""
+            _cur_info=$(detect_telemt_advanced 2>/dev/null) || _cur_info=""
+            _cur_cfg=${_cur_info%%:*}
+            if [ -n "$_cur_cfg" ] && [ -f "$_cur_cfg" ]; then
+                _cur_dom=$(grep -E '^tls_domain[[:space:]]*=' "$_cur_cfg" 2>/dev/null | head -1 | awk -F'=' '{print $2}' | sed 's/#.*//' | tr -d ' "')
+                if [[ "$_cur_dom" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+                    default_sni_domain="$_cur_dom"
+                fi
+            fi
             while true; do
-                echo -en "  ${BOLD}Введите SNI домен${NC} ${DIM}(по умолчанию: ozon.ru)${NC}: " >&2
+                echo -en "  ${BOLD}Введите SNI домен${NC} ${DIM}(по умолчанию: ${default_sni_domain})${NC}: " >&2
                 if { : </dev/tty; } 2>/dev/null; then
                     read -r DOMAIN </dev/tty || true
                 else
                     DOMAIN=""
                 fi
                 DOMAIN=$(trim "$DOMAIN")
-                [ -z "$DOMAIN" ] && DOMAIN="ozon.ru"
+                [ -z "$DOMAIN" ] && DOMAIN="$default_sni_domain"
                 if [[ "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
                     break
                 fi
@@ -1173,14 +1189,27 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
             done
         fi
         if [ -z "$PROXY_PORT" ]; then
+            # При обновлении порт берём из текущего конфига: иначе на сервере
+            # с WEB (nginx на 443) переустановка падала на «Порт уже занят».
+            default_proxy_port="" _cur_info="" _cur_port=""
+            _cur_info=$(detect_telemt_advanced 2>/dev/null) || _cur_info=""
+            _cur_port=$(printf '%s\n' "$_cur_info" | cut -d: -f2)
+            if ! [[ "$_cur_port" =~ ^[0-9]+$ ]] && [ -s /opt/mtpr-simple/port ]; then
+                _cur_port=$(head -1 /opt/mtpr-simple/port 2>/dev/null | tr -d '[:space:]')
+            fi
+            if [[ "$_cur_port" =~ ^[0-9]+$ ]] && [ "$_cur_port" -ge 1 ] && [ "$_cur_port" -le 65535 ]; then
+                default_proxy_port="$_cur_port"
+            else
+                default_proxy_port="443"
+            fi
             while true; do
-                echo -en "  ${BOLD}Введите порт для прокси${NC} ${DIM}(по умолчанию: 443)${NC}: " >&2
+                echo -en "  ${BOLD}Введите порт для прокси${NC} ${DIM}(по умолчанию: ${default_proxy_port})${NC}: " >&2
                 if { : </dev/tty; } 2>/dev/null; then
                     read -r PROXY_PORT </dev/tty || true
                 else
                     PROXY_PORT=""
                 fi
-                [ -z "$PROXY_PORT" ] && PROXY_PORT="443"
+                [ -z "$PROXY_PORT" ] && PROXY_PORT="$default_proxy_port"
                 if [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ]; then
                     break
                 fi

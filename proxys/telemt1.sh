@@ -508,12 +508,35 @@ get_telemt_ports() {
 }
 
 # ── Функция получения онлайна Telemt ────────────────────────
+# Считает IP во всех блоках "active_ips": формат ответа API менялся
+# (плоский список в старых версиях, {"ok":true,"data":[…]}, в новых),
+# поэтому блоки ищем по всему ответу, а не по фиксированному пути.
+# Пустой вывод = онлайн неизвестен (API не ответил), это не ноль.
+_telemt_online_from_json() {
+    local _quotes
+    _quotes=$(LC_ALL=C tr '\n' ' ' |
+        { grep -o '"active_ips"[[:space:]]*:[[:space:]]*\[[^]]*\]' || true; } |
+        sed 's/^"active_ips"[[:space:]]*:[[:space:]]*//' |
+        LC_ALL=C tr -cd '"' | LC_ALL=C wc -c)
+    echo "$(( _quotes / 2 ))"
+}
+
 get_telemt_online() {
-    if is_telemt_installed; then
-        curl -s http://127.0.0.1:9091/v1/stats/users/active-ips 2>/dev/null | grep -o '"active_ips":\[[^]]*\]' | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | wc -l | tr -d ' '
-    else
+    is_telemt_installed || { echo ""; return 0; }
+
+    local json
+    json=$(curl -s --connect-timeout 1 --max-time 3 \
+        http://127.0.0.1:9091/v1/stats/users/active-ips 2>/dev/null) || {
         echo ""
-    fi
+        return 0
+    }
+
+    case "$json" in
+        *'"ok":true'*) ;;
+        *) echo ""; return 0 ;;
+    esac
+
+    printf '%s\n' "$json" | _telemt_online_from_json
 }
 
 # ── Функция обновления пути к конфигу ──────────────────────
@@ -1675,7 +1698,8 @@ _web_make_link() {
     b64=$(printf '%b' "$esc" | base64 -w0 2>/dev/null)
     [ -n "$b64" ] || b64=$(printf '%b' "$esc" | base64 2>/dev/null | tr -d '\n')
     b64=$(printf '%s' "$b64" | tr '+/' '-_' | tr -d '=')
-    printf 'tg://webproxy?server=%s%%2F%s%%2F&secret=%s' "$host" "${path//\//%2F}" "$b64"
+    # Хвостовой %2F не ставим: telemt печатает ...%2Fapp%2Fsync (без слэша в конце).
+    printf 'tg://webproxy?server=%s%%2F%s&secret=%s' "$host" "${path//\//%2F}" "$b64"
 }
 
 # Печатает host<TAB>path<TAB>user<TAB>secret_mode<TAB>secret<TAB>sideband
@@ -1863,6 +1887,70 @@ _get_web_template() {
     return 1
 }
 
+# ── Рендер WEB-конфига из шаблона (подстановка по ключам) ─────
+# Печатает готовый конфиг в stdout. Подстановка идёт по именам ключей
+# (tls_domain, host, public_addr, ключ в [access.users], [general.links].show,
+# user в профиле), а не по литералам шаблона: правки data/webconfig.txt
+# не должны снова давать молчаливый no-op. 1 — шаблон не распознан
+# или подстановка не удалась.
+_web_render_cfg() {
+    local tpl="$1" host="$2" ip="$3" user="$4" secret="$5"
+    local tpl_user=""
+    tpl_user=$(awk '
+        /^[[:space:]]*\[access\.users\][[:space:]]*(#.*)?$/ { inu=1; next }
+        inu && /^[[:space:]]*\[/ { exit }
+        inu && /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/ {
+            line=$0; sub(/[[:space:]]*=.*/,"",line); gsub(/[[:space:]]/,"",line); print line; exit
+        }
+    ' "$tpl" 2>/dev/null)
+    [ -n "$tpl_user" ] || return 1
+
+    local rendered=""
+    rendered=$(sed -E \
+        -e "s#^([[:space:]]*tls_domain[[:space:]]*=[[:space:]]*)\"[^\"]*\"#\1\"$host\"#" \
+        -e "s#^([[:space:]]*host[[:space:]]*=[[:space:]]*)\"[^\"]*\"#\1\"$host\"#" \
+        -e "s#^([[:space:]]*public_addr[[:space:]]*=[[:space:]]*)\"[^\"]*\"#\1\"$ip:443\"#" \
+        -e "s#^([[:space:]]*${tpl_user}[[:space:]]*=[[:space:]]*)\"[^\"]*\"#\1\"$secret\"#" \
+        -e "s#(^[[:space:]]*show[[:space:]]*=[[:space:]]*\[[[:space:]]*)\"[^\"]*\"#\1\"$user\"#" \
+        -e "s#^([[:space:]]*user[[:space:]]*=[[:space:]]*)\"$tpl_user\"#\1\"$user\"#" \
+        "$tpl") || return 1
+
+    # Ключ в [access.users] переименовываем только внутри этой секции,
+    # чтобы не задеть одноимённые ключи других секций.
+    if [ "$user" != "$tpl_user" ]; then
+        rendered=$(printf '%s\n' "$rendered" | awk -v old="$tpl_user" -v new="$user" '
+            /^[[:space:]]*\[/ { inu = ($0 ~ /^[[:space:]]*\[access\.users\][[:space:]]*$/); print; next }
+            inu && $0 ~ ("^[[:space:]]*" old "[[:space:]]*=") {
+                match($0, /^[[:space:]]*/)
+                print substr($0, 1, RLENGTH) new substr($0, RLENGTH + length(old) + 1)
+                next
+            }
+            { print }
+        ') || return 1
+    fi
+
+    # Проверяем, что подстановка реально произошла: иначе на сервер уедет
+    # шаблон с example.com/203.0.113.10 и telemt не стартует.
+    grep -qE "^[[:space:]]*tls_domain[[:space:]]*=[[:space:]]*\"$host\"" <<< "$rendered" || return 1
+    grep -qE "^[[:space:]]*host[[:space:]]*=[[:space:]]*\"$host\"" <<< "$rendered" || return 1
+    grep -qE "^[[:space:]]*public_addr[[:space:]]*=[[:space:]]*\"$ip:443\"" <<< "$rendered" || return 1
+    grep -qE "^[[:space:]]*${user}[[:space:]]*=[[:space:]]*\"$secret\"" <<< "$rendered" || return 1
+    grep -qF -- "user = \"$user\"" <<< "$rendered" || return 1
+    grep -qE "^[[:space:]]*show[[:space:]]*=[[:space:]]*\[[[:space:]]*\"$user\"" <<< "$rendered" || return 1
+    if grep -qF -- 'CHANGE_ME' <<< "$rendered"; then
+        return 1
+    fi
+
+    printf '%s\n' "$rendered"
+    return 0
+}
+
+# ── decoy-каталог из [web.vhosts.decoy] (нужен и без nginx) ───
+_web_ensure_decoy() {
+    mkdir -p /var/lib/telemt/public 2>/dev/null || true
+    [ -s /var/lib/telemt/public/index.html ] || echo "OK" > /var/lib/telemt/public/index.html 2>/dev/null || true
+}
+
 # ── Установка/настройка nginx для WEB-режима (с откатом) ─────
 _web_install_nginx() {
     local web_host="$1"
@@ -1903,8 +1991,7 @@ _web_install_nginx() {
         nginx_was_active=true
     fi
 
-    mkdir -p /var/lib/telemt/public 2>/dev/null || true
-    echo "OK" > /var/lib/telemt/public/index.html 2>/dev/null || true
+    _web_ensure_decoy
 
     echo -e "  ${DIM}Получение SSL-сертификата для ${web_host}...${NC}"
     sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1 || true
@@ -2065,6 +2152,10 @@ _web_proxy_install() {
         web_secret="$(_gen_secret)"
         echo -e "  ${DIM}Сгенерирован секрет: ${web_secret}${NC}"
     fi
+    if ! [[ "$web_secret" =~ ^[0-9a-fA-F]{32}$ ]]; then
+        echo -e "  ${RED}[x]${NC} Секрет должен быть 32 hex-символа (0-9, a-f) — telemt другой не примет"
+        return 1
+    fi
 
     echo -en "  ${BOLD}Ставить nginx + SSL (certbot)? [y/N]:${NC} "
     local use_nginx=""
@@ -2118,17 +2209,17 @@ _web_proxy_install() {
     fi
 
     local content=""
-    content=$(cat "$tpl")
-    content="${content//\"zdez.tvoi.domen.com\"/\"$web_host\"}"
-    content="${content//\"12.34.56.789:443\"/\"$web_ip:443\"}"
-    content="${content//hello = \"e5544cb710bae52b8bcbc05375921c16\"/hello = \"$web_secret\"}"
-    if [ "$web_user" != "hello" ]; then
-        content="${content//hello = /$web_user = }"
-        content="${content//links_show = \[\"hello\"\]/links_show = [\"$web_user\"]}"
-        content="${content//user = \"hello\"/user = \"$web_user\"}"
+    if ! content=$(_web_render_cfg "$tpl" "$web_host" "$web_ip" "$web_user" "$web_secret"); then
+        echo -e "  ${RED}[x]${NC} Не удалось подставить домен/IP/секрет в шаблон WEB-конфига — ${cfg} не изменён"
+        rm -f "$tpl"
+        return 1
     fi
-    printf '%s\n' "$content" > "$cfg"
     rm -f "$tpl"
+    printf '%s\n' "$content" > "$cfg"
+
+    # decoy-каталог из [web.vhosts.decoy] должен существовать и быть
+    # настоящим каталогом, иначе telemt не стартует (и без nginx тоже).
+    _web_ensure_decoy
 
     local vrc=0
     _verify_toml "$cfg" || vrc=$?
@@ -2138,10 +2229,42 @@ _web_proxy_install() {
         return 1
     fi
 
-    if systemctl restart telemt >/dev/null 2>&1 && systemctl is-active --quiet telemt 2>/dev/null; then
+    # Перезапуск + реальная проверка: юнит может стартовать и тут же упасть
+    # на разборе конфига, а is-active сразу после restart ещё покажет active.
+    if ! systemctl restart telemt >/dev/null 2>&1; then
+        echo -e "  ${RED}[x]${NC} Не удалось перезапустить telemt — восстанавливаю прежний конфиг"
+        cp -a "$backup" "$cfg" 2>/dev/null || true
+        systemctl restart telemt >/dev/null 2>&1 || true
+        return 1
+    fi
+    local _wait=0
+    while [ "$_wait" -lt 6 ] && ! systemctl is-active --quiet telemt 2>/dev/null; do
+        sleep 0.5
+        _wait=$((_wait + 1))
+    done
+    if systemctl is-active --quiet telemt 2>/dev/null; then
+        # Процесс может быть active, но ещё не успеть занять WEB-порт:
+        # тогда ссылка сразу после установки отдаёт 502. Ждём недолго.
+        local _lwait=0
+        while [ "$_lwait" -lt 20 ] && command -v ss >/dev/null 2>&1; do
+            if ss -tlnH 2>/dev/null | awk '{print $4}' | grep -qE ':18080$'; then
+                break
+            fi
+            sleep 0.5
+            _lwait=$((_lwait + 1))
+        done
         echo -e "  ${GREEN}[✓]${NC} telemt перезапущен и активен"
+        if command -v ss >/dev/null 2>&1 && ! ss -tlnH 2>/dev/null | awk '{print $4}' | grep -qE ':18080$'; then
+            echo -e "  ${YELLOW}[!]${NC} порт WEB (18080) ещё не слушается — откройте ссылку через пару секунд"
+        fi
     else
-        echo -e "  ${YELLOW}[!]${NC} Не удалось подтвердить активность telemt"
+        local terr=""
+        terr=$(journalctl -u telemt -n 20 --no-pager 2>/dev/null | grep -E 'Error:|ERROR ' | tail -n 1)
+        echo -e "  ${RED}[x]${NC} telemt не запустился: ${terr:-см. journalctl -u telemt}"
+        cp -a "$backup" "$cfg" 2>/dev/null || true
+        systemctl restart telemt >/dev/null 2>&1 || true
+        echo -e "  ${YELLOW}[!]${NC} Прежний конфиг восстановлен из ${backup}"
+        return 1
     fi
 
     local _dd=0 _wpath="" _wh="" _wu="" _wm="" _ws="" _wsb=""
@@ -2745,10 +2868,10 @@ while true; do
         
         # Онлайн
         online=$(get_telemt_online)
-        if [ -n "$online" ] && [ "$online" -ge 0 ] 2>/dev/null; then
+        if [[ "$online" =~ ^[0-9]+$ ]]; then
             echo -e "  ${NC}${BOLD}Подключено к прокси:${NC} ${CYAN}${BOLD}${online}${NC}${BOLD} человек"
         else
-            echo -e "  ${NC}${BOLD}Подключено к прокси:${NC} ${CYAN}${BOLD}0${NC}${BOLD} человек"
+            echo -e "  ${NC}${BOLD}Подключено к прокси:${NC} ${CYAN}${BOLD}н/д${NC}${BOLD} (API Telemt не ответил)"
         fi
         
         # ── СТАТУС MSS (как в main.sh) ──────────────────────

@@ -1029,6 +1029,28 @@ SERVICE_NFT_EOF
     fi
 
     # ── iptables режимы (v2 и v3) ──────────────────────────
+    # На Debian 13 / Ubuntu 24+ пакет iptables может отсутствовать (остаётся
+    # только nft). Без бинарника правила молча не применяются — ставим пакет.
+    if ! command -v iptables >/dev/null 2>&1; then
+        log_info "iptables не найден, устанавливаю..."
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq iptables
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y -q iptables
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y -q iptables
+        elif command -v apk >/dev/null 2>&1; then
+            apk add --no-cache iptables
+        fi
+        if ! command -v iptables >/dev/null 2>&1; then
+            log_error "iptables не установлен — V2/V3 без него не работают (установите пакет iptables вручную)"
+            if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
+                pause_key "Нажмите любую клавишу..."
+            fi
+            return 1
+        fi
+    fi
+
     if [ "$auto_install" = false ]; then
         echo ""
         log_warning "Будет выполнена установка SYN FIX на порты: $ports_str"

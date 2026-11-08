@@ -1,11 +1,14 @@
 [general]
 use_middle_proxy = true
-links_show = ["hello"]
 
 [general.modes]
 classic = true
 secure = true
 tls = true
+
+# Какие ссылки печатать в лог/API: список пользователей или "*".
+[general.links]
+show = ["hello"]
 
 [server]
 port = 9443

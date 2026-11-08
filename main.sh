@@ -314,27 +314,39 @@ get_port_from_config() {
     return 0
 }
 
+# Считает IP во всех блоках "active_ips" (формат ответа API менялся).
+# Пустой вывод = онлайн неизвестен (API не ответил), это не ноль.
+_telemt_online_from_json() {
+    local _quotes
+    _quotes=$(LC_ALL=C tr '\n' ' ' |
+        { grep -o '"active_ips"[[:space:]]*:[[:space:]]*\[[^]]*\]' || true; } |
+        sed 's/^"active_ips"[[:space:]]*:[[:space:]]*//' |
+        LC_ALL=C tr -cd '"' | LC_ALL=C wc -c)
+    echo "$(( _quotes / 2 ))"
+}
+
 get_telemt_online_for_config() {
     local _cfg="$1"
     _cfg=$(trim "$_cfg")
-    
+
     if [ -z "$_cfg" ] || [ ! -f "$_cfg" ]; then
-        echo "0"
+        echo ""
         return 1
     fi
-    
-    local _port=$(get_port_from_config "$_cfg")
-    if [ -z "$_port" ]; then
-        echo "0"
+
+    local _json
+    _json=$(curl -s --connect-timeout 1 --max-time 3 \
+        "http://127.0.0.1:9091/v1/stats/users/active-ips" 2>/dev/null) || {
+        echo ""
         return 1
-    fi
-    
-    local _online=$(curl -s --max-time 2 --connect-timeout 1 "http://127.0.0.1:9091/v1/stats/users/active-ips" 2>/dev/null | grep -o '"active_ips":\[[^]]*\]' | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' | wc -l | tr -d ' ')
-    if [ -z "$_online" ] || [ "$_online" -lt 0 ] 2>/dev/null; then
-        echo "0"
-    else
-        echo "$_online"
-    fi
+    }
+
+    case "$_json" in
+        *'"ok":true'*) ;;
+        *) echo ""; return 1 ;;
+    esac
+
+    printf '%s\n' "$_json" | _telemt_online_from_json
 }
 
 is_mss_enabled_for_config() {
@@ -1146,7 +1158,11 @@ show_header() {
             
             echo ""
             echo -e "  ${BOLD}Telemt V:${NC} ${version_color}${_version}${NC}${port_display}"
-            echo -e "  ${BOLD}Telemt онлайн:${NC} ${CYAN}${_online}${NC}${BOLD} человек"
+            if [[ "$_online" =~ ^[0-9]+$ ]]; then
+                echo -e "  ${BOLD}Telemt онлайн:${NC} ${CYAN}${_online}${NC}${BOLD} человек"
+            else
+                echo -e "  ${BOLD}Telemt онлайн:${NC} ${CYAN}н/д${NC}${BOLD} (API Telemt не ответил)"
+            fi
             echo -e "  ${BOLD}Встроенный MSS:${NC} ${mss_color}${_mss_enabled}${NC}  |  ${BOLD}MSS_BULK:${NC} ${mss_bulk_color}${_mss_bulk_enabled}${NC}  |  ${BOLD}Synlimit:${NC} ${synlimit_color}${_synlimit_enabled}${NC}"
         done
     elif [ "$telemt_installed" = true ] && [ ${#configs_array[@]} -eq 0 ]; then
@@ -1257,7 +1273,13 @@ main_menu() {
         local forced_port="$2"
         echo -e "  ${BLUE}[i]${NC} Запуск в режиме авто-установки SYN FIX..."
         if ensure_rules_loaded; then
-            install_syn_fix -auto_install "$forced_port"
+            # Порт передаём явно через -port: позиционный аргумент
+            # install_syn_fix игнорирует и ставит фикс на 443.
+            if [ -n "$forced_port" ]; then
+                install_syn_fix -auto_install -port "$forced_port"
+            else
+                install_syn_fix -auto_install
+            fi
         else
             log_error "Невозможно выполнить автоустановку: rules.sh не загружен"
             wait_key "Нажмите любую клавишу..."
@@ -1727,8 +1749,8 @@ cli_online() {
                 [ -n "$_cfg" ] || continue
                 local _port _online
                 _port="$(get_port_from_config "$_cfg" 2>/dev/null || true)"
-                _online="$(get_telemt_online_for_config "$_cfg" 2>/dev/null || echo 0)"
-                [ -n "$_online" ] || _online=0
+                _online="$(get_telemt_online_for_config "$_cfg" 2>/dev/null || true)"
+                [[ "$_online" =~ ^[0-9]+$ ]] || _online="н/д"
                 if [ -n "$_port" ]; then
                     echo -e "    ${BOLD}Telemt${NC} ${DIM}($_cfg, порт $_port)${NC}: ${CYAN}${_online}${NC} человек"
                 else

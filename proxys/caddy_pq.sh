@@ -21,6 +21,7 @@ NC='\033[0m'
 CADDYFILE="/etc/caddy/Caddyfile"
 SITE_DIR="/var/www/site"
 CERT_DIR_BASE="/etc/letsencrypt/live"
+CERT_EXPORT_DIR="/etc/caddy/certs"
 SERVICE="caddy"
 PORT="8443"
 # Маркер «наш» файл: по нему отличаем сгенерированный нами Caddyfile
@@ -192,17 +193,112 @@ obtain_certificate() {
     return 0
 }
 
+# ── Копия сертификата, читаемая пользователем caddy ───────────
+# Пакет Caddy в Debian/Ubuntu запускает службу под User=caddy, а
+# /etc/letsencrypt/live у certbot — drwx------ root:root. Поэтому
+# Caddyfile не может читать серт напрямую: копируем в отдельный
+# каталог с группой caddy и правами 0640.
+caddy_group() {
+    if getent group caddy >/dev/null 2>&1; then
+        printf 'caddy'
+    else
+        printf 'root'
+    fi
+}
+
+export_cert_for_caddy() {
+    local domain="$1"
+    local src_dir="${CERT_DIR_BASE}/${domain}"
+    local dst_dir="${CERT_EXPORT_DIR}/${domain}"
+    local grp="" _ok=0
+
+    if [ ! -f "${src_dir}/fullchain.pem" ] || [ ! -f "${src_dir}/privkey.pem" ]; then
+        log_error "Сертификат не найден: ${src_dir}"
+        return 1
+    fi
+
+    mkdir -p "$dst_dir" || return 1
+    grp="$(caddy_group)"
+    chown root:"$grp" "$dst_dir" 2>/dev/null || true
+    chmod 755 "$CERT_EXPORT_DIR" 2>/dev/null || true
+    chmod 750 "$dst_dir" 2>/dev/null || true
+    cp -Lf "${src_dir}/fullchain.pem" "${dst_dir}/fullchain.pem" || return 1
+    cp -Lf "${src_dir}/privkey.pem" "${dst_dir}/privkey.pem" || return 1
+    chown root:"$grp" "${dst_dir}/fullchain.pem" "${dst_dir}/privkey.pem" 2>/dev/null || true
+    chmod 640 "${dst_dir}/fullchain.pem" "${dst_dir}/privkey.pem" 2>/dev/null || true
+
+    # Проверяем именно то, что важно: сможет ли caddy прочитать файлы.
+    if id caddy >/dev/null 2>&1; then
+        if command -v runuser >/dev/null 2>&1; then
+            if runuser -u caddy -- test -r "${dst_dir}/fullchain.pem" 2>/dev/null; then
+                if runuser -u caddy -- test -r "${dst_dir}/privkey.pem" 2>/dev/null; then
+                    _ok=1
+                fi
+            fi
+        else
+            if su -s /bin/sh -c "test -r '${dst_dir}/fullchain.pem' && test -r '${dst_dir}/privkey.pem'" caddy >/dev/null 2>&1; then
+                _ok=1
+            fi
+        fi
+        if [ "$_ok" -ne 1 ]; then
+            log_error "Caddy не сможет прочитать сертификат в ${dst_dir}"
+            return 1
+        fi
+    fi
+
+    log_success "Сертификат подготовлен для Caddy: ${dst_dir}"
+    return 0
+}
+
+# ── Хук продления: обновляет копии после certbot renew ────────
+install_cert_hook() {
+    local hook_dir="/etc/letsencrypt/renewal-hooks/deploy"
+    local hook="${hook_dir}/caddy-certs.sh"
+
+    mkdir -p "$hook_dir" || return 1
+    cat > "$hook" <<'HOOK'
+#!/bin/sh
+# managed by MEKO Manager: обновляет копии сертификатов для Caddy
+set -eu
+grp=root
+if getent group caddy >/dev/null 2>&1; then
+    grp=caddy
+fi
+for d in /etc/letsencrypt/live/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d")
+    dst="/etc/caddy/certs/$name"
+    [ -d "$dst" ] || continue
+    cp -Lf "$d/fullchain.pem" "$dst/fullchain.pem"
+    cp -Lf "$d/privkey.pem" "$dst/privkey.pem"
+    chmod 640 "$dst/fullchain.pem" "$dst/privkey.pem"
+    chown root:"$grp" "$dst/fullchain.pem" "$dst/privkey.pem" 2>/dev/null || true
+done
+if systemctl is-active --quiet caddy 2>/dev/null; then
+    systemctl restart caddy || true
+fi
+exit 0
+HOOK
+    chmod 755 "$hook" || return 1
+    log_success "Хук продления сертификата: ${hook}"
+    return 0
+}
+
 # ── Запись Caddyfile ──────────────────────────────────────────
 write_caddyfile() {
     local domain="$1"
-    local fullchain="${CERT_DIR_BASE}/${domain}/fullchain.pem"
-    local privkey="${CERT_DIR_BASE}/${domain}/privkey.pem"
+    local fullchain="${CERT_EXPORT_DIR}/${domain}/fullchain.pem"
+    local privkey="${CERT_EXPORT_DIR}/${domain}/privkey.pem"
 
     mkdir -p "$(dirname "$CADDYFILE")"
 
     # Не затираем чужой рабочий Caddyfile: если файл есть и в нём нет
     # нашего маркера — делаем бэкап и спрашиваем подтверждение.
-    if [ -f "$CADDYFILE" ] && ! grep -qF "$CADDY_MARKER" "$CADDYFILE"; then
+    # Исключение — стандартный Caddyfile из пакета caddy (":80"): это не
+    # чужой конфиг, а болванка, и спрашивать про неё незачем.
+    if [ -f "$CADDYFILE" ] && ! grep -qF "$CADDY_MARKER" "$CADDYFILE" \
+        && ! { grep -qF 'root * /usr/share/caddy' "$CADDYFILE" \
+            && grep -qF 'The Caddyfile is an easy way to configure' "$CADDYFILE"; }; then
         local ts backup _ans
         ts=$(date +%Y%m%d-%H%M%S)
         backup="${CADDYFILE}.bak.${ts}"
@@ -314,6 +410,18 @@ install_caddy_pq() {
         return 1
     fi
 
+    if ! export_cert_for_caddy "$domain"; then
+        log_error "Сертификат не подготовлен для Caddy"
+        pause || true
+        return 1
+    fi
+
+    if ! install_cert_hook; then
+        log_error "Не удалось установить хук продления сертификата"
+        pause || true
+        return 1
+    fi
+
     if ! write_caddyfile "$domain"; then
         log_error "Запись Caddyfile отменена или не удалась"
         pause || true
@@ -410,7 +518,9 @@ remove_caddy_pq() {
     if [[ "$rmcfg" =~ ^[yY]$ ]]; then
         rm -f "$CADDYFILE"
         rm -rf "$SITE_DIR"
-        log_success "Caddyfile и заглушка удалены"
+        rm -rf "$CERT_EXPORT_DIR"
+        rm -f /etc/letsencrypt/renewal-hooks/deploy/caddy-certs.sh
+        log_success "Caddyfile, заглушка, копии сертификатов и хук продления удалены"
     fi
 
     log_warning "Сертификат Let's Encrypt НЕ удалён (${CERT_DIR_BASE})."
