@@ -242,15 +242,33 @@ if ! iptables -t filter -C INPUT -j "$CHAIN" 2>/dev/null; then
     echo "Цепочка $CHAIN подключена к INPUT"
 fi
 
-# ── 1. Маркировка iOS в mangle (идемпотентно) ───────────────
+# ── 1. Маркировка iOS (iptables u32, а без xt_u32 — тем же фильтром в nftables) ──
 U32_FILTER="32 & 0x000FFFFF = 0x0002FFFF && 40 & 0xFF000000 = 0x02000000 && 44 & 0xFFFF0000 = 0x01030000 && 48 & 0xFFFFFF00 = 0x01010800 && 60 & 0xFFFFFFFF = 0x04020000"
 # Сначала сносим все ранее накопившиеся дубликаты этого правила
 while iptables -t mangle -C PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400 2>/dev/null; do
     iptables -t mangle -D PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400 2>/dev/null || break
 done
-# И добавляем ровно одно
-iptables -t mangle -C PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400 2>/dev/null \
-    || iptables -t mangle -A PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400
+if iptables -t mangle -A PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400 2>/dev/null; then
+    nft delete table inet mtpr_synfix_u32 2>/dev/null || true
+else
+    # Ядро без xt_u32 (RHEL/Alma/Rocky 9 и т.п.): те же смещения читаем
+    # штатным nftables через @nh (смещения там в битах), mark общий.
+    echo "xt_u32 недоступен — маркировка через nftables"
+    nft delete table inet mtpr_synfix_u32 2>/dev/null || true
+    nft add table inet mtpr_synfix_u32
+    nft add chain inet mtpr_synfix_u32 pre '{ type filter hook prerouting priority mangle; policy accept; }'
+    # Каждое условие — отдельный аргумент в кавычках: nft склеивает их через AND.
+    # Смещения u32 (в байтах от начала IP-заголовка) переводим в биты для @nh.
+    for PORT in $(echo "$PORTS" | tr ',' ' '); do
+        nft add rule inet mtpr_synfix_u32 pre meta nfproto ipv4 tcp dport "$PORT" \
+            '@nh,256,32 & 0x000FFFFF == 0x0002FFFF' \
+            '@nh,320,32 & 0xFF000000 == 0x02000000' \
+            '@nh,352,32 & 0xFFFF0000 == 0x01030000' \
+            '@nh,384,32 & 0xFFFFFF00 == 0x01010800' \
+            '@nh,480,32 & 0xFFFFFFFF == 0x04020000' \
+            meta mark set 0x400
+    done
+fi
 
 # ── Проходим по каждому порту ──────────────────────────────
 IFS=',' read -ra PORT_ARRAY <<< "$PORTS"
@@ -321,9 +339,18 @@ u32_module_available() {
     if modprobe xt_u32 2>/dev/null; then
         lsmod 2>/dev/null | grep -q '^xt_u32' && return 0
     fi
-    # 3) косвенная проверка: iptables умеет match u32
-    if command -v iptables >/dev/null 2>&1 && iptables -m u32 -h >/dev/null 2>&1; then
-        return 0
+    # 3) косвенная проверка: iptables -m u32 -h печатает справку даже без
+    # ядра-модуля (exit 0), поэтому пробуем настоящее правило в тестовой цепочке.
+    if command -v iptables >/dev/null 2>&1; then
+        local _test_chain="MTPR_U32TEST"
+        if iptables -t mangle -N "$_test_chain" 2>/dev/null; then
+            if iptables -t mangle -A "$_test_chain" -m u32 --u32 "0=0" 2>/dev/null; then
+                iptables -t mangle -F "$_test_chain" 2>/dev/null || true
+                iptables -t mangle -X "$_test_chain" 2>/dev/null || true
+                return 0
+            fi
+            iptables -t mangle -X "$_test_chain" 2>/dev/null || true
+        fi
     fi
     return 1
 }
@@ -366,20 +393,48 @@ install_u32_module_elrepo() {
         *)  rel="9"; elrepo_url="https://www.elrepo.org/elrepo-release-9.el9.elrepo.noarch.rpm" ;;
     esac
 
-    if $sudo_cmd dnf repolist 2>/dev/null | grep -qi 'elrepo'; then
+    if timeout 20 $sudo_cmd dnf repolist 2>/dev/null | grep -qi 'elrepo'; then
         log_info "Репозиторий elrepo уже подключён"
     else
         log_info "Подключение репозитория elrepo (RHEL/CentOS ${rel}.x)..."
-        if ! $sudo_cmd dnf install -y "$elrepo_url"; then
+        if ! timeout 90 $sudo_cmd dnf install -y --setopt=timeout=20 --setopt=retries=1 "$elrepo_url"; then
             log_error "Не удалось подключить репозиторий elrepo ($elrepo_url)"
             return 1
         fi
     fi
 
     log_info "Установка модуля kmod-xt_u32..."
-    if ! $sudo_cmd dnf install -y kmod-xt_u32; then
-        log_error "Не удалось установить пакет kmod-xt_u32"
+    # Пакет уже стоит (например, после обновления ядра): не дёргаем dnf,
+    # у elrepo метаданные иногда тянутся минутами.
+    if command -v rpm >/dev/null 2>&1 && rpm -q kmod-xt_u32 >/dev/null 2>&1; then
+        $sudo_cmd modprobe xt_u32 2>/dev/null || modprobe xt_u32 2>/dev/null || true
+        if u32_module_available; then
+            log_success "Модуль xt_u32 загружен и доступен"
+            return 0
+        fi
+        log_warning "kmod-xt_u32 установлен, но модуль не загрузился (собран под другое ядро?) — будет nftables"
         return 1
+    fi
+
+    # Сначала прямой rpm: металлинк elrepo умеет висеть в «B/s ETA» до таймаута dnf,
+    # а листинг каталога отдаётся быстро. dnf — только запасной путь.
+    local arch base rpm_name rpm_path installed=false
+    arch=$(uname -m)
+    base="https://elrepo.org/linux/elrepo/el${rel}/${arch}/RPMS/"
+    rpm_name=$(curl -fsSL --max-time 20 "$base" 2>/dev/null | grep -oE 'kmod-xt_u32-[^"]+\.rpm' | sort -uV | tail -1)
+    if [ -n "$rpm_name" ]; then
+        rpm_path="/tmp/${rpm_name}"
+        if curl -fsSL --max-time 90 -o "$rpm_path" "${base}${rpm_name}" \
+           && $sudo_cmd rpm -Uvh --nodeps "$rpm_path"; then
+            installed=true
+        else
+            log_warning "Прямая установка kmod-xt_u32 не удалась — пробую dnf"
+        fi
+    else
+        log_info "В elrepo нет kmod-xt_u32 для el${rel} — пробую dnf"
+    fi
+    if [ "$installed" != true ]; then
+        timeout 90 $sudo_cmd dnf install -y --setopt=timeout=20 --setopt=retries=1 kmod-xt_u32 >/dev/null 2>&1 || true
     fi
 
     # Явная загрузка и ПРОВЕРКА факта наличия модуля
@@ -388,7 +443,8 @@ install_u32_module_elrepo() {
         log_success "Модуль xt_u32 загружен и доступен"
         return 0
     fi
-    log_error "Пакет kmod-xt_u32 установлен, но модуль xt_u32 НЕ загрузился (проверьте: modprobe xt_u32; lsmod | grep xt_u32)"
+    log_error "Пакет kmod-xt_u32 установлен, но модуль xt_u32 НЕ загрузился (проверьте: modprobe xt_u32; lsmod | grep xt_u32)."
+    log_error "Если kmod собран под другое ядро (например, после обновления kernel) — перезагрузите сервер и повторите."
     return 1
 }
 
@@ -1087,8 +1143,7 @@ SERVICE_NFT_EOF
         if [ "$auto_install" = true ]; then
             log_info "Автоматическая установка kmod-xt_u32 через elrepo..."
             if ! install_u32_module_elrepo; then
-                log_error "Модуль u32 недоступен. Автоматическая установка не удалась."
-                return 1
+                log_warning "Модуль xt_u32 поставить не удалось — маркировка iOS пойдёт через nftables (модуль не нужен)."
             fi
         else
             echo -e "  ${BOLD}Установить необходимый модуль xt_u32?${NC}"
@@ -1104,10 +1159,7 @@ SERVICE_NFT_EOF
             fi
             if [[ -z "$install_u32" || "$install_u32" =~ ^[yY]$ ]]; then
                 if ! install_u32_module_elrepo; then
-                    if { : </dev/tty; } 2>/dev/null; then
-                        pause_key "Нажмите любую клавишу"
-                    fi
-                    return 1
+                    log_warning "Модуль xt_u32 поставить не удалось — маркировка iOS пойдёт через nftables (модуль не нужен)."
                 fi
             else
                 log_info "Установка отменена"
@@ -1135,9 +1187,30 @@ SERVICE_NFT_EOF
     fi
 
     # ── Явная проверка результата: успех НЕ определяется пустым выводом + кодом 0 ──
+    # Проверяем ядро, а не лог. На RHEL-семействе первый проход иногда
+    # проигрывает гонку (юнит остаётся inactive) — тогда один повтор.
     if [ "$FIX_TYPE" = "new" ]; then
-        if ! iptables -t mangle -C PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400 2>/dev/null; then
-            log_error "SYN FIX (v3/u32) НЕ применён: правило u32 в таблице mangle отсутствует"
+        local _rules_ok=false _nft_dump=""
+        if iptables -t mangle -C PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400 2>/dev/null; then
+            _rules_ok=true
+        else
+            # Без пайпа: nft пишет больше, чем grep -q успевает прочитать, и при
+            # pipefail SIGPIPE от grep даёт ложное «правил нет».
+            _nft_dump=$(nft list table inet mtpr_synfix_u32 2>/dev/null || true)
+            case "$_nft_dump" in *"@nh"*) _rules_ok=true ;; esac
+        fi
+        if [ "$_rules_ok" != true ]; then
+            systemctl restart mtpr-synfix.service >/dev/null 2>&1 || true
+            sleep 1
+            if iptables -t mangle -C PREROUTING -m u32 --u32 "$U32_FILTER" -j MARK --set-mark 0x400 2>/dev/null; then
+                _rules_ok=true
+            else
+                _nft_dump=$(nft list table inet mtpr_synfix_u32 2>/dev/null || true)
+                case "$_nft_dump" in *"@nh"*) _rules_ok=true ;; esac
+            fi
+        fi
+        if [ "$_rules_ok" != true ]; then
+            log_error "SYN FIX (v3/u32) НЕ применён: ни правило u32 в mangle, ни таблица nft не созданы"
             echo -e "  ${DIM}apply_output:${NC} ${apply_output:-<пусто>}"
             if [ "$auto_install" = false ] && { : </dev/tty; } 2>/dev/null; then
                 pause_key "Нажмите любую клавишу..."
