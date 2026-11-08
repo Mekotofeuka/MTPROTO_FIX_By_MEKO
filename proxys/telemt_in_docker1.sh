@@ -355,9 +355,17 @@ services:
 EOF
 log_success "docker-compose.yml создан"
 
-# Устанавливаем jq
-if ! apt install -y jq >/dev/null 2>&1; then
-    log_warning "Не удалось установить jq — ссылка может не отобразиться"
+# Устанавливаем jq (в EL-семействе и Alpine пакетного скрипта "apt" нет)
+if command -v apt >/dev/null 2>&1; then
+    apt install -y jq >/dev/null 2>&1 || log_warning "Не удалось установить jq — ссылка может не отобразиться"
+elif command -v dnf >/dev/null 2>&1; then
+    _dop="--setopt=timeout=15 --setopt=retries=1"
+    [ -f /etc/yum.repos.d/elrepo.repo ] && _dop="$_dop --disablerepo=elrepo"
+    dnf install -y -q $_dop jq >/dev/null 2>&1 || log_warning "Не удалось установить jq — ссылка может не отобразиться"
+elif command -v yum >/dev/null 2>&1; then
+    yum install -y -q jq >/dev/null 2>&1 || log_warning "Не удалось установить jq — ссылка может не отобразиться"
+elif command -v apk >/dev/null 2>&1; then
+    apk add --no-cache jq >/dev/null 2>&1 || log_warning "Не удалось установить jq — ссылка может не отобразиться"
 fi
 
 # Запускаем

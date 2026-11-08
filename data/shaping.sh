@@ -84,6 +84,23 @@ SH_CONFIG_BROKEN=0
 
 _sh_have_jq() { command -v jq >/dev/null 2>&1; }
 
+# iproute2/jq есть не всегда и ставятся по-разному: apt, dnf/yum, apk.
+_sh_install_pkg() {
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get install -y "$@" >/dev/null 2>&1
+    elif command -v dnf >/dev/null 2>&1; then
+        local dop="--setopt=timeout=15 --setopt=retries=1"
+        [ -f /etc/yum.repos.d/elrepo.repo ] && dop="$dop --disablerepo=elrepo"
+        dnf install -y -q $dop "$@" >/dev/null 2>&1
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y -q "$@" >/dev/null 2>&1
+    elif command -v apk >/dev/null 2>&1; then
+        apk add --no-cache "$@" >/dev/null 2>&1
+    else
+        return 1
+    fi
+}
+
 _sh_load() {
     SH_ENABLED="false"; SH_MODE="manual"
     SH_CHANNEL="1000"; SH_RESERVE="10"; SH_USERS="10"
@@ -363,18 +380,18 @@ sh_apply() {
         log_error "Утилита tc не найдена (пакет iproute2)"
         if [ "${SH_ALLOW_TC_INSTALL:-0}" = "1" ]; then
             log_info "Пробую установить iproute2..."
-            if apt-get install -y iproute2 >/dev/null 2>&1; then
+            if _sh_install_pkg iproute2; then
                 log_success "iproute2 установлен"
             else
                 log_error "Не удалось установить iproute2"; _sh_save_last_error "tc missing"; return 1
             fi
         else
-            log_info "Установите пакет iproute2 (apt-get install -y iproute2) и повторите"
+            log_info "Установите пакет iproute2 (apt/dnf install iproute2) и повторите"
             _sh_save_last_error "tc missing"; return 1
         fi
     fi
     if ! _sh_have_jq; then
-        log_error "jq не найден (apt-get install -y jq)"; return 1
+        log_error "jq не найден (установите пакет jq для вашего дистрибутива)"; return 1
     fi
     if [ "${SH_CONFIG_BROKEN:-0}" = "1" ]; then
         log_error "Конфиг шейпинга повреждён (${CONFIG_FILE}) — применение отменено. Исправьте файл или удалите его (rm -f ${CONFIG_FILE}) и настройте заново"
