@@ -1624,6 +1624,19 @@ _toml_set_in_table() {
     ' "$cfg"
 }
 
+# Дождаться, пока telemt займёт порт WEB: сразу после restart он ещё
+# не слушает и ссылка отдаёт 502.
+_web_wait_web_port() {
+    local i=0
+    command -v ss >/dev/null 2>&1 || return 0
+    while [ "$i" -lt 20 ]; do
+        ss -tlnH 2>/dev/null | awk '{print $4}' | grep -qE ':18080$' && return 0
+        sleep 0.5
+        i=$((i + 1))
+    done
+    return 1
+}
+
 # Бэкап + запись нового содержимого + verify + откат при невалидном TOML,
 # затем рестарт telemt и проверка активности.
 _web_apply_edit() {
@@ -1646,6 +1659,7 @@ _web_apply_edit() {
     echo -e "  ${DIM}Бэкап: ${backup}${NC}"
     if systemctl restart telemt >/dev/null 2>&1 && systemctl is-active --quiet telemt 2>/dev/null; then
         echo -e "  ${GREEN}[✓]${NC} telemt перезапущен и активен"
+        _web_wait_web_port || echo -e "  ${YELLOW}[!]${NC} порт WEB (18080) ещё не слушается — откройте ссылку через пару секунд"
     else
         echo -e "  ${YELLOW}[!]${NC} Не удалось подтвердить активность telemt"
     fi
@@ -2243,20 +2257,9 @@ _web_proxy_install() {
         _wait=$((_wait + 1))
     done
     if systemctl is-active --quiet telemt 2>/dev/null; then
-        # Процесс может быть active, но ещё не успеть занять WEB-порт:
-        # тогда ссылка сразу после установки отдаёт 502. Ждём недолго.
-        local _lwait=0
-        while [ "$_lwait" -lt 20 ] && command -v ss >/dev/null 2>&1; do
-            if ss -tlnH 2>/dev/null | awk '{print $4}' | grep -qE ':18080$'; then
-                break
-            fi
-            sleep 0.5
-            _lwait=$((_lwait + 1))
-        done
+        # Процесс active, но WEB-порт может занять не сразу.
+        _web_wait_web_port || echo -e "  ${YELLOW}[!]${NC} порт WEB (18080) ещё не слушается — откройте ссылку через пару секунд"
         echo -e "  ${GREEN}[✓]${NC} telemt перезапущен и активен"
-        if command -v ss >/dev/null 2>&1 && ! ss -tlnH 2>/dev/null | awk '{print $4}' | grep -qE ':18080$'; then
-            echo -e "  ${YELLOW}[!]${NC} порт WEB (18080) ещё не слушается — откройте ссылку через пару секунд"
-        fi
     else
         local terr=""
         terr=$(journalctl -u telemt -n 20 --no-pager 2>/dev/null | grep -E 'Error:|ERROR ' | tail -n 1)
