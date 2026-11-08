@@ -83,6 +83,7 @@ ensure_rules_loaded() {
     [ "$RULES_LOADED" -eq 1 ] && return 0
 
     if [ -f "$RULES_SCRIPT" ]; then
+        # shellcheck source=/dev/null
         source "$RULES_SCRIPT"
         RULES_LOADED=1
         if [ -f "$INSTALL_DIR/data/zapret2_fix.sh" ]; then
@@ -96,6 +97,7 @@ ensure_rules_loaded() {
     mkdir -p "$INSTALL_DIR/data"
     if curl -fsSL --max-time 5 "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/data/rules.sh" -o "$RULES_SCRIPT"; then
         chmod +x "$RULES_SCRIPT"
+        # shellcheck source=/dev/null
         source "$RULES_SCRIPT"
         RULES_LOADED=1
         if curl -fsSL --max-time 5 "https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/data/zapret2_fix.sh" -o "$INSTALL_DIR/data/zapret2_fix.sh"; then
@@ -273,7 +275,8 @@ detect_all_telemt_configs() {
     done
     
     if [ -f "$CONFIG_PATH_FILE" ] && [ -s "$CONFIG_PATH_FILE" ]; then
-        local _saved_path=$(trim "$(cat "$CONFIG_PATH_FILE")")
+        local _saved_path
+        _saved_path=$(trim "$(cat "$CONFIG_PATH_FILE")") || _saved_path=""
         if [ -n "$_saved_path" ] && [ "$_saved_path" != "skip" ] && [ -f "$_saved_path" ] && _looks_like_telemt_config "$_saved_path"; then
             case "$SEEN_PATHS" in *"$_saved_path"*) ;; *)
                 SEEN_PATHS="${SEEN_PATHS}${_saved_path}\n"
@@ -295,7 +298,8 @@ get_port_from_config() {
         return 1
     fi
     
-    local _port=$(grep -E '^[[:space:]]*port[[:space:]]*=' "$_cfg" 2>/dev/null | head -1 | sed -E 's/^[[:space:]]*port[[:space:]]*=[[:space:]]*//; s/[^0-9]//g')
+    local _port
+    _port=$(grep -E '^[[:space:]]*port[[:space:]]*=' "$_cfg" 2>/dev/null | head -1 | sed -E 's/^[[:space:]]*port[[:space:]]*=[[:space:]]*//; s/[^0-9]//g') || _port=""
     
     if [ -z "$_port" ]; then
         _port=$(_toml_get_value "port" "$_cfg")
@@ -1018,7 +1022,8 @@ show_header() {
     fi
     if [ -z "$open_ports" ] || [ "$open_ports" = "skip" ]; then
         if [ -n "$CONFIG_TELEMT" ] && [ -f "$CONFIG_TELEMT" ]; then
-            local telemt_port=$(get_port_from_config "$CONFIG_TELEMT")
+            local telemt_port
+            telemt_port=$(get_port_from_config "$CONFIG_TELEMT") || telemt_port=""
             if [ -n "$telemt_port" ]; then
                 open_ports="$telemt_port"
             fi
@@ -1107,7 +1112,8 @@ show_header() {
     fi
 
     # ── Найденные конфиги Telemt ───────────────────────────
-    local all_configs=$(detect_all_telemt_configs)
+    local all_configs
+    all_configs=$(detect_all_telemt_configs) || all_configs=""
     local configs_array=()
     if [ -n "$all_configs" ]; then
         IFS=':' read -ra configs_array <<< "$all_configs"
@@ -1121,12 +1127,18 @@ show_header() {
                 continue
             fi
             
-            local _port=$(get_port_from_config "$cfg")
-            local _version=$(get_telemt_version)
-            local _online=$(get_telemt_online_for_config "$cfg")
-            local _mss_enabled=$(is_mss_enabled_for_config "$cfg" && echo "включен" || echo "отключен")
-            local _mss_bulk_enabled=$(is_mss_bulk_enabled_for_config "$cfg" && echo "включен" || echo "отключен")
-            local _synlimit_enabled=$(is_synlimit_enabled_for_config "$cfg" && echo "включен" || echo "отключен")
+            local _port
+            _port=$(get_port_from_config "$cfg") || _port=""
+            local _version
+            _version=$(get_telemt_version) || _version=""
+            local _online
+            _online=$(get_telemt_online_for_config "$cfg") || _online=""
+            local _mss_enabled
+            _mss_enabled=$(is_mss_enabled_for_config "$cfg" && echo "включен" || echo "отключен") || _mss_enabled=""
+            local _mss_bulk_enabled
+            _mss_bulk_enabled=$(is_mss_bulk_enabled_for_config "$cfg" && echo "включен" || echo "отключен") || _mss_bulk_enabled=""
+            local _synlimit_enabled
+            _synlimit_enabled=$(is_synlimit_enabled_for_config "$cfg" && echo "включен" || echo "отключен") || _synlimit_enabled=""
             
             local version_color=""
             if [ "$_version" = "3.4.18" ]; then
@@ -1166,7 +1178,8 @@ show_header() {
             echo -e "  ${BOLD}Встроенный MSS:${NC} ${mss_color}${_mss_enabled}${NC}  |  ${BOLD}MSS_BULK:${NC} ${mss_bulk_color}${_mss_bulk_enabled}${NC}  |  ${BOLD}Synlimit:${NC} ${synlimit_color}${_synlimit_enabled}${NC}"
         done
     elif [ "$telemt_installed" = true ] && [ ${#configs_array[@]} -eq 0 ]; then
-        local _version=$(get_telemt_version)
+        local _version
+        _version=$(get_telemt_version) || _version=""
         local version_color=""
         if [ "$_version" = "3.4.18" ]; then
             version_color="${GREEN}"
@@ -1181,7 +1194,8 @@ show_header() {
 
     # ── Mtproto.zig ───────────────────────────────────────
     if [ "$mtprotozig_installed" = true ]; then
-        local online_count=$(get_mtprotozig_online)
+        local online_count
+        online_count=$(get_mtprotozig_online) || online_count=""
         if [ -n "$online_count" ] && [ "$online_count" -ge 0 ] 2>/dev/null; then
             echo ""
             echo -e "  ${BOLD}Mtproto.zig онлайн:${NC} ${CYAN}$online_count${NC} человек"
@@ -1193,8 +1207,10 @@ show_header() {
 
     # ── MTG ───────────────────────────────────────────────
     if [ "$mtg_installed" = true ]; then
-        local mtg_version=$(get_mtg_version)
-        local mtg_config_path=$(get_mtg_config_path)
+        local mtg_version
+        mtg_version=$(get_mtg_version) || mtg_version=""
+        local mtg_config_path
+        mtg_config_path=$(get_mtg_config_path) || mtg_config_path=""
         local mtg_port=""
         if [ -f "$mtg_config_path" ]; then
             mtg_port=$(get_mtg_port "$mtg_config_path")
@@ -1295,8 +1311,10 @@ main_menu() {
         ensure_rules_loaded 2>/dev/null && rules_available=1
 
         if [ "$rules_available" -eq 1 ]; then
-            local iptables_status=$(get_synfix_status)
-            local nft_status=$(get_nft_fix_status)
+            local iptables_status
+            iptables_status=$(get_synfix_status) || iptables_status=""
+            local nft_status
+            nft_status=$(get_nft_fix_status) || nft_status=""
             if [ "$iptables_status" = "inactive" ] && [ "$nft_status" = "inactive" ]; then
                 local item1="${NC}${BOLD}Меню установки ${CYAN}${BOLD}MTProto FIX${NC}"
             else
@@ -1339,8 +1357,10 @@ main_menu() {
                 continue
             fi
 
-            local iptables_status=$(get_synfix_status)
-            local nft_status=$(get_nft_fix_status)
+            local iptables_status
+            iptables_status=$(get_synfix_status) || iptables_status=""
+            local nft_status
+            nft_status=$(get_nft_fix_status) || nft_status=""
             
             if [ "$iptables_status" != "inactive" ]; then
                 log_info "Обнаружен iptables SYN FIX ($SYNFIX_CHAIN). Удалить?"
@@ -1451,7 +1471,8 @@ update_script() {
     local MANIFEST_URL="$BASE_URL/data/manifest.txt"
     local MANIFEST_FILE="/tmp/manifest_update.txt"
     local url="$BASE_URL/main.sh"
-    local temp="/tmp/$(basename "$SELF_PATH").new.$$"
+    local temp
+    temp="/tmp/$(basename "$SELF_PATH").new.$$" || temp=""
 
     echo ""
     echo -e "  ${GREEN}[✓]${NC} Скачиваем новую версию main.sh..."
@@ -1485,9 +1506,11 @@ update_script() {
         local desc="$2"
         local url="$BASE_URL/$file"
         local dest="$INSTALL_DIR/$file"
-        local name=$(basename "$file")
+        local name
+        name=$(basename "$file") || name=""
         
-        local size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
+        local size
+        size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r') || size=""
         local size_str="?"
         if [ -n "$size" ] && [ "$size" -gt 0 ] 2>/dev/null; then
             if [ "$size" -gt 1048576 ]; then
@@ -1614,11 +1637,14 @@ install_node_manager() {
         local desc="$2"
         local url="$BASE_URL/remote_ctl/$file"
         local dest="$NODE_DIR/$file"
-        local name=$(basename "$file")
-        local dir=$(dirname "$dest")
+        local name
+        name=$(basename "$file") || name=""
+        local dir
+        dir=$(dirname "$dest") || dir=""
         mkdir -p "$dir"
 
-        local size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r')
+        local size
+        size=$(curl -sI "$url" 2>/dev/null | grep -i "Content-Length" | awk '{print $2}' | tr -d '\r') || size=""
         local size_str="?"
         if [ -n "$size" ] && [ "$size" -gt 0 ] 2>/dev/null; then
             if [ "$size" -gt 1048576 ]; then

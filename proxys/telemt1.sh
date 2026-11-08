@@ -876,6 +876,7 @@ install_telemt_docker() {
     
     if [ -f "$DOCKER_SCRIPT" ]; then
         chmod +x "$DOCKER_SCRIPT"
+        # shellcheck source=/dev/null
         source "$DOCKER_SCRIPT"
     else
         echo ""

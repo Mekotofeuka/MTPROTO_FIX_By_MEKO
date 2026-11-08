@@ -758,6 +758,7 @@ install_syn_fix() {
                 _zapret2_file="/opt/mtpr-simple/data/zapret2_fix.sh"
             fi
             if [ -r "$_zapret2_file" ]; then
+                # shellcheck source=/dev/null
                 . "$_zapret2_file"
             fi
         fi
