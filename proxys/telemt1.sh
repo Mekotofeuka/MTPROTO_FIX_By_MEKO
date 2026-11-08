@@ -1627,10 +1627,11 @@ _toml_set_in_table() {
 # Дождаться, пока telemt займёт порт WEB: сразу после restart он ещё
 # не слушает и ссылка отдаёт 502.
 _web_wait_web_port() {
-    local i=0
+    local i=0 dump
     command -v ss >/dev/null 2>&1 || return 0
-    while [ "$i" -lt 20 ]; do
-        ss -tlnH 2>/dev/null | awk '{print $4}' | grep -qE ':18080$' && return 0
+    while [ "$i" -lt 40 ]; do
+        dump=$(ss -tlnH 2>/dev/null || true)
+        printf '%s\n' "$dump" | awk '$4 ~ /:18080$/ {found=1} END {exit !found}' && return 0
         sleep 0.5
         i=$((i + 1))
     done
@@ -1965,35 +1966,93 @@ _web_ensure_decoy() {
     [ -s /var/lib/telemt/public/index.html ] || echo "OK" > /var/lib/telemt/public/index.html 2>/dev/null || true
 }
 
+# ── Остановка nginx, запущенного не через systemd ────────────
+# certbot --nginx умеет поднять собственный мастер-процесс (PPID 1).
+# Такой nginx держит 443, и systemctl restart nginx падает на bind.
+_web_stop_stray_nginx() {
+    command -v pgrep >/dev/null 2>&1 || return 0
+    pgrep -x nginx >/dev/null 2>&1 || return 0
+    nginx -s stop >/dev/null 2>&1 || true
+    local _i=0
+    while [ "$_i" -lt 5 ] && pgrep -x nginx >/dev/null 2>&1; do
+        sleep 1
+        _i=$((_i + 1))
+    done
+    if pgrep -x nginx >/dev/null 2>&1 && command -v pkill >/dev/null 2>&1; then
+        pkill -x nginx >/dev/null 2>&1 || true
+        sleep 1
+    fi
+}
+
 # ── Установка/настройка nginx для WEB-режима (с откатом) ─────
+# Пакеты: Debian/Ubuntu — apt, RHEL/Alma/Rocky/Fedora — dnf/yum.
+# certbot в EL есть только в EPEL, поэтому его тянем отдельным шагом.
+_web_install_nginx_deps() {
+    if command -v apt-get >/dev/null 2>&1; then
+        DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx certbot python3-certbot-nginx
+        return $?
+    fi
+
+    local pm=""
+    if command -v dnf >/dev/null 2>&1; then
+        pm="dnf"
+    elif command -v yum >/dev/null 2>&1; then
+        pm="yum"
+    else
+        return 127
+    fi
+
+    local dnf_opt=""
+    if [ "$pm" = "dnf" ]; then
+        dnf_opt="--setopt=timeout=15 --setopt=retries=1"
+        [ -f /etc/yum.repos.d/elrepo.repo ] && dnf_opt="$dnf_opt --disablerepo=elrepo"
+    fi
+
+    "$pm" install -y -q $dnf_opt nginx || return 1
+    if ! command -v certbot >/dev/null 2>&1; then
+        grep -qi '^ID=fedora' /etc/os-release 2>/dev/null || "$pm" install -y -q $dnf_opt epel-release >/dev/null 2>&1 || true
+        "$pm" install -y -q $dnf_opt certbot python3-certbot-nginx || return 1
+        # Fedora: certbot-nginx требует pyparsing, но пакет его не тянет.
+        "$pm" install -y -q $dnf_opt python3-pyparsing >/dev/null 2>&1 || true
+    fi
+    return 0
+}
+
+# firewalld в EL по умолчанию закрывает 80/443 — certbot и nginx не достучатся.
+_web_open_firewall() {
+    command -v firewall-cmd >/dev/null 2>&1 || return 0
+    systemctl is-active --quiet firewalld 2>/dev/null || return 0
+    firewall-cmd --permanent --add-service=http >/dev/null 2>&1 || true
+    firewall-cmd --permanent --add-service=https >/dev/null 2>&1 || true
+    firewall-cmd --reload >/dev/null 2>&1 || true
+}
+
+# SELinux в enforcing не даст nginx проксировать на 127.0.0.1:18080.
+_web_selinux_allow_proxy() {
+    command -v getenforce >/dev/null 2>&1 || return 0
+    [ "$(getenforce 2>/dev/null)" = "Disabled" ] && return 0
+    setsebool -P httpd_can_network_connect 1 >/dev/null 2>&1 || true
+}
+
 _web_install_nginx() {
     local web_host="$1"
 
     if ! command -v nginx >/dev/null 2>&1 || ! command -v certbot >/dev/null 2>&1; then
         echo -e "  ${DIM}Установка nginx и certbot...${NC}"
-        if command -v apt-get >/dev/null 2>&1; then
-            DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
-            if ! DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nginx certbot python3-certbot-nginx; then
-                echo -e "  ${RED}[x]${NC} Не удалось установить nginx/certbot"
-                return 1
-            fi
-        elif command -v dnf >/dev/null 2>&1; then
-            if ! dnf install -y -q nginx certbot python3-certbot-nginx; then
-                echo -e "  ${RED}[x]${NC} Не удалось установить nginx/certbot"
-                return 1
-            fi
-        elif command -v yum >/dev/null 2>&1; then
-            if ! yum install -y -q nginx certbot python3-certbot-nginx; then
-                echo -e "  ${RED}[x]${NC} Не удалось установить nginx/certbot"
-                return 1
-            fi
-        else
-            echo -e "  ${RED}[x]${NC} Не удалось определить пакетный менеджер"
+        if ! _web_install_nginx_deps; then
+            echo -e "  ${RED}[x]${NC} Не удалось установить nginx/certbot"
             return 1
         fi
     fi
+    _web_open_firewall
 
-    local nginx_conf="/etc/nginx/sites-available/default"
+    local nginx_conf
+    if [ -d /etc/nginx/sites-available ]; then
+        nginx_conf="/etc/nginx/sites-available/default"
+    else
+        nginx_conf="/etc/nginx/conf.d/telemt-web.conf"
+    fi
     local nginx_bak=""
     if [ -f "$nginx_conf" ]; then
         nginx_bak="${nginx_conf}.bak.$(date +%Y%m%d-%H%M%S)"
@@ -2004,6 +2063,8 @@ _web_install_nginx() {
     if systemctl is-active --quiet nginx 2>/dev/null; then
         nginx_was_active=true
     fi
+    local _cert_log
+    _cert_log=$(mktemp /tmp/meko-certbot.XXXXXX.log 2>/dev/null || echo /tmp/meko-certbot.log)
 
     _web_ensure_decoy
 
@@ -2011,11 +2072,18 @@ _web_install_nginx() {
     sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1 || true
     sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1 || true
     local cert_ok=false
-    if certbot --nginx -d "$web_host" --non-interactive --agree-tos --email "admin@$web_host" >/dev/null 2>&1; then
-        cert_ok=true
-    else
+    # certbot --nginx поднимает свой мастер nginx, если служба не запущена,
+    # и потом этот процесс держит 443. Чужой (не systemd) nginx — только
+    # standalone-режим; systemd-службу после получения серта перезапустим сами.
+    if [ "$nginx_was_active" = true ]; then
+        if certbot --nginx -d "$web_host" --non-interactive --agree-tos --email "admin@$web_host" >"$_cert_log" 2>&1; then
+            cert_ok=true
+        fi
+    fi
+    if [ "$cert_ok" != true ]; then
         systemctl stop nginx >/dev/null 2>&1 || true
-        if certbot certonly --standalone -d "$web_host" --non-interactive --agree-tos --email "admin@$web_host" >/dev/null 2>&1; then
+        _web_stop_stray_nginx
+        if certbot certonly --standalone -d "$web_host" --non-interactive --agree-tos --email "admin@$web_host" >"$_cert_log" 2>&1; then
             cert_ok=true
         fi
     fi
@@ -2024,6 +2092,10 @@ _web_install_nginx() {
 
     if [ "$cert_ok" != true ]; then
         echo -e "  ${RED}[x]${NC} Не удалось получить SSL-сертификат для $web_host"
+        # Причина от certbot: без неё видно только «не удалось».
+        local _cerr
+        _cerr=$(grep -aE 'too many certificates|rate limit|Error|error|Failed|Timeout|timed out' "$_cert_log" 2>/dev/null | tail -2)
+        [ -n "$_cerr" ] && echo -e "  ${RED}[x]${NC} certbot: $_cerr"
         if [ -n "$nginx_bak" ] && [ -f "$nginx_bak" ]; then
             cp -a "$nginx_bak" "$nginx_conf" 2>/dev/null || true
         fi
@@ -2073,6 +2145,7 @@ server {
 }
 EOF
 
+    _web_selinux_allow_proxy
     if ! nginx -t >/dev/null 2>&1; then
         echo -e "  ${RED}[x]${NC} Конфигурация nginx невалидна — откат"
         if [ -n "$nginx_bak" ] && [ -f "$nginx_bak" ]; then
@@ -2081,6 +2154,8 @@ EOF
         systemctl restart nginx >/dev/null 2>&1 || true
         return 1
     fi
+    _web_stop_stray_nginx
+    systemctl enable nginx >/dev/null 2>&1 || true
     if ! systemctl restart nginx >/dev/null 2>&1; then
         echo -e "  ${RED}[x]${NC} Не удалось перезапустить nginx"
         return 1
@@ -2177,9 +2252,9 @@ _web_proxy_install() {
     local do_nginx=false
     case "$use_nginx" in y|Y|yes|YES) do_nginx=true ;; esac
 
-    if ss -tlnH 2>/dev/null | grep -q ':443 ' || netstat -tlnH 2>/dev/null | grep -q ':443 '; then
-        echo -e "  ${YELLOW}[!]${NC} Порт 443 уже занят. В WEB-режиме его занимает nginx —"
-        echo -e "  ${YELLOW}[!]${NC} обычный telemt-прокси на 443 работать не будет (конфликт)."
+    if [ "$do_nginx" = true ] && ss -tlnH 2>/dev/null | grep -q ':443 '; then
+        echo -e "  ${DIM}Порт 443 занят telemt — после записи WEB-конфига он переедет на 9443,${NC}"
+        echo -e "  ${DIM}освободит 443 для nginx. Старый MTProto на 443 при этом выключится.${NC}"
     fi
 
     echo ""
@@ -2212,14 +2287,6 @@ _web_proxy_install() {
         echo -e "  ${RED}[x]${NC} Не удалось определить внешний IP"
         rm -f "$tpl"
         return 1
-    fi
-
-    if [ "$do_nginx" = true ]; then
-        if ! _web_install_nginx "$web_host"; then
-            echo -e "  ${RED}[x]${NC} Настройка nginx не удалась — конфиг telemt не изменён"
-            rm -f "$tpl"
-            return 1
-        fi
     fi
 
     local content=""
@@ -2268,6 +2335,17 @@ _web_proxy_install() {
         systemctl restart telemt >/dev/null 2>&1 || true
         echo -e "  ${YELLOW}[!]${NC} Прежний конфиг восстановлен из ${backup}"
         return 1
+    fi
+
+    if [ "$do_nginx" = true ]; then
+        # nginx ставим ПОСЛЕ записи WEB-конфига: telemt уже переехал
+        # с 443 на 9443, иначе nginx не сможет занять 443.
+        if ! _web_install_nginx "$web_host"; then
+            echo -e "  ${RED}[x]${NC} Настройка nginx не удалась — восстанавливаю прежний конфиг telemt"
+            cp -a "$backup" "$cfg" 2>/dev/null || true
+            systemctl restart telemt >/dev/null 2>&1 || true
+            return 1
+        fi
     fi
 
     local _dd=0 _wpath="" _wh="" _wu="" _wm="" _ws="" _wsb=""
