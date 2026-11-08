@@ -98,6 +98,38 @@ port_is_busy() {
 
 # ── Установка Caddy из официального репозитория ───────────────
 install_caddy_repo() {
+    local caddy_ver
+
+    if ! command -v apt-get >/dev/null 2>&1; then
+        # RHEL-семейство: официальный репозиторий Caddy — COPR.
+        local pm=""
+        if command -v dnf >/dev/null 2>&1; then
+            pm="dnf"
+        elif command -v yum >/dev/null 2>&1; then
+            pm="yum"
+        else
+            log_error "Не найден apt-get/dnf/yum — не знаю, как ставить Caddy"
+            return 1
+        fi
+        local dnf_opt=""
+        if [ "$pm" = "dnf" ]; then
+            dnf_opt="--setopt=timeout=15 --setopt=retries=1"
+            [ -f /etc/yum.repos.d/elrepo.repo ] && dnf_opt="$dnf_opt --disablerepo=elrepo"
+        fi
+        log_info "Установка зависимостей..."
+        "$pm" install -y -q $dnf_opt 'dnf-command(copr)' >/dev/null 2>&1 || true
+        log_info "Добавление официального репозитория Caddy (COPR)..."
+        "$pm" copr enable -y @caddy/caddy || { log_error "Не удалось подключить COPR @caddy/caddy"; return 1; }
+        "$pm" install -y -q $dnf_opt caddy || { log_error "Не удалось установить caddy"; return 1; }
+        caddy_ver=$(caddy version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+' | head -1 | tr -d 'v' || true)
+        if [ -z "$caddy_ver" ] || [ "$(printf '%s\n2.10\n' "$caddy_ver" | LC_ALL=C sort -V | head -1)" != "2.10" ]; then
+            log_error "Установлен Caddy ${caddy_ver:-неизвестной версии} — PQ (X25519MLKEM768) поддерживается только с Caddy 2.10+."
+            return 1
+        fi
+        log_success "Caddy ${caddy_ver} — PQ (X25519MLKEM768) поддерживается"
+        return 0
+    fi
+
     local keyring="/usr/share/keyrings/caddy-stable-archive-keyring.gpg"
     local sourcelist="/etc/apt/sources.list.d/caddy-stable.list"
 
@@ -156,12 +188,34 @@ obtain_certificate() {
 
     if ! command -v certbot >/dev/null 2>&1; then
         log_info "Установка certbot..."
-        apt-get install -y certbot || { log_error "Не удалось установить certbot"; return 1; }
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get install -y certbot || { log_error "Не удалось установить certbot"; return 1; }
+        elif command -v dnf >/dev/null 2>&1; then
+            local dop="--setopt=timeout=15 --setopt=retries=1"
+            [ -f /etc/yum.repos.d/elrepo.repo ] && dop="$dop --disablerepo=elrepo"
+            grep -qi '^ID=fedora' /etc/os-release 2>/dev/null || dnf install -y -q $dop epel-release >/dev/null 2>&1 || true
+            dnf install -y -q $dop certbot python3-certbot-nginx || { log_error "Не удалось установить certbot (EPEL)"; return 1; }
+            dnf install -y -q $dop python3-pyparsing >/dev/null 2>&1 || true
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y -q epel-release >/dev/null 2>&1 || true
+            yum install -y -q certbot python3-certbot-nginx || { log_error "Не удалось установить certbot (EPEL)"; return 1; }
+        else
+            log_error "Не найден пакетный менеджер для установки certbot"
+            return 1
+        fi
     fi
 
     if systemctl is-active --quiet nginx 2>/dev/null; then
         log_info "Обнаружен активный nginx — получаю сертификат через плагин --nginx"
-        apt-get install -y python3-certbot-nginx >/dev/null 2>&1 || true
+        if command -v apt-get >/dev/null 2>&1; then
+            apt-get install -y python3-certbot-nginx >/dev/null 2>&1 || true
+        elif command -v dnf >/dev/null 2>&1; then
+            local dop2="--setopt=timeout=15 --setopt=retries=1"
+            [ -f /etc/yum.repos.d/elrepo.repo ] && dop2="$dop2 --disablerepo=elrepo"
+            dnf install -y -q $dop2 python3-certbot-nginx >/dev/null 2>&1 || true
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y -q python3-certbot-nginx >/dev/null 2>&1 || true
+        fi
         certbot --nginx -d "$domain" --non-interactive --agree-tos --register-unsafely-without-email \
             || { log_error "certbot (--nginx) не смог получить сертификат"; return 1; }
     else
@@ -326,6 +380,9 @@ ${CADDY_MARKER}
 {
 	admin off
 	auto_https off
+	servers {
+		protocols h1 h2
+	}
 }
 
 https://${domain}:${PORT} {
@@ -358,6 +415,10 @@ create_site_stub() {
 <body><h1>It works!</h1></body>
 </html>
 EOF
+    # Fedora/RHEL: без метки httpd_sys_content_t Caddy под SELinux отдаёт 403.
+    if command -v getenforce >/dev/null 2>&1 && [ "$(getenforce 2>/dev/null)" != "Disabled" ]; then
+        chcon -R -t httpd_sys_content_t "$SITE_DIR" >/dev/null 2>&1 || true
+    fi
     log_success "Заглушка создана: ${SITE_DIR}/index.html"
 }
 
@@ -376,8 +437,10 @@ install_caddy_pq() {
     log_info "Установка Caddy как PQ-заглушки (SelfSteal)"
     echo ""
 
-    if ! command -v apt-get >/dev/null 2>&1; then
-        log_error "apt-get не найден (поддерживаются Debian/Ubuntu)"
+    if ! command -v apt-get >/dev/null 2>&1 \
+       && ! command -v dnf >/dev/null 2>&1 \
+       && ! command -v yum >/dev/null 2>&1; then
+        log_error "Не найден apt-get/dnf/yum (поддерживаются Debian/Ubuntu и RHEL-семейство)"
         pause || true
         return 1
     fi
@@ -432,6 +495,12 @@ install_caddy_pq() {
     log_info "Перезапуск ${SERVICE} (при 'admin off' reload недоступен)..."
     systemctl enable "$SERVICE" >/dev/null 2>&1 || true
     if systemctl restart "$SERVICE"; then
+        sleep 1
+        if ! systemctl is-active --quiet "$SERVICE"; then
+            log_error "Caddy упал сразу после старта: $(journalctl -u ${SERVICE} -n 20 --no-pager 2>/dev/null | grep -a '"level":"error"' | tail -1 | cut -c1-300)"
+            pause || true
+            return 1
+        fi
         log_success "Caddy запущен и слушает 127.0.0.1:${PORT}"
         hint_sni_checker
     else
@@ -509,8 +578,14 @@ remove_caddy_pq() {
     systemctl disable "$SERVICE" 2>/dev/null || true
 
     log_info "Удаление пакета caddy..."
-    apt-get purge -y caddy || log_warning "apt-get purge caddy завершился с ошибкой"
-    apt-get autoremove -y >/dev/null 2>&1 || true
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get purge -y caddy || log_warning "apt-get purge caddy завершился с ошибкой"
+        apt-get autoremove -y >/dev/null 2>&1 || true
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf remove -y -q caddy || log_warning "dnf remove caddy завершился с ошибкой"
+    elif command -v yum >/dev/null 2>&1; then
+        yum remove -y -q caddy || log_warning "yum remove caddy завершился с ошибкой"
+    fi
 
     echo -en "  ${BOLD}Удалить ${CADDYFILE} и ${SITE_DIR}? [y/N]:${NC} "
     local rmcfg
