@@ -6,6 +6,10 @@ set -e
 BASE_URL="https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main"
 INSTALL_DIR="/opt/mtpr-simple"
 
+# elrepo виснет на металлинке; на Fedora его нет, и dnf с --disablerepo=elrepo падает.
+DNF_ELREPO_OPT=""
+[ -f /etc/yum.repos.d/elrepo.repo ] && DNF_ELREPO_OPT="--disablerepo=elrepo"
+
 # ── Безопасный запуск внешнего установщика ────────────────────
 # Скачивает скрипт во временный файл, проверяет успех curl и
 # непустой ответ, и только затем запускает. Возвращает реальный
@@ -127,6 +131,35 @@ ensure_file() {
         fi
     fi
     chmod +x "$dest" 2>/dev/null || true
+}
+
+# ── Базовые зависимости минимальных систем ────────────────────
+# Минимальный Alma идёт без tar, голый Debian — без curl: установщик
+# падал «Необходимая команда не найдена: tar». Ставим сами.
+ensure_base_deps() {
+    local missing=() pm
+    command -v curl >/dev/null 2>&1 || missing+=(curl)
+    command -v tar  >/dev/null 2>&1 || missing+=(tar)
+    [ ${#missing[@]} -eq 0 ] && return 0
+
+    if command -v apt-get >/dev/null 2>&1; then
+        apt-get update -qq >/dev/null 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing[@]}" ca-certificates >/dev/null 2>&1 || true
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y -q --setopt=timeout=15 --setopt=retries=1 $DNF_ELREPO_OPT "${missing[@]}" ca-certificates >/dev/null 2>&1 || true
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y -q "${missing[@]}" ca-certificates >/dev/null 2>&1 || true
+    elif command -v apk >/dev/null 2>&1; then
+        apk add --no-cache "${missing[@]}" ca-certificates >/dev/null 2>&1 || true
+    fi
+
+    for pm in "${missing[@]}"; do
+        if ! command -v "$pm" >/dev/null 2>&1; then
+            log_error "Не удалось установить $pm — установите вручную и повторите"
+            return 1
+        fi
+    done
+    return 0
 }
 
 trim() {
@@ -684,10 +717,21 @@ setup_nginx() {
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -qq
         apt-get install -y -qq nginx certbot python3-certbot-nginx
-    elif command -v yum &>/dev/null; then
-        yum install -y -q nginx certbot python3-certbot-nginx
     elif command -v dnf &>/dev/null; then
-        dnf install -y -q nginx certbot python3-certbot-nginx
+        # В EL (Alma/Rocky/CentOS) nginx есть в базовых репозиториях,
+        # certbot — только в EPEL.
+        dnf install -y -q --setopt=timeout=15 --setopt=retries=1 $DNF_ELREPO_OPT nginx
+        if ! command -v certbot &>/dev/null; then
+            grep -qi '^ID=fedora' /etc/os-release 2>/dev/null || dnf install -y -q --setopt=timeout=15 --setopt=retries=1 $DNF_ELREPO_OPT epel-release >/dev/null 2>&1 || true
+            dnf install -y -q --setopt=timeout=15 --setopt=retries=1 $DNF_ELREPO_OPT certbot python3-certbot-nginx
+            dnf install -y -q --setopt=timeout=15 --setopt=retries=1 $DNF_ELREPO_OPT python3-pyparsing >/dev/null 2>&1 || true
+        fi
+    elif command -v yum &>/dev/null; then
+        yum install -y -q nginx
+        if ! command -v certbot &>/dev/null; then
+            yum install -y -q epel-release >/dev/null 2>&1 || true
+            yum install -y -q certbot python3-certbot-nginx
+        fi
     else
         log_error "Не удалось определить пакетный менеджер для установки Nginx"
         return 1
@@ -724,7 +768,12 @@ setup_nginx() {
     log_success "SSL-сертификат получен"
     
     # Создаём конфиг Nginx
-    local nginx_config="/etc/nginx/sites-available/default"
+    local nginx_config
+    if [ -d /etc/nginx/sites-available ]; then
+        nginx_config="/etc/nginx/sites-available/default"
+    else
+        nginx_config="/etc/nginx/conf.d/telemt-web.conf"
+    fi
     log_info "Создание конфига Nginx для $web_host..."
     
     cat > "$nginx_config" <<EOF
@@ -766,8 +815,20 @@ server {
 }
 EOF
     
+    # firewalld (EL) и SELinux: без этого nginx не откроет 443 и не сможет
+    # проксировать на 127.0.0.1:18080.
+    if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld 2>/dev/null; then
+        firewall-cmd --permanent --add-service=http >/dev/null 2>&1 || true
+        firewall-cmd --permanent --add-service=https >/dev/null 2>&1 || true
+        firewall-cmd --reload >/dev/null 2>&1 || true
+    fi
+    if command -v getenforce &>/dev/null && [ "$(getenforce 2>/dev/null)" != "Disabled" ]; then
+        setsebool -P httpd_can_network_connect 1 >/dev/null 2>&1 || true
+    fi
+
     # Проверяем и перезагружаем Nginx
     if nginx -t 2>/dev/null; then
+        systemctl enable nginx >/dev/null 2>&1 || true
         systemctl restart nginx
         log_success "Nginx перезагружен с новым конфигом"
     else
@@ -978,6 +1039,8 @@ _invalid_arg() {
     echo -e "  ${DIM}${3}${NC}"
     exit 1
 }
+
+ensure_base_deps || exit 1
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
