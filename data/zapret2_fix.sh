@@ -774,8 +774,71 @@ detect_network_mode() {
     fi
 }
 
+# ── nftables в системе ──────────────────────────────────────
+# Голый Debian/Ubuntu идёт без nftables, а стартовый скрипт службы начинается
+# с `nft add table` — без пакета он падает на строке 20 с «nft: command not
+# found», и установка откатывается. В меню спрашиваем (Enter = да), при
+# автоустановке ставим сами — но всегда показываем, что именно ставится.
+zapret2_ensure_nft() {
+    # $1 = auto: автоустановка (CLI) — ставим сами, без вопросов.
+    local _mode="${1:-ask}"
+    command -v nft >/dev/null 2>&1 && return 0
+
+    local _pm=""
+    if command -v apt-get >/dev/null 2>&1; then
+        _pm="apt-get"
+    elif command -v dnf >/dev/null 2>&1; then
+        _pm="dnf"
+    elif command -v yum >/dev/null 2>&1; then
+        _pm="yum"
+    elif command -v zypper >/dev/null 2>&1; then
+        _pm="zypper"
+    elif command -v apk >/dev/null 2>&1; then
+        _pm="apk"
+    else
+        log_error "В системе нет nftables, а чем ставить пакеты — не найти. Поставьте nftables вручную."
+        return 1
+    fi
+
+    echo ""
+    log_warning "В системе нет nftables."
+    log_info "Без него zapret2 не запустится: стартовый скрипт падает на «nft: command not found»."
+    log_info "Нужен пакет nftables, команда: ${_pm} install nftables"
+    if [ "$_mode" != "auto" ]; then
+        echo -en "  ${BOLD}Установить nftables сейчас? [Y/n]:${NC} "
+        local _ans=""
+        { read -r _ans </dev/tty; } 2>/dev/null || true
+        if [[ "$_ans" =~ ^[nN]$ ]]; then
+            log_error "Отменено: без nftables фикс не поставить."
+            return 1
+        fi
+    fi
+
+    local _rc=0
+    log_info "Ставлю nftables через ${_pm}..."
+    case "$_pm" in
+        apt-get)
+            apt-get update -qq || true
+            DEBIAN_FRONTEND=noninteractive apt-get install -y nftables || _rc=$?
+            ;;
+        dnf)    dnf install -y nftables || _rc=$? ;;
+        yum)    yum install -y nftables || _rc=$? ;;
+        zypper) zypper --non-interactive install nftables || _rc=$? ;;
+        apk)    apk add nftables || _rc=$? ;;
+    esac
+
+    if [ "$_rc" -ne 0 ] || ! command -v nft >/dev/null 2>&1; then
+        log_error "nftables не установился (код ${_rc}). Причина — в выводе ${_pm} выше."
+        log_info "Поставьте вручную: ${_pm} install nftables — и запустите установку снова."
+        return 1
+    fi
+    log_success "nftables установлен"
+}
+
 # ── Применение NFT правил для Zapret2 ──────────────────────
 zapret2_apply_nft() {
+    zapret2_ensure_nft || return 1
+
     local _table="${ZAPRET2_NFT_TABLE}"
     local _fwmark="${ZAPRET2_FWMARK}"
     local _port="${SERVER_PORT:-443}"
@@ -1035,6 +1098,9 @@ zapret2_install() {
     echo -e "  ${DIM}Метод: disorder + badsum + TCP window control.${NC}"
     echo -e "  ${DIM}Работает на сервере — клиент ничего не ставит.${NC}"
     echo ""
+
+    zapret2_ensure_nft || return 1
+
     echo -e "  ${BOLD}Текущие параметры:${NC}"
     echo -e "    out-range:   ${ZAPRET2_OUT_RANGE}  ${DIM}(сколько исходящих пакетов обрабатывать)${NC}"
     echo -e "    split len:   ${ZAPRET2_SPLIT_LEN}  ${DIM}(размер частей при разрезке ClientHello)${NC}"
@@ -1571,6 +1637,8 @@ zapret2_install_auto() {
     local port="${1:-443}"
     echo ""
     log_info "Автоустановка Zapret2 на порт $port..."
+
+    zapret2_ensure_nft auto || return 1
 
     load_settings
 
