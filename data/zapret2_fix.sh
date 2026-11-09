@@ -1226,8 +1226,8 @@ zapret2_install() {
         log_warning "Автозапуск ${ZAPRET2_SERVICE} не включился"
     fi
 
-    # проверка wscale
-    zapret2_check_wscale "show"
+    # проверка wscale: если окно мешает дроблению — предложить поправить
+    zapret2_check_wscale "ask"
 
     echo ""
     log_success "Zapret2 MTProto fix установлен и запущен"
