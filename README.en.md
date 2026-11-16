@@ -111,6 +111,7 @@ Install **Telemt** with the **v3 fix** on port `443`, domain `ozon.ru`, **ad_tag
 | `-telemt` | — | Install [Telemt](https://github.com/telemt/telemt) |
 | `-zig` | — | Install [MTProto.zig](https://github.com/sleep3r/mtproto.zig) |
 | `-mtg` | — | Install [MTG](https://github.com/9seconds/mtg) 2.x (1.0.x can be chosen in the proxy menu) |
+| `-mtdd` | — | Install [mtdd](https://github.com/ugDeDe/mtdd) (FakeTLS, MTProto proxy) |
 | `-fix` | — | Install [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO) |
 | `-no-fix` | — | Do not install the fix |
 | `-fix-type {v2\|v3\|v4\|nft}` | `v3` | Fix type: `v2`/`v3` — iptables, `nft` — v3 via nftables, `v4` — zapret2 (nfqws2) |
@@ -219,6 +220,7 @@ dalink.to/mekome
 - Telemt https://github.com/telemt/telemt
 - MTG https://github.com/9seconds/mtg
 - Mtproto.zig https://github.com/sleep3r/mtproto.zig
+- mtdd https://github.com/ugDeDe/mtdd
 - telemt_panel https://github.com/amirotin/telemt_panel
 - 3x-ui-pro https://github.com/mozaroc/3x-ui-pro
 - remnawave-installer https://github.com/xxphantom/remnawave-installer

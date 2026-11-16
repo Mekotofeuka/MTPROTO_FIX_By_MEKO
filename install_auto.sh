@@ -328,7 +328,8 @@ semi_auto_install_mode() {
         echo -e "  ${GREEN}[2]${NC}  ${BOLD}Установить TELEMT в Docker${NC}"
         echo -e "  ${GREEN}[3]${NC}  ${BOLD}Установить MTG${NC}"
         echo -e "  ${GREEN}[4]${NC}  ${BOLD}Установить MTProtoZig${NC}"
-        echo -e "  ${YELLOW}[5]${NC}  ${BOLD}Пропустить установку прокси${NC}  ${DIM}(если уже установлен)${NC}"
+        echo -e "  ${GREEN}[5]${NC}  ${BOLD}Установить mtdd${NC}  ${DIM}(FakeTLS)${NC}"
+        echo -e "  ${YELLOW}[6]${NC}  ${BOLD}Пропустить установку прокси${NC}  ${DIM}(если уже установлен)${NC}"
         echo -e "  ${RED}[0]${NC}  ${BOLD}Выйти${NC}"
         echo ""
         echo -en "  ${BOLD}Выбор (По умолчанию ${GREEN}${BOLD}1(Enter)${NC}${BOLD}):${NC} "
@@ -374,6 +375,15 @@ semi_auto_install_mode() {
                 fi
                 ;;
             5)
+                echo ""
+                log_info "Установка mtdd..."
+                if ensure_proxy_file "proxys/mtdd1.sh"; then
+                    exec "$INSTALL_DIR/proxys/mtdd1.sh" </dev/tty
+                else
+                    exit 1
+                fi
+                ;;
+            6)
                 echo ""
                 log_info "Установка прокси пропущена."
                 break

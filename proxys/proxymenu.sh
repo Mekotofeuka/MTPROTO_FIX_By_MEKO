@@ -19,13 +19,14 @@ pause_or_break() {
 while true; do
     clear 2>/dev/null || true
     echo ""
-    echo -e "  ${BOLD}Меню движков и панелей Mtproto v0.32${NC}"
+    echo -e "  ${BOLD}Меню движков и панелей Mtproto v0.33${NC}"
     echo -e "  ${DIM}===========================${NC}"
     echo ""
     echo -e "  ${CYAN}[1]${NC}  ${BOLD}Меню Telemt${NC}"
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Меню панелей для Telemt${NC}"
     echo -e "  ${CYAN}[3]${NC}  ${BOLD}Меню MTProtoZig${NC}"
     echo -e "  ${CYAN}[4]${NC}  ${BOLD}Меню MTG${NC}"
+    echo -e "  ${CYAN}[5]${NC}  ${BOLD}Меню mtdd${NC}"
     echo -e ""
     echo -e "  ${RED}[0]${NC}  ${BOLD}Назад в главное меню${NC}"
     echo ""
@@ -92,6 +93,15 @@ while true; do
             else
                 echo ""
                 echo "  [✗] Файл /opt/mtpr-simple/proxys/mtgv2_1.sh не найден или не исполняем"
+                pause_or_break || break
+            fi
+            ;;
+        5)
+            if [ -x "/opt/mtpr-simple/proxys/mtdd1.sh" ]; then
+                bash /opt/mtpr-simple/proxys/mtdd1.sh || true
+            else
+                echo ""
+                echo "  [✗] Файл /opt/mtpr-simple/proxys/mtdd1.sh не найден или не исполняем"
                 pause_or_break || break
             fi
             ;;

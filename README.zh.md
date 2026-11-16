@@ -110,6 +110,7 @@ _MEKO 目前使用 [更精确的 V3 版本](https://github.com/Mekotofeuka/MTPRO
 | `-telemt` | — | 安装 [Telemt](https://github.com/telemt/telemt) |
 | `-zig` | — | 安装 [MTProto.zig](https://github.com/sleep3r/mtproto.zig) |
 | `-mtg` | — | 安装 [MTG](https://github.com/9seconds/mtg) 2.x（1.0.x 可在代理菜单中选择） |
+| `-mtdd` | — | 安装 [mtdd](https://github.com/ugDeDe/mtdd)（FakeTLS，MTProto 代理） |
 | `-fix` | — | 安装 [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO) |
 | `-no-fix` | — | 不安装修复 |
 | `-fix-type {v2\|v3\|v4\|nft}` | `v3` | 修复类型：`v2`/`v3` — iptables，`nft` — 通过 nftables 的 v3，`v4` — zapret2 (nfqws2) |
@@ -218,6 +219,7 @@ dalink.to/mekome
 - Telemt https://github.com/telemt/telemt
 - MTG https://github.com/9seconds/mtg
 - Mtproto.zig https://github.com/sleep3r/mtproto.zig
+- mtdd https://github.com/ugDeDe/mtdd
 - telemt_panel https://github.com/amirotin/telemt_panel
 - 3x-ui-pro https://github.com/mozaroc/3x-ui-pro
 - remnawave-installer https://github.com/xxphantom/remnawave-installer

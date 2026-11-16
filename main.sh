@@ -720,23 +720,24 @@ optimization_menu() {
 }
 
 # ── Пункт 4: Удаление компонентов MEKO Manager ───────────────
-#   Области (scope): meko | fix | all | fix-only | telemt | meko-telemt | fix-telemt
-#   Внутри — три независимых флага: менеджер / фиксы / Telemt.
+#   Области (scope): meko | fix | all | fix-only | telemt | meko-telemt | fix-telemt | mtdd
+#   Внутри — четыре независимых флага: менеджер / фиксы / Telemt / mtdd.
 remove_mekopr() {
     local scope="${1:-fix}"
-    local _do_meko=false _do_fix=false _do_telemt=false
+    local _do_meko=false _do_fix=false _do_telemt=false _do_mtdd=false
 
     case "$scope" in
         meko)        _do_meko=true ;;
         fix)         _do_meko=true; _do_fix=true ;;
-        all)         _do_meko=true; _do_fix=true; _do_telemt=true ;;
+        all)         _do_meko=true; _do_fix=true; _do_telemt=true; _do_mtdd=true ;;
         fix-only)    _do_fix=true ;;
         telemt)      _do_telemt=true ;;
+        mtdd)        _do_mtdd=true ;;
         meko-telemt) _do_meko=true; _do_telemt=true ;;
         fix-telemt)  _do_fix=true; _do_telemt=true ;;
         *)
             log_error "Неверная область удаления: $scope"
-            echo -e "  ${DIM}Доступно: meko | fix | all | fix-only | telemt | meko-telemt | fix-telemt${NC}"
+            echo -e "  ${DIM}Доступно: meko | fix | all | fix-only | telemt | mtdd | meko-telemt | fix-telemt${NC}"
             return 2
             ;;
     esac
@@ -748,6 +749,9 @@ remove_mekopr() {
     if [ "$_do_telemt" = true ]; then
         echo -e "  • ${RED}Telemt${NC}: служба/контейнер, конфиг, образы (полное удаление)"
     fi
+    if [ "$_do_mtdd" = true ]; then
+        echo -e "  • ${RED}mtdd${NC}: служба, бинарник, конфиг, пользователи (полное удаление)"
+    fi
     if [ "$_do_fix" = true ]; then
         echo -e "  • Все iptables-правила и цепочка ${CYAN}${SYNFIX_CHAIN:-MTPR_SYNFIX}${NC}"
         echo -e "  • Все nftables-правила (mtpr_synfix, mtpr_block, Zapret2)"
@@ -757,8 +761,8 @@ remove_mekopr() {
     if [ "$_do_meko" = true ]; then
         echo -e "  • Файлы MEKO Manager в ${CYAN}$INSTALL_DIR${NC} и лаунчеры ${CYAN}mekopr/meko${NC}"
     fi
-    if [ "$_do_telemt" = false ]; then
-        echo -e "  ${GRAY}  Telemt и его конфиг не затрагиваются${NC}"
+    if [ "$_do_telemt" = false ] && [ "$_do_mtdd" = false ]; then
+        echo -e "  ${GRAY}  Telemt, mtdd и их конфиги не затрагиваются${NC}"
     fi
     echo ""
     log_warning "Это действие нельзя отменить!"
@@ -783,6 +787,19 @@ remove_mekopr() {
             bash "$_tmenu" --purge-silent || log_warning "Telemt удалён не полностью — проверьте вручную"
         else
             log_warning "$_tmenu не найден — удалите Telemt вручную (меню прокси)"
+        fi
+    fi
+
+    # ── mtdd ─────────────────────────────────────────────────
+    if [ "$_do_mtdd" = true ]; then
+        local _mmenu="$INSTALL_DIR/proxys/mtdd1.sh"
+        log_info "Удаляю mtdd (служба, бинарник, конфиг, пользователи)..."
+        if [ -f "$_mmenu" ]; then
+            bash "$_mmenu" --purge-silent || log_warning "mtdd удалён не полностью — проверьте вручную"
+        elif [ -x /usr/local/bin/mtdd-ctl ]; then
+            /usr/local/bin/mtdd-ctl uninstall --yes || log_warning "mtdd удалён не полностью — проверьте вручную"
+        else
+            log_warning "mtdd не найден — удалять нечего"
         fi
     fi
 
@@ -851,9 +868,9 @@ remove_mekopr() {
     if [ "$_do_meko" = true ]; then
         if [ "$_rm_files_ok" = true ]; then
             case "$scope" in
-                meko)        log_success "MEKO Manager удалён (правила и Telemt оставлены на месте)!" ;;
+                meko)        log_success "MEKO Manager удалён (правила, Telemt и mtdd оставлены на месте)!" ;;
                 fix)         log_success "MEKO Manager и фиксы удалены с сервера!" ;;
-                all)         log_success "MEKO Manager, фиксы и Telemt удалены с сервера!" ;;
+                all)         log_success "MEKO Manager, фиксы, Telemt и mtdd удалены с сервера!" ;;
                 meko-telemt) log_success "MEKO Manager и Telemt удалены (фиксы оставлены на месте)!" ;;
             esac
         else
@@ -861,8 +878,9 @@ remove_mekopr() {
         fi
     else
         case "$scope" in
-            fix-only)   log_success "Фиксы удалены (MEKO Manager и Telemt оставлены на месте)!" ;;
+            fix-only)   log_success "Фиксы удалены (MEKO Manager, Telemt и mtdd оставлены на месте)!" ;;
             telemt)     log_success "Telemt удалён (MEKO Manager и фиксы оставлены на месте)!" ;;
+            mtdd)       log_success "mtdd удалён (MEKO Manager и фиксы оставлены на месте)!" ;;
             fix-telemt) log_success "Фиксы и Telemt удалены (MEKO Manager оставлен на месте)!" ;;
         esac
     fi
@@ -894,12 +912,13 @@ remove_mekopr_menu() {
         echo -e "  ${CYAN}[1]${NC}  ${BOLD}Только MEKO Manager${NC} ${DIM}(фиксы и Telemt остаются)${NC}"
         echo -e "  ${CYAN}[2]${NC}  ${BOLD}Только фиксы${NC} ${DIM}(SYN-фикс, nftables, GEOIP, Zapret2, шейпинг, блокировка IP)${NC}"
         echo -e "  ${CYAN}[3]${NC}  ${BOLD}Только Telemt${NC} ${DIM}(служба/контейнер, конфиг, образы)${NC}"
+        echo -e "  ${CYAN}[4]${NC}  ${BOLD}Только mtdd${NC} ${DIM}(служба, бинарник, конфиг, пользователи)${NC}"
         echo ""
         echo -e "  ${BOLD}Комбинации:${NC}"
-        echo -e "  ${CYAN}[4]${NC}  ${BOLD}MEKO Manager + фиксы${NC}"
-        echo -e "  ${CYAN}[5]${NC}  ${BOLD}MEKO Manager + Telemt${NC}"
-        echo -e "  ${CYAN}[6]${NC}  ${BOLD}фиксы + Telemt${NC}"
-        echo -e "  ${RED}${BOLD}[7]${NC}  ${RED}${BOLD}Всё: MEKO Manager + фиксы + Telemt${NC} ${DIM}(полная очистка)${NC}"
+        echo -e "  ${CYAN}[5]${NC}  ${BOLD}MEKO Manager + фиксы${NC}"
+        echo -e "  ${CYAN}[6]${NC}  ${BOLD}MEKO Manager + Telemt${NC}"
+        echo -e "  ${CYAN}[7]${NC}  ${BOLD}фиксы + Telemt${NC}"
+        echo -e "  ${RED}${BOLD}[8]${NC}  ${RED}${BOLD}Всё: MEKO Manager + фиксы + Telemt + mtdd${NC} ${DIM}(полная очистка)${NC}"
         echo ""
         echo -e "  ${CYAN}[0]${NC}  ${BOLD}Назад в главное меню${NC}"
         echo ""
@@ -910,10 +929,11 @@ remove_mekopr_menu() {
             1) remove_mekopr meko ;;
             2) remove_mekopr fix-only; _opt_pause ;;
             3) remove_mekopr telemt; _opt_pause ;;
-            4) remove_mekopr fix ;;
-            5) remove_mekopr meko-telemt ;;
-            6) remove_mekopr fix-telemt; _opt_pause ;;
-            7) remove_mekopr all ;;
+            4) remove_mekopr mtdd; _opt_pause ;;
+            5) remove_mekopr fix ;;
+            6) remove_mekopr meko-telemt ;;
+            7) remove_mekopr fix-telemt; _opt_pause ;;
+            8) remove_mekopr all ;;
             0 | "") return 0 ;;
             *) log_error "Неверный выбор"; sleep 0.2 ;;
         esac
@@ -937,6 +957,51 @@ get_mtprotozig_online() {
     else
         echo ""
     fi
+}
+
+# ── mtdd (движок ugDeDe/mtdd) ───────────────────────────────
+MTDD_CONFIG_PATH="/etc/mtdd/config.json"
+MTDD_ENV_PATH="/etc/mtdd/credentials.env"
+
+is_mtdd_installed() {
+    [ -x /usr/local/bin/mtdd ]
+}
+
+get_mtdd_version() {
+    if is_mtdd_installed; then
+        /usr/local/bin/mtdd --version 2>/dev/null | head -1 | awk '{print $2}'
+    fi
+}
+
+get_mtdd_port() {
+    local _port=""
+    [ -f "$MTDD_CONFIG_PATH" ] || { echo ""; return 1; }
+    _port=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("proxy_port",""))' \
+        "$MTDD_CONFIG_PATH" 2>/dev/null)
+    if [ -z "$_port" ]; then
+        _port=$(grep -oE '"proxy_port"[[:space:]]*:[[:space:]]*[0-9]+' "$MTDD_CONFIG_PATH" 2>/dev/null |
+            head -1 | grep -oE '[0-9]+')
+    fi
+    case "$_port" in
+        '' | *[!0-9]*) echo "" ; return 1 ;;
+    esac
+    printf '%s\n' "$_port"
+}
+
+# Онлайн = уникальные IP, прошедшие авторизацию (метрика mtdd_unique_ips_seen).
+# Метрики закрыты токеном из credentials.env. Пустой вывод = неизвестно, не ноль.
+get_mtdd_online() {
+    is_mtdd_installed || { echo ""; return 1; }
+    local _tok _val
+    _tok=$(sed -n 's/^MTDD_METRICS_TOKEN=//p' "$MTDD_ENV_PATH" 2>/dev/null | head -1 | tr -d '"')
+    _val=$(curl -s --connect-timeout 1 --max-time 3 \
+        -H "Authorization: Bearer $_tok" \
+        "http://127.0.0.1:9091/metrics" 2>/dev/null |
+        awk '$1 == "mtdd_unique_ips_seen" {print $2; exit}')
+    case "$_val" in
+        '' | *[!0-9.]*) echo "" ; return 1 ;;
+    esac
+    printf '%s\n' "${_val%%.*}"
 }
 
 show_header() {
@@ -1100,6 +1165,7 @@ show_header() {
     local telemt_installed=false
     local mtprotozig_installed=false
     local mtg_installed=false
+    local mtdd_installed=false
 
     if is_telemt_installed; then
         telemt_installed=true
@@ -1109,6 +1175,9 @@ show_header() {
     fi
     if is_mtg_installed; then
         mtg_installed=true
+    fi
+    if is_mtdd_installed; then
+        mtdd_installed=true
     fi
 
     # ── Найденные конфиги Telemt ───────────────────────────
@@ -1224,8 +1293,24 @@ show_header() {
         fi
     fi
 
+    # ── mtdd ──────────────────────────────────────────────
+    if [ "$mtdd_installed" = true ]; then
+        local mtdd_version mtdd_port mtdd_online
+        mtdd_version=$(get_mtdd_version) || mtdd_version=""
+        mtdd_port=$(get_mtdd_port) || mtdd_port=""
+        mtdd_online=$(get_mtdd_online) || mtdd_online=""
+        echo ""
+        echo -e "  ${BOLD}mtdd V:${NC} ${GREEN}${mtdd_version:-?}${NC}${mtdd_port:+${BOLD}  Port: ${CYAN}${mtdd_port}${NC}}"
+        if [[ "$mtdd_online" =~ ^[0-9]+$ ]]; then
+            echo -e "  ${BOLD}mtdd онлайн:${NC} ${CYAN}${mtdd_online}${NC}${BOLD} IP"
+        else
+            echo -e "  ${BOLD}mtdd онлайн:${NC} ${CYAN}н/д${NC}${BOLD} (метрики mtdd не ответили)"
+        fi
+    fi
+
     # ── Есть ли хотя бы один прокси ───────────────────────
-    if [ "$telemt_installed" = false ] && [ "$mtprotozig_installed" = false ] && [ "$mtg_installed" = false ]; then
+    if [ "$telemt_installed" = false ] && [ "$mtprotozig_installed" = false ] &&
+       [ "$mtg_installed" = false ] && [ "$mtdd_installed" = false ]; then
         echo -e "  ${NC}${BOLD}Прокси: ${GRAY} не установлены${NC}"
     fi
 }
@@ -1341,7 +1426,7 @@ main_menu() {
         echo -e "  ${CYAN}[6]${NC}  ${BOLD}Проверить доступ к популярным сайтам с сервера${NC}"
         echo -e "  ${CYAN}[7]${NC}  ${BOLD}Проверить домен для прокси${YELLOW}${BOLD} (Требуется: OpenSSL 3.5+)  ${NC}"
         echo -e "  ${CYAN}[8]${NC}  ${BOLD}Дополнительно${NC} ${DIM}(GEOIP, шейпинг, Caddy, сервисы, бэкап)${NC}"
-        echo -e "  ${RED}${BOLD}[9]${NC}  ${RED}${BOLD}Удалить${NC}${BOLD} MEKO Manager${NC} ${DIM}(все варианты: менеджер / фиксы / Telemt)${NC}"
+        echo -e "  ${RED}${BOLD}[9]${NC}  ${RED}${BOLD}Удалить${NC}${BOLD} MEKO Manager${NC} ${DIM}(все варианты: менеджер / фиксы / Telemt / mtdd)${NC}"
         echo -e "  ${RED}${BOLD}[0]${NC}${BOLD}  Выход"
         echo ""
         echo -en "  ${BOLD}Выбор:${NC} "
@@ -1804,8 +1889,21 @@ cli_online() {
         found=1
     fi
 
+    if is_mtdd_installed; then
+        local _mtdd_online _mtdd_port
+        _mtdd_online="$(get_mtdd_online 2>/dev/null || true)"
+        _mtdd_port="$(get_mtdd_port 2>/dev/null || true)"
+        [[ "$_mtdd_online" =~ ^[0-9]+$ ]] || _mtdd_online="н/д"
+        if [ -n "$_mtdd_port" ]; then
+            echo -e "    ${BOLD}mtdd${NC} ${DIM}(порт $_mtdd_port)${NC}: ${CYAN}${_mtdd_online}${NC} IP"
+        else
+            echo -e "    ${BOLD}mtdd${NC}: ${CYAN}${_mtdd_online}${NC} IP"
+        fi
+        found=1
+    fi
+
     if [ "$found" -eq 0 ]; then
-        echo -e "    ${YELLOW}Ни Telemt, ни Mtproto.zig, ни MTG не установлены${NC}"
+        echo -e "    ${YELLOW}Ни Telemt, ни Mtproto.zig, ни MTG, ни mtdd не установлены${NC}"
     fi
     echo ""
     return 0
@@ -1824,6 +1922,7 @@ _cli_open() {
         proxy|proxies)   rel="proxys/proxymenu.sh" ;;
         zig|mtprotozig)  rel="proxys/mtprotozig1.sh" ;;
         mtg)             rel="proxys/mtgv2_1.sh" ;;
+        mtdd)            rel="proxys/mtdd1.sh" ;;
         docker)          rel="proxys/telemt_in_docker1.sh" ;;
         panel)           rel="proxys/telemt_panel_amirotin.sh" ;;
         fix|rules)       rel="data/rules.sh" ;;
@@ -1850,13 +1949,14 @@ _cli_usage() {
     echo -e "  ${BOLD}MEKO Manager — командная строка${NC}"
     echo ""
     echo -e "  ${CYAN}mekopr${NC}                             открыть главное меню"
-    echo -e "  ${CYAN}mekopr online${NC}                      текущий онлайн (Telemt / Mtproto.zig / MTG)"
+    echo -e "  ${CYAN}mekopr online${NC}                      текущий онлайн (Telemt / Mtproto.zig / MTG / mtdd)"
     echo -e "  ${CYAN}mekopr status${NC}                      краткий статус системы"
     echo ""
     echo -e "  ${BOLD}Открыть раздел напрямую:${NC}"
     echo -e "  ${CYAN}mekopr telemt${NC}                      меню Telemt"
     echo -e "  ${CYAN}mekopr proxy${NC}                       меню прокси и конфигов"
     echo -e "  ${CYAN}mekopr zig | mtg | docker | panel${NC}  меню Mtproto.zig / MTG / Telemt в Docker / панель"
+    echo -e "  ${CYAN}mekopr mtdd${NC}                        меню mtdd (MTProto / FakeTLS)"
     echo -e "  ${CYAN}mekopr fix${NC}                         меню установки/удаления MTProto FIX"
     echo -e "  ${CYAN}mekopr geoip${NC}                       меню GEOIP-обхода SYN-лимита"
     echo -e "  ${CYAN}mekopr nodes${NC}                       меню управления нодами"
@@ -1877,10 +1977,11 @@ _cli_usage() {
     echo -e "    ${BOLD}meko${NC}        — только файлы менеджера и сам скрипт"
     echo -e "    ${BOLD}fix-only${NC}    — только фиксы (SYN-фикс, nftables, GEOIP, Zapret2, шейпинг)"
     echo -e "    ${BOLD}telemt${NC}      — только Telemt (служба/контейнер, конфиг, образы)"
+    echo -e "    ${BOLD}mtdd${NC}        — только mtdd (служба, бинарник, конфиг)"
     echo -e "    ${BOLD}fix${NC}         — менеджер + фиксы"
     echo -e "    ${BOLD}meko-telemt${NC}  — менеджер + Telemt"
     echo -e "    ${BOLD}fix-telemt${NC}   — фиксы + Telemt"
-    echo -e "    ${BOLD}all${NC}         — всё: менеджер + фиксы + Telemt"
+    echo -e "    ${BOLD}all${NC}         — всё: менеджер + фиксы + Telemt + mtdd"
     echo ""
     echo -e "  ${DIM}Примеры:${NC}"
     echo -e "    mekopr online"
@@ -1923,7 +2024,7 @@ cli_remove() {
     local scope="" assume_yes=false
     while [ $# -gt 0 ]; do
         case "$1" in
-            meko|fix|all|fix-only|telemt|meko-telemt|fix-telemt) scope="$1" ;;
+            meko|fix|all|fix-only|telemt|mtdd|meko-telemt|fix-telemt) scope="$1" ;;
             -y|--yes) assume_yes=true ;;
             -h|--help) _cli_usage; return 0 ;;
             *) log_error "Неизвестный аргумент: $1"; _cli_usage; return 2 ;;
@@ -1981,7 +2082,7 @@ if [ $# -gt 0 ]; then
             main_menu "$@"
             exit $?
             ;;
-        telemt|proxy|proxies|zig|mtprotozig|mtg|docker|panel|fix|rules|geoip|shaping|security|sec|backup|services|extra|caddy|nodes|node|manager)
+        telemt|proxy|proxies|zig|mtprotozig|mtg|mtdd|docker|panel|fix|rules|geoip|shaping|security|sec|backup|services|extra|caddy|nodes|node|manager)
             _cli_open "$@"
             exit $?
             ;;

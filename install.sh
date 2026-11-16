@@ -1000,6 +1000,7 @@ show_main_menu() {
 FLAG_TELEMT=""
 FLAG_ZIG=""
 FLAG_MTG=""
+FLAG_MTDD=""
 FLAG_FIX=""
 FLAG_NO_FIX=""
 FLAG_WEB=""
@@ -1054,6 +1055,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -mtg)
             FLAG_MTG="true"
+            shift
+            ;;
+        -mtdd)
+            FLAG_MTDD="true"
             shift
             ;;
         -fix)
@@ -1166,6 +1171,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -telemt                установить Telemt"
             echo -e "    -zig                   установить Mtproto.zig"
             echo -e "    -mtg                   установить MTG 2.x (последняя ветка)"
+            echo -e "    -mtdd                  установить mtdd (FakeTLS, MTProto-прокси)"
             echo -e "    -fix                   установить фикс"
             echo -e "    -fix-type {v2|v3|v4|nft}   тип фикса (по умолчанию v3)"
             echo -e "    -fix-port <порт>       порт для фикса (если не указан, берётся из -port или спросится)"
@@ -1196,6 +1202,9 @@ while [[ $# -gt 0 ]]; do
             echo -e "    # V4 фикс (zapret2) на порт 443"
             echo -e "    curl ... | sudo bash -s -- -fix -fix-type v4"
             echo ""
+            echo -e "    # mtdd + фикс на 443"
+            echo -e "    curl ... | sudo bash -s -- -mtdd -domain ozon.ru -port 443 -fix -user vasya"
+            echo ""
             echo -e "    # Telemt в WEB-режиме с полной автоматической установкой Nginx"
             echo -e "    curl ... | sudo bash -s -- -telemt -web -web-host my.domain.com -web-user myuser -nginx"
             exit 0
@@ -1212,7 +1221,7 @@ done
 #  АВТОМАТИЧЕСКАЯ УСТАНОВКА (если передан хотя бы один флаг)
 # ══════════════════════════════════════════════════════════════
 
-if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" || -n "$FLAG_WEB" ]]; then
+if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_MTDD" || -n "$FLAG_FIX" || -n "$FLAG_WEB" ]]; then
 
     echo ""
     echo -e "  ${CYAN}${BOLD}⚙️ АВТОМАТИЧЕСКАЯ УСТАНОВКА v0.82${NC}"
@@ -1222,7 +1231,7 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
     # ── 1. Запрос недостающих параметров ──────────────────────
 
     # Домен (если ставится прокси)
-    if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" ]]; then
+    if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_MTDD" ]]; then
         if [ -z "$DOMAIN" ]; then
             # При обновлении домен берём из текущего конфига: иначе повторная
             # установка молча переписывала tls_domain на ozon.ru.
@@ -1591,6 +1600,20 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_FIX" ||
             log_success "MTG установлен"
         else
             log_error "Не удалось установить MTG"
+            exit 1
+        fi
+    fi
+
+    # mtdd: свой установщик от ugDeDe, флаги — домен/порт/пользователь/public_host/ad_tag
+    if [[ -n "$FLAG_MTDD" ]]; then
+        log_info "Установка mtdd на домен $DOMAIN, порт $PROXY_PORT..."
+        if ensure_file "proxys/mtdd1.sh" &&
+           bash "$INSTALL_DIR/proxys/mtdd1.sh" --install-silent "$PROXY_PORT" "$DOMAIN" \
+               "${USER_NAME:-admin}" "$PUBLIC_HOST" "$AD_TAG" >&2 &&
+           systemctl is-active --quiet mtdd.service; then
+            log_success "mtdd установлен"
+        else
+            log_error "Не удалось установить mtdd"
             exit 1
         fi
     fi

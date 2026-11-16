@@ -327,6 +327,15 @@ build_backup_source_list() {
         _backup_add_from_pathfile "$MTG_CONFIG_PATH_FILE"
     fi
 
+    # ── mtdd (FakeTLS) — только в полном бэкапе ──
+    if [ "$SCOPE" = "all" ]; then
+        _backup_add "etc/mtdd"
+        _backup_add "etc/systemd/system/mtdd.service"
+        _backup_add "etc/systemd/system/mtdd-nettune.service"
+        _backup_add "etc/sysctl.d/99-mtdd-load.conf"
+        _backup_add "var/lib/mtdd"
+    fi
+
     # ── MTG / MTProtoZig и прочее — только в полном бэкапе ──
     if [ "$SCOPE" = "all" ]; then
         _backup_add "etc/mtg.toml"

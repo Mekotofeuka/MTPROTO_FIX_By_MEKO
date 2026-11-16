@@ -24,7 +24,7 @@
   
 **Менеджер для работы с VPN и прокси**:
 
-Чинит telegram Mtproto прокси и **Позволяет удобно** работать с **TELEMT, MTG, MTPROTO.ZIG, MTPRoxyL**, поддерживая большинство необходимых команд для взаимодействия:
+Чинит telegram Mtproto прокси и **Позволяет удобно** работать с **TELEMT, MTG, MTPROTO.ZIG, MTDD, MTPRoxyL**, поддерживая большинство необходимых команд для взаимодействия:
 Установка, обновление, откат, настройка, изменение конфигов, просмотр логов, установка и работа с панелями, получение ссылки на подключение - **без ввода каких-либо команд**.
 А также выполняет все необходимые функции для работы с VPN панелями/нодами
 
@@ -95,7 +95,7 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 ```Bash
 curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/main/install.sh | sudo bash
 ```
-2. **Установить стандартный Telemt**, либо "**MTPROTO.zig**" или **MTG** и так далее.
+2. **Установить стандартный Telemt**, либо "**MTPROTO.zig**", **MTG** или **mtdd** и так далее.
    > (все прокси можно поставить через меню нашего скрипта, ставить их заранее на сервер не обязательно, также - не важно в какой последовательности ставить: _прокси -> фикс_ или _фикс -> прокси_)
 4. Применить наш фикс к прокси нажав **[1] Меню установки MTProto FIX** в главном меню
 5. **Отключить встроенные MSS и SYN** из конфига телемт нажав **[8]** в **меню настроек телемт** _(если он уже был добавлен в конфиг телемт на сервер ранее)_
@@ -142,6 +142,7 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 | `-telemt`                     | —                          | Установить [Telemt](https://github.com/telemt/telemt)                    |
 | `-zig`                        | —                          | Установить [MTProto.zig](https://github.com/sleep3r/mtproto.zig)               |
 | `-mtg`                        | —                          | Установить [MTG](https://github.com/9seconds/mtg) 2.x (в меню прокси есть выбор 1.0.x) |
+| `-mtdd`                       | —                          | Установить [mtdd](https://github.com/ugDeDe/mtdd) (FakeTLS, MTProto-прокси) |
 | `-fix`                        | —                          | Установить [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO)               |
 | `-no-fix`                     | —                          | Не устанавливать фикс                |
 | `-fix-type {v2\|v3\|v4\|nft}`| `v3`                       | Тип фикса: `v2`/`v3` — iptables, `nft` — v3 через nftables, `v4` — zapret2 (nfqws2) |
@@ -259,6 +260,7 @@ SOL SPL ``` J2fdY6G4JimD2fEA685Upt4riTTJtPMfXfLBLc7H3zas ```
 - Telemt https://github.com/telemt/telemt
 - MTG https://github.com/9seconds/mtg
 - Mtproto.zig https://github.com/sleep3r/mtproto.zig
+- mtdd https://github.com/ugDeDe/mtdd
 - telemt_panel https://github.com/amirotin/telemt_panel
 - 3x-ui-pro https://github.com/mozaroc/3x-ui-pro
 - remnawave-installer https://github.com/xxphantom/remnawave-installer

@@ -22,6 +22,8 @@ proxys/mtgv2_1.sh|Меню MTG
 
 proxys/mtprotozig1.sh|Меню MTProtoZig
 
+proxys/mtdd1.sh|Меню mtdd (FakeTLS MTProto)
+
 proxys/telemt_in_docker1.sh|Установка Telemt в Docker
 
 proxy_checker.py|Проверка SNI
