@@ -2192,10 +2192,12 @@ web_proxy_menu() {
         local wchoice=""
         { read -r wchoice </dev/tty; } 2>/dev/null || { echo; return 1; }
         case "$wchoice" in
-            1) _web_proxy_install || true ;;
-            p|P) _web_path_menu "$cfg" || true ;;
-            r|R) _web_reports_menu "$cfg" || true ;;
-            s|S) _web_show_link "$cfg" || true ;;
+            # Пауза обязательна: следующий круг цикла делает clear и стирает
+            # вывод пункта — ссылка и подтверждение исчезают до прочтения.
+            1) _web_proxy_install || true; pause_key "Нажмите любую клавишу для возврата" ;;
+            p|P) _web_path_menu "$cfg" || true; pause_key "Нажмите любую клавишу для возврата" ;;
+            r|R) _web_reports_menu "$cfg" || true; pause_key "Нажмите любую клавишу для возврата" ;;
+            s|S) _web_show_link "$cfg" || true; pause_key "Нажмите любую клавишу для возврата" ;;
             0 | "") return 0 ;;
             *) echo "  Неверный выбор"; sleep 0.1 ;;
         esac
