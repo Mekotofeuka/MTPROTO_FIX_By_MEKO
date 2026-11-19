@@ -1789,7 +1789,7 @@ _web_path_menu() {
     IFS='|' read -r host path user mode secret sideband < <(_web_parse_cfg "$cfg")
     cur="$path"
     echo ""
-    echo -e "  ${BOLD}Путь WEB внутри домена${NC}"
+    echo -e "  ${BOLD}Путь в адресе${NC}"
     echo -e "  ${DIM}Пусто — корень домена (ссылка без пути). Пример: app/sync${NC}"
     echo -en "  ${BOLD}Путь [${cur:-корень}]:${NC} "
     local newp=""
@@ -2182,9 +2182,9 @@ web_proxy_menu() {
         _web_print_status "$cfg"
         echo ""
         echo -e "  ${CYAN}[1]${NC}  ${BOLD}Установить/переустановить WEB-прокси (nginx + конфиг)${NC}"
-        echo -e "  ${CYAN}[p]${NC}  ${BOLD}Путь WEB внутри домена${NC}"
-        echo -e "  ${CYAN}[r]${NC}  ${BOLD}Отчёты bridge-страницы: вкл/выкл${NC}"
-        echo -e "  ${CYAN}[s]${NC}  ${BOLD}Показать WEB-ссылку${NC}"
+        echo -e "  ${CYAN}[p]${NC}  ${BOLD}Путь в адресе (например app/sync)${NC}"
+        echo -e "  ${CYAN}[r]${NC}  ${BOLD}Диагностика bridge (логи в конфиге)${NC}"
+        echo -e "  ${CYAN}[s]${NC}  ${BOLD}Ссылка для Telegram (tg://webproxy)${NC}"
         echo ""
         echo -e "  ${RED}[0]${NC}  ${BOLD}Назад${NC}"
         echo ""
@@ -2983,9 +2983,9 @@ while true; do
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Установить Telemt в Docker${NC}"
     echo -e "  ${CYAN}[3]${NC}  ${BOLD}Открыть конфиг Telemt${NC}"
     echo -e "  ${CYAN}[4]${NC}  ${BOLD}Перезапустить Telemt${NC}"
-    echo -e "  ${CYAN}[5]${NC}  ${BOLD}Обновить путь к конфигу Telemt${NC}"
+    echo -e "  ${CYAN}[5]${NC}  ${BOLD}Указать путь к конфигу Telemt${NC}"
     echo -e "  ${CYAN}[6]${NC}  ${BOLD}Посмотреть логи Telemt${NC}"
-    echo -e "  ${CYAN}[7]${NC}  ${BOLD}Вывести ссылку на подключение для пользователя${NC}"
+    echo -e "  ${CYAN}[7]${NC}  ${BOLD}Ссылка MTProto для пользователя${NC}"
     
     # ── Динамическое отображение статуса MSS в меню ──────
     config_path=$(get_config_path)
@@ -3003,7 +3003,7 @@ while true; do
     echo ""
     echo -e "  ${CYAN}[a]${NC}  ${BOLD}Открыть меню панели Telemt${NC}"
     echo -e "  ${CYAN}[u]${NC}  ${BOLD}Добавить пользователя(ей)${NC}"
-    echo -e "  ${CYAN}[w]${NC}  ${BOLD}Установить WEB-прокси (telemt + nginx)${NC}"
+    echo -e "  ${CYAN}[w]${NC}  ${BOLD}WEB-прокси: установка, ссылка, отчёты${NC}"
     echo -e "  ${CYAN}[b]${NC}  ${BOLD}Бэкап и восстановление Telemt${NC}"
     echo -e "  ${CYAN}[e]${NC}  ${BOLD}Движок Telemt (кастомная сборка из архива)${NC}"
     echo ""

@@ -1932,9 +1932,9 @@ while true; do
     echo -e "  ${CYAN}[2]${NC}  ${BOLD}Установить Telemt в Docker${NC}"
     echo -e "  ${CYAN}[3]${NC}  ${BOLD}Открыть конфиг Telemt${NC}"
     echo -e "  ${CYAN}[4]${NC}  ${BOLD}Перезапустить Telemt${NC}"
-    echo -e "  ${CYAN}[5]${NC}  ${BOLD}Обновить путь к конфигу Telemt${NC}"
+    echo -e "  ${CYAN}[5]${NC}  ${BOLD}Указать путь к конфигу Telemt${NC}"
     echo -e "  ${CYAN}[6]${NC}  ${BOLD}Посмотреть логи Telemt${NC}"
-    echo -e "  ${CYAN}[7]${NC}  ${BOLD}Вывести ссылку на подключение для пользователя${NC}"
+    echo -e "  ${CYAN}[7]${NC}  ${BOLD}Ссылка MTProto для пользователя${NC}"
     
     # ── Динамическое отображение статуса MSS в меню ──────
     config_path=$(get_config_path)
@@ -1953,7 +1953,7 @@ while true; do
     echo -e "  ${CYAN}[a]${NC}  ${BOLD}Открыть меню панели Telemt${NC} ${DIM}(не поддерживается удалённо)${NC}"
     echo ""
     echo -e "  ${CYAN}[u]${NC}  ${BOLD}Добавить пользователя(ей)${NC}"
-    echo -e "  ${CYAN}[w]${NC}  ${BOLD}Установить WEB-прокси (telemt + nginx)${NC}"
+    echo -e "  ${CYAN}[w]${NC}  ${BOLD}WEB-прокси: установка, ссылка, отчёты${NC}"
     echo -e "  ${CYAN}[b]${NC}  ${BOLD}Бэкап и восстановление Telemt${NC}"
     echo -e "  ${CYAN}[e]${NC}  ${BOLD}Движок Telemt (кастомная сборка из архива)${NC}"
     echo ""
