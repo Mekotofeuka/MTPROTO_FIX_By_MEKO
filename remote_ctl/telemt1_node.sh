@@ -458,6 +458,9 @@ get_telemt_version() {
 }
 
 # ── Функция получения порта(ов) из конфига ──────────────────
+# Берём порты [server] и [[server.listeners]], без повторов.
+# Листенер с transport = "web" пропускаем: он слушает loopback, а наружу
+# WEB-прокси отдаёт nginx на 443.
 get_telemt_ports() {
     local config_path
     config_path=$(get_config_path)
@@ -465,7 +468,26 @@ get_telemt_ports() {
         echo ""
         return 1
     fi
-    ssh_exec "grep -E '^port[[:space:]]*=' \"$config_path\" 2>/dev/null | awk -F'=' '{print \$2}' | tr -d ' \"'"
+    # Конфиг только читаем, разбор — локальный: иначе awk пришлось бы
+    # экранировать под удалённый shell.
+    ssh_exec "cat \"$config_path\"" | awk '
+        function flush() {
+            if (port > 0 && !web && !(port in seen)) { seen[port] = 1; print port }
+            port = 0; web = 0
+        }
+        /^[[:space:]]*\[\[server\.listeners\]\][[:space:]]*$/ { flush(); blk = 1; next }
+        /^[[:space:]]*\[server\][[:space:]]*$/ { flush(); blk = 1; next }
+        /^[[:space:]]*\[/ { flush(); blk = 0; next }
+        blk && /^[[:space:]]*port[[:space:]]*=/ {
+            line = $0
+            sub(/#.*/, "", line)
+            sub(/^[^=]*=[[:space:]]*/, "", line)
+            gsub(/[^0-9]/, "", line)
+            port = line + 0
+        }
+        blk && /^[[:space:]]*transport[[:space:]]*=[[:space:]]*"web"/ { web = 1 }
+        END { flush() }
+    '
 }
 
 # ── Функция получения онлайна Telemt ────────────────────────
