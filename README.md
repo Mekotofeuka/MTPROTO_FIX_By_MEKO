@@ -146,6 +146,7 @@ curl -fsSL https://raw.githubusercontent.com/Mekotofeuka/MTPROTO_FIX_By_MEKO/mai
 | `-fix`                        | —                          | Установить [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO)               |
 | `-no-fix`                     | —                          | Не устанавливать фикс                |
 | `-fix-type {v2\|v3\|v4\|nft}`| `v3`                       | Тип фикса: `v2`/`v3` — iptables, `nft` — v3 через nftables, `v4` — zapret2 (nfqws2) |
+| `-fix-profile {v1\|v2}`       | `v1`                       | Профиль zapret2: `v1` (фиксированное окно) или `v2` (окно по wscale). Только с `-fix-type v4` |
 | `-fix-port <порт>`            | значение `-port` или `443` | Порт, к которому применяется фикс    |
 | `-port <порт>`                | `443`                      | Порт прокси                          |
 | `-domain <домен>`             | `ozon.ru`                  | Домен для TLS-маскировки прокси      |

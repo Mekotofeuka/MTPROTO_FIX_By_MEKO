@@ -75,6 +75,9 @@ ZAPRET2_IN_RANGE='${ZAPRET2_IN_RANGE:-a}'
 ZAPRET2_SPLIT_LEN='${ZAPRET2_SPLIT_LEN:-400}'
 ZAPRET2_WIN_SYNACK='${ZAPRET2_WIN_SYNACK:-1400}'
 ZAPRET2_WIN_ACK='${ZAPRET2_WIN_ACK:-10}'
+ZAPRET2_PROFILE='${ZAPRET2_PROFILE:-v1}'
+ZAPRET2_V2_WIN='${ZAPRET2_V2_WIN:-768}'
+ZAPRET2_V2_LEN='${ZAPRET2_V2_LEN:-256}'
 ZAPRET2_APPLIED='${ZAPRET2_APPLIED:-false}'
 ZAPRET2_SERVICE_ENABLED='${ZAPRET2_SERVICE_ENABLED:-false}'
 ZAPRET2_FWMARK='${ZAPRET2_FWMARK:-0x40000000}'
@@ -125,6 +128,7 @@ load_settings() {
                 DOCKER_BRIDGE_MODE|BRIDGE_WATCH_INTERVAL|EXTRA_RULES_COUNT|\
                 ZAPRET2_QNUM|ZAPRET2_QUEUE_LIMIT|ZAPRET2_OUT_RANGE|ZAPRET2_IN_RANGE|ZAPRET2_SPLIT_LEN|\
                 ZAPRET2_WIN_SYNACK|ZAPRET2_WIN_ACK|ZAPRET2_FWMARK|\
+                ZAPRET2_PROFILE|ZAPRET2_V2_WIN|ZAPRET2_V2_LEN|\
                 ZAPRET2_APPLIED|ZAPRET2_SERVICE_ENABLED|\
                 ZAPRET2_DEBUG|ZAPRET2_DEBUG_LOG|\
                 MEKO_OPT_APPLIED|\
@@ -166,6 +170,13 @@ load_settings() {
         fingerprint|ttl) ;;
         *) NFT_IOS_DETECT="fingerprint" ;;
     esac
+    # Профиль Zapret2: старые установки без ключа остаются на v1.
+    case "${ZAPRET2_PROFILE:-}" in
+        v1|v2) ;;
+        *) ZAPRET2_PROFILE="v1" ;;
+    esac
+    [[ "${ZAPRET2_V2_WIN:-}" =~ ^[0-9]+$ ]] || ZAPRET2_V2_WIN="768"
+    [[ "${ZAPRET2_V2_LEN:-}" =~ ^[0-9]+$ ]] || ZAPRET2_V2_LEN="256"
 }
 
 # ── Zapret2 настройки по умолчанию ─────────────────────────────
@@ -186,6 +197,9 @@ ZAPRET2_DEBUG="false"
 ZAPRET2_DEBUG_LOG="/var/log/nfqws2-mtproto.log"
 ZAPRET2_WIN_SYNACK="1400"
 ZAPRET2_WIN_ACK="10"
+ZAPRET2_PROFILE="v1"
+ZAPRET2_V2_WIN="768"
+ZAPRET2_V2_LEN="256"
 ZAPRET2_APPLIED="false"
 ZAPRET2_SERVICE_ENABLED="false"
 
@@ -208,9 +222,13 @@ zapret2_status() {
     if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null 2>&1; then
         local _dbg=""
         [ "${ZAPRET2_DEBUG:-false}" = "true" ] && _dbg=" ${YELLOW}debug${NC}"
-        echo -e "${GREEN}активен${NC} (out-range=${ZAPRET2_OUT_RANGE} len=${ZAPRET2_SPLIT_LEN} win=${ZAPRET2_WIN_SYNACK}/${ZAPRET2_WIN_ACK})${_dbg}"
+        if [ "${ZAPRET2_PROFILE:-v1}" = "v2" ]; then
+            echo -e "${GREEN}активен${NC} (v2 win=${ZAPRET2_V2_WIN} len=${ZAPRET2_V2_LEN})${_dbg}"
+        else
+            echo -e "${GREEN}активен${NC} (v1 out-range=${ZAPRET2_OUT_RANGE} len=${ZAPRET2_SPLIT_LEN} win=${ZAPRET2_WIN_SYNACK}/${ZAPRET2_WIN_ACK})${_dbg}"
+        fi
     else
-        echo -e "${YELLOW}установлен, остановлен${NC}"
+        echo -e "${YELLOW}установлен, остановлен${NC} (профиль ${ZAPRET2_PROFILE:-v1})"
     fi
 }
 
@@ -435,6 +453,13 @@ zapret2_write_conf() {
         _debug_line="--debug=@${ZAPRET2_DEBUG_LOG}"
     fi
 
+    # v2 работает по всему потоку: окно считается в lua от wscale.
+    local _out="${ZAPRET2_OUT_RANGE}" _in="${ZAPRET2_IN_RANGE}"
+    if [ "${ZAPRET2_PROFILE:-v1}" = "v2" ]; then
+        _out="a"
+        _in="a"
+    fi
+
     cat > "$ZAPRET2_CONF" << EOF
 --qnum ${ZAPRET2_QNUM}
 --fwmark=${ZAPRET2_FWMARK}
@@ -444,17 +469,93 @@ ${_debug_line}
 --lua-init=@${ZAPRET2_LUA_DIR}/zapret-antidpi.lua
 --lua-init=@${ZAPRET2_LUA_DIR}/mtproto.lua
 --filter-tcp=${_port}
---out-range=${ZAPRET2_OUT_RANGE}
---in-range=${ZAPRET2_IN_RANGE}
+--out-range=${_out}
+--in-range=${_in}
 --payload-disable=all
 --lua-desync=lets_resend
 --new
 EOF
-    log_success "Конфиг записан: ${ZAPRET2_CONF} (порт=${_port})"
+    log_success "Конфиг записан: ${ZAPRET2_CONF} (порт=${_port} профиль=${ZAPRET2_PROFILE:-v1})"
 }
 
-# ── Запись Lua-скрипта для MTProto ──────────────────────────
-zapret2_write_lua() {
+# ── Проверка параметров профиля v2 ──────────────────────────
+zapret2_validate_v2() {
+    local _win="${1:-$ZAPRET2_V2_WIN}" _len="${2:-$ZAPRET2_V2_LEN}"
+    [[ "$_win" =~ ^[0-9]+$ ]] && [[ "$_len" =~ ^[0-9]+$ ]] &&
+        [ "$_len" -ge 1 ] && [ "$_len" -lt "$_win" ] && [ "$_win" -le 1400 ]
+}
+
+# ── Запись Lua-скрипта профиля v2 (из MTProxyL) ─────────────
+zapret2_write_v2_lua() {
+    local _dst="${1:-$ZAPRET2_LUA}"
+    mkdir -p "$(dirname "$_dst")"
+    cat > "$_dst" << LUAEOF
+-- Zapret2 MTProto fix v2 — MTProxyL
+local win, len, release_at = ${ZAPRET2_V2_WIN}, ${ZAPRET2_V2_LEN}, 1400
+local sequence_space = 4294967296
+
+local function get_wscale(options)
+    local i = find_tcp_option(options, TCP_KIND_SCALE)
+    local data = i and options[i].data
+    return math.min(data and data:byte(1) or 0, 14)
+end
+
+local function ack_window(shift)
+    local unit = 2 ^ shift
+    return math.max(math.floor(win / unit + 0.5), math.floor(len / unit) + 1)
+end
+
+function lets_resend(ctx, desync)
+    local dis = desync.dis
+    local tcp = dis.tcp
+    local payload = dis.payload or ""
+    local state = desync.track and desync.track.lua_state
+    if not tcp or not state then return VERDICT_PASS end
+
+    local flags = tcp.th_flags
+    if bitand(flags, TH_FIN + TH_RST) ~= 0 then return VERDICT_PASS end
+
+    if desync.outgoing then
+        if bitand(flags, TH_SYN + TH_ACK) == TH_SYN + TH_ACK then
+            state.ack0 = tcp.th_ack
+            state.broken_upto = 0
+            state.win_ack = ack_window(get_wscale(tcp.options))
+            wsize_rewrite(dis, {wsize = math.min(win, tcp.th_win)})
+            return VERDICT_MODIFY
+        end
+        if not state.ack0 or bitand(flags, TH_ACK) == 0 then return VERDICT_PASS end
+        if #payload > 0 or (tcp.th_ack - state.ack0) % sequence_space >= release_at then
+            instance_cutoff(ctx, nil)
+            return VERDICT_PASS
+        end
+        wsize_rewrite(dis, {wsize = math.min(state.win_ack, tcp.th_win)})
+        return VERDICT_MODIFY
+    end
+
+    if not state.ack0 or #payload == 0 then return VERDICT_PASS end
+    local offset = (tcp.th_seq - state.ack0) % sequence_space
+    if offset >= release_at or offset < state.broken_upto then return VERDICT_PASS end
+    if #payload <= len then return VERDICT_PASS end
+
+    local first = payload:sub(1, len)
+    local middle = payload:sub(len + 1, 2 * len)
+    local tail = payload:sub(2 * len + 1)
+    if not rawsend_payload_segmented(desync, first) then return VERDICT_PASS end
+    if #tail > 0 and not rawsend_payload_segmented(desync, tail, 2 * len) then return VERDICT_PASS end
+    local saved_badsum = desync.arg.badsum
+    desync.arg.badsum = true
+    local sent = rawsend_payload_segmented(desync, middle, len)
+    desync.arg.badsum = saved_badsum
+    if not sent then return VERDICT_PASS end
+    state.broken_upto = offset + #payload
+    return VERDICT_DROP
+end
+LUAEOF
+    [ "$_dst" != "$ZAPRET2_LUA" ] || log_success "Lua скрипт записан: ${ZAPRET2_LUA} (v2 win=${ZAPRET2_V2_WIN} len=${ZAPRET2_V2_LEN})"
+}
+
+# ── Запись Lua-скрипта профиля v1 ───────────────────────────
+zapret2_write_v1_lua() {
     local _dst="${1:-$ZAPRET2_LUA}"
     mkdir -p "$(dirname "$_dst")"
     cat > "$_dst" << LUAEOF
@@ -520,6 +621,15 @@ LUAEOF
     [ "$_dst" != "$ZAPRET2_LUA" ] || log_success "Lua скрипт записан: ${ZAPRET2_LUA}"
 }
 
+# ── Запись Lua-скрипта по текущему профилю ──────────────────
+zapret2_write_lua() {
+    if [ "${ZAPRET2_PROFILE:-v1}" = "v2" ]; then
+        zapret2_write_v2_lua "$@"
+    else
+        zapret2_write_v1_lua "$@"
+    fi
+}
+
 # Обновление Lua у уже установленного zapret2: если скрипт отличается от
 # текущего, подменяем файл и перезапускаем службу. Нужно тем, кто обновил
 # менеджер, но не трогал настройки: без этого старая копия Lua остаётся жить.
@@ -570,6 +680,7 @@ TABLE="${ZAPRET2_NFT_TABLE}"
 FWMARK="${ZAPRET2_FWMARK}"
 PORT="${_port}"
 QNUM="${ZAPRET2_QNUM}"
+PROFILE="${ZAPRET2_PROFILE:-v1}"
 CT_MARK="${_ct_mark}"
 COMBINED_MARK="${_combined_mark}"
 # Потолок пакетов соединения в очереди; пусто — без потолка.
@@ -585,11 +696,17 @@ nft delete table ip "\$TABLE" 2>/dev/null || true
 nft add table ip "\$TABLE"
 
 nft "add chain ip \$TABLE predefrag { type filter hook output priority -401; policy accept; }"
-nft "add rule ip \$TABLE predefrag meta mark \$COMBINED_MARK counter accept"
+# В v1 iOS-пакеты метятся на выходе и принимаются по combined mark.
+# В v2 iOS-обхода нет: очередь просто пропускает уже помеченные пакеты.
+if [ "\$PROFILE" = "v1" ]; then
+    nft "add rule ip \$TABLE predefrag meta mark \$COMBINED_MARK counter accept"
+fi
 nft "add rule ip \$TABLE predefrag meta mark and \$FWMARK != 0x00000000 counter notrack"
 
-nft "add chain ip \$TABLE output { type route hook output priority mangle; policy accept; }"
-nft "add rule ip \$TABLE output meta mark and \$COMBINED_MARK == \$COMBINED_MARK ct mark set \$CT_MARK counter accept"
+if [ "\$PROFILE" = "v1" ]; then
+    nft "add chain ip \$TABLE output { type route hook output priority mangle; policy accept; }"
+    nft "add rule ip \$TABLE output meta mark and \$COMBINED_MARK == \$COMBINED_MARK ct mark set \$CT_MARK counter accept"
+fi
 
 if [ "\$IS_BRIDGE" = "true" ]; then
     DADDR_MATCH=""
@@ -615,24 +732,30 @@ if [ "\$IS_BRIDGE" = "true" ]; then
 
     nft "add chain ip \$TABLE forward { type filter hook forward priority mangle; policy accept; }"
     nft "add rule ip \$TABLE forward ct state invalid counter drop"
-    nft "add rule ip \$TABLE forward ct mark \$CT_MARK counter accept"
+    if [ "\$PROFILE" = "v1" ]; then
+        nft "add rule ip \$TABLE forward ct mark \$CT_MARK counter accept"
+    fi
     [ -z "\$LIMIT_MATCH" ] || nft "add rule ip \$TABLE forward \$LIMIT_MATCH counter accept"
     nft "add rule ip \$TABLE forward \${DADDR_MATCH}meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT counter queue num \$QNUM bypass"
     nft "add rule ip \$TABLE forward \${SADDR_MATCH}meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT counter queue num \$QNUM bypass"
 else
     nft "add chain ip \$TABLE postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
-    nft "add rule ip \$TABLE postrouting ct mark \$CT_MARK counter accept"
+    if [ "\$PROFILE" = "v1" ]; then
+        nft "add rule ip \$TABLE postrouting ct mark \$CT_MARK counter accept"
+    fi
     [ -z "\$LIMIT_MATCH" ] || nft "add rule ip \$TABLE postrouting \$LIMIT_MATCH counter accept"
     nft "add rule ip \$TABLE postrouting meta mark and \$FWMARK == 0x00000000 tcp sport \$PORT counter queue num \$QNUM bypass"
 
     nft "add chain ip \$TABLE prerouting { type filter hook prerouting priority mangle; policy accept; }"
     nft "add rule ip \$TABLE prerouting ct state invalid counter drop"
-    nft "add rule ip \$TABLE prerouting ct mark \$CT_MARK counter accept"
+    if [ "\$PROFILE" = "v1" ]; then
+        nft "add rule ip \$TABLE prerouting ct mark \$CT_MARK counter accept"
+    fi
     [ -z "\$LIMIT_MATCH" ] || nft "add rule ip \$TABLE prerouting \$LIMIT_MATCH counter accept"
     nft "add rule ip \$TABLE prerouting meta mark and \$FWMARK == 0x00000000 tcp dport \$PORT counter queue num \$QNUM bypass"
 fi
 
-echo "MEKO MTProto: NFT table \$TABLE applied (port=\$PORT qnum=\$QNUM fwmark=\$FWMARK ctmark=\$CT_MARK bridge=\$IS_BRIDGE precise=\$IS_PRECISE)"
+echo "MEKO MTProto: NFT table \$TABLE applied (port=\$PORT qnum=\$QNUM fwmark=\$FWMARK ctmark=\$CT_MARK profile=\$PROFILE bridge=\$IS_BRIDGE precise=\$IS_PRECISE)"
 
 # Учёт пакетов conntrack для потолка очереди (без него правило молча не работает)
 [ -z "\$LIMIT_MATCH" ] || sysctl -w net.netfilter.nf_conntrack_acct=1 >/dev/null 2>&1 || true
@@ -856,11 +979,15 @@ zapret2_apply_nft() {
     nft add table ip "$_table"
 
     nft "add chain ip $_table predefrag { type filter hook output priority -401; policy accept; }"
-    nft "add rule ip $_table predefrag meta mark ${_combined_mark} counter accept"
+    if [ "${ZAPRET2_PROFILE:-v1}" = "v1" ]; then
+        nft "add rule ip $_table predefrag meta mark ${_combined_mark} counter accept"
+    fi
     nft "add rule ip $_table predefrag meta mark and $_fwmark != 0x00000000 counter notrack"
 
-    nft "add chain ip $_table output { type route hook output priority mangle; policy accept; }"
-    nft "add rule ip $_table output meta mark and ${_combined_mark} == ${_combined_mark} ct mark set ${_ct_mark} counter accept"
+    if [ "${ZAPRET2_PROFILE:-v1}" = "v1" ]; then
+        nft "add chain ip $_table output { type route hook output priority mangle; policy accept; }"
+        nft "add rule ip $_table output meta mark and ${_combined_mark} == ${_combined_mark} ct mark set ${_ct_mark} counter accept"
+    fi
 
     detect_network_mode
     if [ "${DETECTED_NETWORK_MODE:-}" = "bridge" ] || [ "${NFT_HOOK:-input}" = "forward" ]; then
@@ -879,23 +1006,29 @@ zapret2_apply_nft() {
 
         nft "add chain ip $_table forward { type filter hook forward priority mangle; policy accept; }"
         nft "add rule ip $_table forward ct state invalid counter drop"
-        nft "add rule ip $_table forward ct mark ${_ct_mark} counter accept"
+        if [ "${ZAPRET2_PROFILE:-v1}" = "v1" ]; then
+            nft "add rule ip $_table forward ct mark ${_ct_mark} counter accept"
+        fi
         [ -z "$_limit" ] || nft "add rule ip $_table forward ${_limit} counter accept"
         nft "add rule ip $_table forward ${_daddr_match}meta mark and $_fwmark == 0x00000000 tcp dport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
         nft "add rule ip $_table forward ${_saddr_match}meta mark and $_fwmark == 0x00000000 tcp sport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
         log_success "NFT таблица ${_table} применена для Docker bridge (forward: порт=${_port} qnum=${ZAPRET2_QNUM} fwmark=${_fwmark} ctmark=${_ct_mark})"
     else
         nft "add chain ip $_table postrouting { type filter hook postrouting priority srcnat + 1; policy accept; }"
-        nft "add rule ip $_table postrouting ct mark ${_ct_mark} counter accept"
+        if [ "${ZAPRET2_PROFILE:-v1}" = "v1" ]; then
+            nft "add rule ip $_table postrouting ct mark ${_ct_mark} counter accept"
+        fi
         [ -z "$_limit" ] || nft "add rule ip $_table postrouting ${_limit} counter accept"
         nft "add rule ip $_table postrouting meta mark and $_fwmark == 0x00000000 tcp sport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
 
         nft "add chain ip $_table prerouting { type filter hook prerouting priority mangle; policy accept; }"
         nft "add rule ip $_table prerouting ct state invalid counter drop"
-        nft "add rule ip $_table prerouting ct mark ${_ct_mark} counter accept"
+        if [ "${ZAPRET2_PROFILE:-v1}" = "v1" ]; then
+            nft "add rule ip $_table prerouting ct mark ${_ct_mark} counter accept"
+        fi
         [ -z "$_limit" ] || nft "add rule ip $_table prerouting ${_limit} counter accept"
         nft "add rule ip $_table prerouting meta mark and $_fwmark == 0x00000000 tcp dport ${_port} counter queue num ${ZAPRET2_QNUM} bypass"
-        log_success "NFT таблица ${_table} применена (порт=${_port} qnum=${ZAPRET2_QNUM} fwmark=${_fwmark} ctmark=${_ct_mark})"
+        log_success "NFT таблица ${_table} применена (порт=${_port} qnum=${ZAPRET2_QNUM} fwmark=${_fwmark} ctmark=${_ct_mark} профиль=${ZAPRET2_PROFILE:-v1})"
     fi
 
     zapret2_conntrack_acct
@@ -1127,6 +1260,24 @@ zapret2_install() {
     save_settings
     log_info "Порт установлен: ${SERVER_PORT}"
 
+    # ── Профиль Zapret2 ──────────────────────────────────────
+    echo ""
+    echo -e "  ${BOLD}Профиль Zapret2:${NC}"
+    echo -e "    ${GREEN}[1]${NC} v1 — старый (out-range + подгонка win ACK)"
+    echo -e "    ${CYAN}[2]${NC} v2 — новый (бета), окно считается по wscale"
+    echo -en "  ${BOLD}Выбор [1/2, Enter - v2]:${NC} "
+    local _prof_in; { read -r _prof_in </dev/tty; } 2>/dev/null || true
+    case "$_prof_in" in
+        ""|2|v2|V2) ZAPRET2_PROFILE="v2" ;;
+        1|v1|V1)    ZAPRET2_PROFILE="v1" ;;
+        *)
+            log_warning "Неверный выбор, ставлю v2"
+            ZAPRET2_PROFILE="v2"
+            ;;
+    esac
+    save_settings
+    log_info "Профиль Zapret2: ${ZAPRET2_PROFILE}"
+
     echo -en "  ${BOLD}Скачать и установить zapret2 bundle? [Y/n]:${NC} "
     local _yn; { read -r _yn </dev/tty; } 2>/dev/null || true
     [[ "$_yn" =~ ^[nN]$ ]] && { log_info "Отменено"; return 0; }
@@ -1224,8 +1375,11 @@ zapret2_install() {
         log_warning "Автозапуск ${ZAPRET2_SERVICE} не включился"
     fi
 
-    # проверка wscale: если окно мешает дроблению — предложить поправить
-    zapret2_check_wscale "ask"
+    # проверка wscale: если окно мешает дроблению — предложить поправить.
+    # В v2 окно пересчитывается в lua от wscale, подгонка не нужна.
+    if [ "$ZAPRET2_PROFILE" = "v1" ]; then
+        zapret2_check_wscale "ask"
+    fi
 
     echo ""
     log_success "Zapret2 MTProto fix установлен и запущен"
@@ -1263,7 +1417,9 @@ zapret2_remove() {
     zapret2_stop
     systemctl disable "$ZAPRET2_SERVICE" 2>/dev/null || true
     rm -f "/etc/systemd/system/${ZAPRET2_SERVICE}"
+    rm -f "/usr/local/sbin/mtpr-zapret2-start.sh"
     systemctl daemon-reload 2>/dev/null || true
+    systemctl reset-failed "$ZAPRET2_SERVICE" 2>/dev/null || true
     rm -f "$ZAPRET2_CONF"
     rm -f "$ZAPRET2_LUA"
     rm -rf "$ZAPRET2_DIR"
@@ -1299,6 +1455,83 @@ zapret2_update_config() {
     fi
 }
 
+# ── Переключение профиля Zapret2 (v1 <-> v2) ────────────────
+zapret2_set_profile() {
+    local _new="${1:-}"
+    if [ "$_new" != "v1" ] && [ "$_new" != "v2" ]; then
+        log_error "Профиль должен быть v1 или v2"
+        return 1
+    fi
+    if [ "$_new" = "${ZAPRET2_PROFILE:-v1}" ]; then
+        log_info "Уже выбран профиль ${_new}"
+        return 0
+    fi
+    if [ "$_new" = "v2" ] && ! zapret2_validate_v2; then
+        log_error "Параметры v2 некорректны: нужно 1 <= len < win <= 1400 (win=${ZAPRET2_V2_WIN} len=${ZAPRET2_V2_LEN})"
+        return 1
+    fi
+
+    local _old="${ZAPRET2_PROFILE:-v1}"
+    if [ "${ZAPRET2_APPLIED:-false}" != "true" ]; then
+        ZAPRET2_PROFILE="$_new"
+        save_settings
+        log_success "Профиль Zapret2: ${_new} (применится при установке)"
+        return 0
+    fi
+
+    local _bk_dir _had_lua="false" _had_conf="false" _had_start="false"
+    local _was_active="false"
+    systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null 2>&1 && _was_active="true"
+    _bk_dir=$(mktemp -d 2>/dev/null) || { log_error "Не удалось создать временный каталог"; return 1; }
+    if [ -f "$ZAPRET2_LUA" ]; then cp -a "$ZAPRET2_LUA" "$_bk_dir/mtproto.lua" && _had_lua="true"; fi
+    if [ -f "$ZAPRET2_CONF" ]; then cp -a "$ZAPRET2_CONF" "$_bk_dir/mtproto.conf" && _had_conf="true"; fi
+    if [ -f /usr/local/sbin/mtpr-zapret2-start.sh ]; then
+        cp -a /usr/local/sbin/mtpr-zapret2-start.sh "$_bk_dir/start.sh" && _had_start="true"
+    fi
+
+    log_info "Переключаю Zapret2: ${_old} -> ${_new}..."
+    ZAPRET2_PROFILE="$_new"
+    save_settings
+    zapret2_write_all
+    systemctl daemon-reload 2>/dev/null || true
+
+    # Служба была остановлена вручную — не поднимаем её ради смены профиля,
+    # новые конфиг/lua применятся при следующем запуске.
+    if [ "$_was_active" != "true" ]; then
+        rm -rf "$_bk_dir"
+        log_success "Профиль Zapret2 переключён на ${_new} (служба остановлена, применится при запуске)"
+        return 0
+    fi
+
+    systemctl restart "$ZAPRET2_SERVICE" 2>/dev/null || true
+    sleep 1
+    zapret2_apply_nft >/dev/null 2>&1 || true
+
+    if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null 2>&1; then
+        rm -rf "$_bk_dir"
+        log_success "Zapret2 переключён на профиль ${_new}"
+        return 0
+    fi
+
+    log_error "Профиль ${_new} не запустился — возвращаю ${_old}"
+    ZAPRET2_PROFILE="$_old"
+    save_settings
+    [ "$_had_lua" = "true" ] && cp -a "$_bk_dir/mtproto.lua" "$ZAPRET2_LUA"
+    [ "$_had_conf" = "true" ] && cp -a "$_bk_dir/mtproto.conf" "$ZAPRET2_CONF"
+    [ "$_had_start" = "true" ] && cp -a "$_bk_dir/start.sh" /usr/local/sbin/mtpr-zapret2-start.sh
+    rm -rf "$_bk_dir"
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl restart "$ZAPRET2_SERVICE" 2>/dev/null || true
+    sleep 1
+    zapret2_apply_nft >/dev/null 2>&1 || true
+    if systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null 2>&1; then
+        log_success "Откат на ${_old} выполнен"
+    else
+        log_error "Откат не помог, служба не работает — смотрите journalctl -u ${ZAPRET2_SERVICE}"
+    fi
+    return 1
+}
+
 # ── Меню настроек Zapret2 ────────────────────────────────────
 show_zapret2_settings_menu() {
     while true; do
@@ -1318,6 +1551,10 @@ show_zapret2_settings_menu() {
         echo -e "  ${DIM}[7]${NC} fwmark      [${ZAPRET2_FWMARK}]"
         echo -e "  ${DIM}[8]${NC} Debug лог   [$([ "${ZAPRET2_DEBUG:-false}" = "true" ] && echo "включён" || echo "выключен")]"
         echo -e "  ${DIM}[9]${NC} потолок пакетов в очереди [${ZAPRET2_QUEUE_LIMIT}]  ${DIM}(0 — без потолка)${NC}"
+        echo ""
+        echo -e "  ${DIM}[p]${NC} профиль Zapret2 [${ZAPRET2_PROFILE}]  ${DIM}(v1 — старый, v2 — бета)${NC}"
+        echo -e "  ${DIM}[10]${NC} v2: win [${ZAPRET2_V2_WIN}]  ${DIM}(1..1400)${NC}"
+        echo -e "  ${DIM}[11]${NC} v2: split len [${ZAPRET2_V2_LEN}]  ${DIM}(1..win-1)${NC}"
         echo ""
         echo -e "  ${DIM}[0]${NC} вернуться"
         echo ""
@@ -1391,6 +1628,32 @@ show_zapret2_settings_menu() {
                 elif [ -n "$_v" ]; then
                     log_error "Диапазон 0..100000 (0 — без потолка)"
                 fi ;;
+            p|P|з|З)
+                echo -en "  Профиль [v1/v2, сейчас ${ZAPRET2_PROFILE}]: "
+                local _v; { read -r _v </dev/tty; } 2>/dev/null || true
+                case "$_v" in
+                    v1|v2) zapret2_set_profile "$_v" ;;
+                    "") ;;
+                    *) log_error "Допустимо: v1 или v2" ;;
+                esac ;;
+            10)
+                echo -en "  v2 win [${ZAPRET2_V2_WIN}]: "
+                local _v; { read -r _v </dev/tty; } 2>/dev/null || true
+                if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 2 ] && [ "$_v" -le 1400 ] && [ "$_v" -gt "$ZAPRET2_V2_LEN" ]; then
+                    ZAPRET2_V2_WIN="$_v"; save_settings
+                    if [ "$ZAPRET2_PROFILE" = "v2" ]; then zapret2_update_config; else log_info "Сохранено, применится в профиле v2"; fi
+                elif [ -n "$_v" ]; then
+                    log_error "Нужно 2..1400 и больше len (${ZAPRET2_V2_LEN})"
+                fi ;;
+            11)
+                echo -en "  v2 split len [${ZAPRET2_V2_LEN}]: "
+                local _v; { read -r _v </dev/tty; } 2>/dev/null || true
+                if [[ "$_v" =~ ^[0-9]+$ ]] && [ "$_v" -ge 1 ] && [ "$_v" -lt "$ZAPRET2_V2_WIN" ]; then
+                    ZAPRET2_V2_LEN="$_v"; save_settings
+                    if [ "$ZAPRET2_PROFILE" = "v2" ]; then zapret2_update_config; else log_info "Сохранено, применится в профиле v2"; fi
+                elif [ -n "$_v" ]; then
+                    log_error "Нужно 1..win-1 (win=${ZAPRET2_V2_WIN})"
+                fi ;;
             0|"") return ;;
             *) log_warning "Неверный выбор: ${_choice}" ;;
         esac
@@ -1403,7 +1666,7 @@ show_zapret2_menu() {
     while true; do
         clear 2>/dev/null || true
         echo ""
-        echo -e "  ${NC}${BOLD}Меню v0.31 | ${CYAN}${BOLD}V4.2 Zapret2 MTProto fix${NC}"
+        echo -e "  ${NC}${BOLD}Меню v0.31 | ${CYAN}${BOLD}V4.2 Zapret2 MTProto fix${NC} ${DIM}· профиль ${ZAPRET2_PROFILE}${NC}"
         echo -e "  ${DIM}══════════════════════════════"
         echo -e "  ${DIM}disorder + badsum + window control${NC}"
         echo ""
@@ -1412,11 +1675,16 @@ show_zapret2_menu() {
 
         if [ "${ZAPRET2_APPLIED:-false}" = "true" ]; then
             echo -e "  ${BOLD}Текущие параметры:${NC}"
-            echo -e "    out-range:     ${GREEN}${ZAPRET2_OUT_RANGE}${NC}"
-            echo -e "    in-range:      ${ZAPRET2_IN_RANGE}"
-            echo -e "    split len:     ${GREEN}${ZAPRET2_SPLIT_LEN}${NC}"
-            echo -e "    win SYN+ACK:   ${ZAPRET2_WIN_SYNACK}"
-            echo -e "    win ACK:       ${ZAPRET2_WIN_ACK}"
+            if [ "${ZAPRET2_PROFILE:-v1}" = "v2" ]; then
+                echo -e "    win v2:        ${GREEN}${ZAPRET2_V2_WIN}${NC}"
+                echo -e "    split len v2:  ${GREEN}${ZAPRET2_V2_LEN}${NC}"
+            else
+                echo -e "    out-range:     ${GREEN}${ZAPRET2_OUT_RANGE}${NC}"
+                echo -e "    in-range:      ${ZAPRET2_IN_RANGE}"
+                echo -e "    split len:     ${GREEN}${ZAPRET2_SPLIT_LEN}${NC}"
+                echo -e "    win SYN+ACK:   ${ZAPRET2_WIN_SYNACK}"
+                echo -e "    win ACK:       ${ZAPRET2_WIN_ACK}"
+            fi
             echo -e "    NFQUEUE num:   ${ZAPRET2_QNUM}"
             echo -e "    Потолок пакетов: ${ZAPRET2_QUEUE_LIMIT}"
             echo -e "    fwmark:        ${ZAPRET2_FWMARK}"
@@ -1449,6 +1717,11 @@ show_zapret2_menu() {
             echo -e "  ${CYAN}[5]${NC}  Показать конфиг + Lua"
             echo -e "  ${CYAN}[6]${NC}  Логи службы (journalctl)"
             echo -e "  ${CYAN}[7]${NC}  Диагностика очереди / конфликтов"
+            if [ "${ZAPRET2_PROFILE:-v1}" = "v2" ]; then
+                echo -e "  ${CYAN}[11]${NC} Переключить на Zapret2 v1 (стабильный)"
+            else
+                echo -e "  ${CYAN}[11]${NC} Переключить на Zapret2 v2 (бета)"
+            fi
             echo -e "  ${CYAN}[r]${NC}  Сбросить настройки к значениям по умолчанию"
             echo -e "  ${RED}[8]${NC}  Удалить zapret2"
         fi
@@ -1533,6 +1806,16 @@ show_zapret2_menu() {
                 else
                     log_info "Zapret2 не установлен — используйте [1]"
                 fi ;;
+            11)
+                if [ "${ZAPRET2_APPLIED:-false}" = "true" ]; then
+                    if [ "${ZAPRET2_PROFILE:-v1}" = "v2" ]; then
+                        zapret2_set_profile v1
+                    else
+                        zapret2_set_profile v2
+                    fi
+                else
+                    log_info "Zapret2 не установлен — используйте [1]"
+                fi ;;
             r|R)
                 if [ "${ZAPRET2_APPLIED:-false}" = "true" ]; then
                     echo ""
@@ -1542,6 +1825,7 @@ show_zapret2_menu() {
                     echo -e "    split len:   400"
                     echo -e "    win SYN+ACK: 1400"
                     echo -e "    win ACK:     10"
+                    echo -e "    v2 win/len:  768/256"
                     echo -e "    NFQUEUE:     200"
                     echo -e "    fwmark:      0x40000000"
                     echo ""
@@ -1553,6 +1837,8 @@ show_zapret2_menu() {
                         ZAPRET2_SPLIT_LEN="400"
                         ZAPRET2_WIN_SYNACK="1400"
                         ZAPRET2_WIN_ACK="10"
+                        ZAPRET2_V2_WIN="768"
+                        ZAPRET2_V2_LEN="256"
                         ZAPRET2_QNUM="200"
                         ZAPRET2_FWMARK="0x40000000"
                         save_settings
@@ -1633,15 +1919,34 @@ EOF
 # ── Автоматическая установка zapret2 (без вопросов) ──────────
 zapret2_install_auto() {
     local port="${1:-443}"
+    local profile="${2:-v1}"
+    case "$profile" in
+        v1|v2) ;;
+        *) profile="v1" ;;
+    esac
     echo ""
-    log_info "Автоустановка Zapret2 на порт $port..."
+    log_info "Автоустановка Zapret2 на порт $port (профиль $profile)..."
 
     zapret2_ensure_nft auto || return 1
 
     load_settings
+    if [ "$profile" = "v2" ] && ! zapret2_validate_v2; then
+        log_error "Параметры v2 некорректны: нужно 1 <= len < win <= 1400 (win=${ZAPRET2_V2_WIN} len=${ZAPRET2_V2_LEN})"
+        return 1
+    fi
 
     SERVER_PORT="$port"
+    ZAPRET2_PROFILE="$profile"
     save_settings
+
+    # Переустановка поверх работающей службы: без остановки nfqws2 останется
+    # со старым профилем и старой очередью, а find_free_queue увидит занятый порт.
+    if [ "${ZAPRET2_APPLIED:-false}" = "true" ] || systemctl is-active "$ZAPRET2_SERVICE" &>/dev/null 2>&1; then
+        systemctl stop "$ZAPRET2_SERVICE" 2>/dev/null || true
+        nft delete table ip "${ZAPRET2_NFT_TABLE}" 2>/dev/null || true
+        pkill -f "$ZAPRET2_BIN" 2>/dev/null || true
+        sleep 1
+    fi
 
     if [ ! -x "$ZAPRET2_BIN" ]; then
         log_info "Скачивание zapret2..."
@@ -1683,10 +1988,12 @@ zapret2_install_auto() {
     mkdir -p "$(dirname "$PORT_FILE")"
     echo "$port" >"$PORT_FILE"
 
-    # Проверка и автоматическая корректировка wscale
-    zapret2_check_wscale "auto"
+    # Проверка и автоматическая корректировка wscale (только для v1)
+    if [ "$ZAPRET2_PROFILE" = "v1" ]; then
+        zapret2_check_wscale "auto"
+    fi
 
-    log_success "Zapret2 успешно установлен на порт $port"
+    log_success "Zapret2 успешно установлен на порт $port (профиль $ZAPRET2_PROFILE)"
 }
 
 # ── Загрузка настроек при старте ────────────────────────────

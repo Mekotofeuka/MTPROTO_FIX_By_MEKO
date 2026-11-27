@@ -1006,6 +1006,7 @@ FLAG_NO_FIX=""
 FLAG_WEB=""
 FLAG_NGINX=""
 FIX_TYPE=""              # v2, v3, v4, nft
+FIX_PROFILE=""           # v1, v2 — только для -fix-type v4
 FIX_PORT=""              # порт для фикса
 PROXY_PORT=""            # порт прокси
 DOMAIN=""
@@ -1105,6 +1106,13 @@ while [[ $# -gt 0 ]]; do
             esac
             shift 2
             ;;
+        -fix-profile)
+            case "$2" in
+                v1|v2) FIX_PROFILE="$2" ;;
+                *) echo -e "${RED}[✗]${NC} Неверный профиль zapret2: $2 (доступны: v1, v2)"; exit 1 ;;
+            esac
+            shift 2
+            ;;
         -fix-port)
             if [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -ge 1 ] && [ "$2" -le 65535 ]; then
                 FIX_PORT="$2"
@@ -1174,6 +1182,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "    -mtdd                  установить mtdd (FakeTLS, MTProto-прокси)"
             echo -e "    -fix                   установить фикс"
             echo -e "    -fix-type {v2|v3|v4|nft}   тип фикса (по умолчанию v3)"
+            echo -e "    -fix-profile {v1|v2}   профиль zapret2 (только с -fix-type v4; по умолчанию v1)"
             echo -e "    -fix-port <порт>       порт для фикса (если не указан, берётся из -port или спросится)"
             echo -e "    -port <порт>           порт для прокси (и для фикса, если не задан -fix-port)"
             echo -e "    -domain <домен>        SNI домен для прокси (по умолчанию ozon.ru)"
@@ -1390,9 +1399,9 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_MTDD" |
             echo -e "${DIM}  Если совпало -> это ios и принимаем пакеты без лимита" >&2
             echo -e "${DIM}  Если не совпало -> это другое ус-во и ставим SYN 1 пакет в 1.1 сек." >&2
             echo "" >&2
-            echo -e "  ${CYAN}[V4]${NC}  ${BOLD}v4 фикс zapret2${NC} — быстрый (на этапе тестирования)" >&2
+            echo -e "  ${CYAN}[V4]${NC}  ${BOLD}v4 фикс zapret2${NC} — быстрый (v1 / v2 бета — выбор при установке)" >&2
             echo -e "${DIM}  Работает с помощью zapret2 на уровне TCP-пакетов:" >&2
-            echo -e "${DIM}  disorder + badsum + window control" >&2
+            echo -e "${DIM}  disorder + badsum + window control (v1) / окно по wscale (v2)" >&2
             echo "" >&2
             echo -e "  ${GREEN}[nft]${NC}  ${BOLD}v3 фикс nftables${NC} — совместим с Docker" >&2
             echo -e "${DIM}  Разделение по байтам из пакета, как в v3 iptables" >&2
@@ -1625,7 +1634,9 @@ if [[ -n "$FLAG_TELEMT" || -n "$FLAG_ZIG" || -n "$FLAG_MTG" || -n "$FLAG_MTDD" |
         log_info "Установка фикса типа $FIX_TYPE на порт $FIX_PORT..."
 
         # Вызываем install_syn_fix с переданными параметрами
-        install_syn_fix -auto_install -port "$FIX_PORT" -type "$FIX_TYPE"
+        fix_args=(-auto_install -port "$FIX_PORT" -type "$FIX_TYPE")
+        [[ -n "$FIX_PROFILE" ]] && fix_args+=(-profile "$FIX_PROFILE")
+        install_syn_fix "${fix_args[@]}"
 
         log_success "Фикс установлен"
     fi

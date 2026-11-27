@@ -115,6 +115,7 @@ Install **Telemt** with the **v3 fix** on port `443`, domain `ozon.ru`, **ad_tag
 | `-fix` | — | Install [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO) |
 | `-no-fix` | — | Do not install the fix |
 | `-fix-type {v2\|v3\|v4\|nft}` | `v3` | Fix type: `v2`/`v3` — iptables, `nft` — v3 via nftables, `v4` — zapret2 (nfqws2) |
+| `-fix-profile {v1\|v2}` | `v1` | Zapret2 profile: `v1` (fixed window) or `v2` (window from wscale). Only with `-fix-type v4` |
 | `-fix-port <port>` | `-port` or `443` | Port the fix is applied to |
 | `-port <port>` | `443` | Proxy port |
 | `-domain <domain>` | `ozon.ru` | Domain used for TLS masking |

@@ -694,6 +694,7 @@ install_syn_fix() {
     local auto_install=false
     local forced_ports=""
     local FIX_TYPE="new"   # new=v3, old=v2, docker_smart=nft, zapret2
+    local fix_profile=""   # v1|v2 для zapret2
     local GEOIP_MODE=false
     local geoip_action="menu"
 
@@ -715,6 +716,13 @@ install_syn_fix() {
                     nft)      FIX_TYPE="docker_smart" ;;
                     v4|zapret2) FIX_TYPE="zapret2" ;;
                     *) log_warning "Неизвестный тип фикса: $2, используем v3"; FIX_TYPE="new" ;;
+                esac
+                shift 2
+                ;;
+            -profile)
+                case "$2" in
+                    v1|v2) fix_profile="$2" ;;
+                    *) log_warning "Неизвестный профиль zapret2: $2, используется v1"; fix_profile="" ;;
                 esac
                 shift 2
                 ;;
@@ -764,7 +772,7 @@ install_syn_fix() {
         fi
         log_info "Установка Zapret2 (v4) на порт $forced_ports..."
         if declare -f zapret2_install_auto &>/dev/null; then
-            zapret2_install_auto "$forced_ports"
+            zapret2_install_auto "$forced_ports" "$fix_profile"
             return $?
         else
             log_error "Функция zapret2_install_auto не найдена: файл data/zapret2_fix.sh отсутствует или повреждён"
@@ -846,7 +854,7 @@ install_syn_fix() {
         echo -e ""
         echo -e "  ${CYAN}[2]${NC}  ${BOLD}V4 фикс zapret2 ${NC} — быстрый ${NC}"
         echo -e "${DIM}  Работает с помощью zapret2 на уровне TCP-пакетов: ${NC}"
-        echo -e "${DIM}  disorder + badsum + window control"
+        echo -e "${DIM}  disorder + badsum + window control (v1) / окно по wscale (v2 бета)${NC}"
         echo ""
         echo -e "  ${YELLOW}[3]${NC}  ${BOLD}v2 фикс iptables${NC} (Разделение устройств определяя их TTL+Length)"
         echo -e "${DIM}  Если TTL <65 и length 64 -> это ios и принимаем пакеты без лимита"

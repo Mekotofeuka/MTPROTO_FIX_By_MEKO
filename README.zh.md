@@ -114,6 +114,7 @@ _MEKO 目前使用 [更精确的 V3 版本](https://github.com/Mekotofeuka/MTPRO
 | `-fix` | — | 安装 [MTProto FIX](https://github.com/Mekotofeuka/MTPROTO_FIX_By_MEKO) |
 | `-no-fix` | — | 不安装修复 |
 | `-fix-type {v2\|v3\|v4\|nft}` | `v3` | 修复类型：`v2`/`v3` — iptables，`nft` — 通过 nftables 的 v3，`v4` — zapret2 (nfqws2) |
+| `-fix-profile {v1\|v2}` | `v1` | zapret2 配置：`v1`（固定窗口）或 `v2`（根据 wscale 计算窗口）。仅用于 `-fix-type v4` |
 | `-fix-port <端口>` | `-port` 或 `443` | 应用修复的端口 |
 | `-port <端口>` | `443` | 代理端口 |
 | `-domain <域名>` | `ozon.ru` | 用于 TLS 伪装的域名 |
